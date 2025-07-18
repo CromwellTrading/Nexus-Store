@@ -3,12 +3,28 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
-      document.getElementById('admin-button').style.display = this.isAdminUser() ? 'block' : 'none';
+      // Solo mostrar si es administrador
+      const isAdmin = this.isAdminUser();
+      document.getElementById('admin-button').style.display = isAdmin ? 'block' : 'none';
+      
+      // Agregar event listener si es admin
+      if (isAdmin) {
+          document.getElementById('admin-button').addEventListener('click', () => this.openAdminPanel());
+      }
+      
+      console.log('AdminSystem inicializado. Es admin:', isAdmin);
   },
   
   isAdminUser: function() {
       const telegramUserId = UserProfile.getTelegramUserId();
-      const adminIds = [5376388604, 718827739];
+      const adminIds = window.ADMIN_IDS || [];
+      
+      console.log('Verificando admin:', {
+          userId: telegramUserId,
+          adminIds: adminIds,
+          isAdmin: adminIds.includes(telegramUserId)
+      });
+      
       return adminIds.includes(telegramUserId);
   },
 
@@ -1073,3 +1089,8 @@ const AdminSystem = {
       });
   }
 };
+
+// Inicializar después de cargar
+document.addEventListener('DOMContentLoaded', () => {
+  AdminSystem.init();
+});
