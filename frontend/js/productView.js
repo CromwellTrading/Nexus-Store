@@ -1,6 +1,5 @@
 const ProductView = {
   currentView: 'list',
-  productDatabase: {},
   
   init: function() {
       this.setupEventListeners();
@@ -30,61 +29,63 @@ const ProductView = {
   },
   
   loadProducts: function(tabType) {
-      if (!this.productDatabase[tabType]) {
-          this.productDatabase[tabType] = {};
-      }
-      
-      const categories = Object.keys(this.productDatabase[tabType]);
-      
+      fetch(`${window.API_URL}/api/products/${tabType}`)
+          .then(response => response.json())
+          .then(products => {
+              this.displayProducts(tabType, products);
+          })
+          .catch(error => {
+              console.error('Error cargando productos:', error);
+              this.displayError();
+          });
+  },
+  
+  displayProducts: function(tabType, products) {
       document.getElementById('list-view').style.display = 'none';
       document.getElementById('columns-view').style.display = 'none';
       document.getElementById('grid-view').style.display = 'none';
       
       if (this.currentView === 'list') {
-          this.generateListView(tabType, categories);
+          this.generateListView(tabType, products);
           document.getElementById('list-view').style.display = 'block';
       } else if (this.currentView === 'columns') {
-          this.generateColumnsView(tabType, categories);
+          this.generateColumnsView(tabType, products);
           document.getElementById('columns-view').style.display = 'flex';
       } else if (this.currentView === 'grid') {
-          this.generateGridView(tabType, categories);
+          this.generateGridView(tabType, products);
           document.getElementById('grid-view').style.display = 'grid';
       }
       
       this.setupProductEvents(tabType);
   },
   
-  generateListView: function(tabType, categories) {
+  generateListView: function(tabType, products) {
       const listView = document.getElementById('list-view');
       listView.innerHTML = '';
       
-      let hasProducts = false;
+      if (!products || Object.keys(products).length === 0) {
+          listView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
+          return;
+      }
       
-      categories.forEach(category => {
-          const products = this.productDatabase[tabType][category];
-          if (!products || products.length === 0) return;
-          
-          hasProducts = true;
+      Object.keys(products).forEach(category => {
+          const productsInCategory = products[category];
+          if (!productsInCategory || productsInCategory.length === 0) return;
           
           const categorySection = document.createElement('div');
           categorySection.className = 'category-section';
           categorySection.innerHTML = `<h2 class="category-title">${this.getCategoryName(category)}</h2>`;
           
-          products.forEach(product => {
+          productsInCategory.forEach(product => {
               const productItem = document.createElement('div');
               productItem.className = 'product-item';
               productItem.dataset.id = product.id;
               productItem.dataset.category = category;
               
-              const imageUrl = tabType === 'fisico' && product.images && product.images.length > 0 ? 
-                  product.images[0] : (product.image || 'placeholder.jpg');
-              
               const pricesHTML = this.getPricesHTML(product.prices);
               
               productItem.innerHTML = `
-                  <div class="product-image">
-                      <img src="${imageUrl}" alt="${product.name}" style="width: 80px; height: 80px; object-fit: cover;">
-                  </div>
+                  <div class="product-image">${product.name}</div>
                   <div class="product-details">
                       <h3 class="product-name">${product.name}</h3>
                       <div class="product-prices">
@@ -98,42 +99,34 @@ const ProductView = {
           
           listView.appendChild(categorySection);
       });
-      
-      if (!hasProducts) {
-          listView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
-      }
   },
   
-  generateColumnsView: function(tabType, categories) {
+  generateColumnsView: function(tabType, products) {
       const columnsView = document.getElementById('columns-view');
       columnsView.innerHTML = '';
       
-      let hasProducts = false;
+      if (!products || Object.keys(products).length === 0) {
+          columnsView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
+          return;
+      }
       
-      categories.forEach(category => {
-          const products = this.productDatabase[tabType][category];
-          if (!products || products.length === 0) return;
-          
-          hasProducts = true;
+      Object.keys(products).forEach(category => {
+          const productsInCategory = products[category];
+          if (!productsInCategory || productsInCategory.length === 0) return;
           
           const categoryColumn = document.createElement('div');
           categoryColumn.className = 'category-column';
           categoryColumn.innerHTML = `<h2 class="category-title">${this.getCategoryName(category)}</h2>`;
           
-          products.forEach(product => {
+          productsInCategory.forEach(product => {
               const productItem = document.createElement('div');
               productItem.className = 'product-item';
               productItem.dataset.id = product.id;
               
-              const imageUrl = tabType === 'fisico' && product.images && product.images.length > 0 ? 
-                  product.images[0] : (product.image || 'placeholder.jpg');
-              
               const pricesHTML = this.getPricesHTML(product.prices);
               
               productItem.innerHTML = `
-                  <div class="product-image">
-                      <img src="${imageUrl}" alt="${product.name}" style="width: 100%; height: 120px; object-fit: cover;">
-                  </div>
+                  <div class="product-image" style="height: 120px;">${product.name}</div>
                   <h3 class="product-name">${product.name}</h3>
                   <div class="product-prices">
                       ${pricesHTML}
@@ -145,38 +138,30 @@ const ProductView = {
           
           columnsView.appendChild(categoryColumn);
       });
-      
-      if (!hasProducts) {
-          columnsView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
-      }
   },
   
-  generateGridView: function(tabType, categories) {
+  generateGridView: function(tabType, products) {
       const gridView = document.getElementById('grid-view');
       gridView.innerHTML = '';
       
-      let hasProducts = false;
+      if (!products || Object.keys(products).length === 0) {
+          gridView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
+          return;
+      }
       
-      categories.forEach(category => {
-          const products = this.productDatabase[tabType][category];
-          if (!products || products.length === 0) return;
-          
-          hasProducts = true;
-          
-          products.forEach(product => {
+      Object.keys(products).forEach(category => {
+          const productsInCategory = products[category];
+          productsInCategory.forEach(product => {
               const gridProduct = document.createElement('div');
               gridProduct.className = 'grid-product';
               gridProduct.dataset.id = product.id;
               gridProduct.dataset.category = category;
               
-              const imageUrl = tabType === 'fisico' && product.images && product.images.length > 0 ? 
-                  product.images[0] : (product.image || 'placeholder.jpg');
-              
               const pricesHTML = this.getPricesHTML(product.prices);
               
               gridProduct.innerHTML = `
-                  <div class="product-image">
-                      <img src="${imageUrl}" alt="${product.name}" style="width: 100%; height: 100%; object-fit: cover;">
+                  <div class="product-image" style="background: var(--secondary-color); display: flex; align-items: center; justify-content: center; height: 100%;">
+                      ${product.name}
                   </div>
                   <div class="product-overlay">
                       <h3 class="product-name">${product.name}</h3>
@@ -189,10 +174,6 @@ const ProductView = {
               gridView.appendChild(gridProduct);
           });
       });
-      
-      if (!hasProducts) {
-          gridView.innerHTML = '<p>No hay productos disponibles en esta categoría.</p>';
-      }
   },
   
   getPricesHTML: function(prices) {
@@ -238,14 +219,27 @@ const ProductView = {
       return names[categoryKey] || categoryKey;
   },
   
-  getProductById: function(id, tabType) {
-      if (!this.productDatabase[tabType]) return null;
-      
-      const categories = Object.keys(this.productDatabase[tabType]);
-      for (const category of categories) {
-          const product = this.productDatabase[tabType][category].find(p => p.id == id);
-          if (product) return product;
+  getProductById: async function(id, tabType) {
+      try {
+          const response = await fetch(`${window.API_URL}/api/products/${tabType}/${id}`);
+          return await response.json();
+      } catch (error) {
+          console.error('Error obteniendo producto:', error);
+          return null;
       }
-      return null;
+  },
+  
+  displayError: function() {
+      const containers = [
+          document.getElementById('list-view'),
+          document.getElementById('columns-view'),
+          document.getElementById('grid-view')
+      ];
+      
+      containers.forEach(container => {
+          if (container) {
+              container.innerHTML = '<p>Error cargando productos. Intente nuevamente más tarde.</p>';
+          }
+      });
   }
 };
