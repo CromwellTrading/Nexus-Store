@@ -3,11 +3,9 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
-      // Solo mostrar si es administrador
       const isAdmin = this.isAdminUser();
       document.getElementById('admin-button').style.display = isAdmin ? 'block' : 'none';
       
-      // Agregar event listener si es admin
       if (isAdmin) {
           document.getElementById('admin-button').addEventListener('click', () => this.openAdminPanel());
       }
@@ -1092,5 +1090,8 @@ const AdminSystem = {
 
 // Inicializar después de cargar
 document.addEventListener('DOMContentLoaded', () => {
-  AdminSystem.init();
+  // Solo inicializar si el elemento admin-button existe
+  if (document.getElementById('admin-button')) {
+      AdminSystem.init();
+  }
 });
