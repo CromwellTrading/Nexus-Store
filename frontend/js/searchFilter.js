@@ -10,20 +10,25 @@ const SearchFilter = {
       const categoryFilter = document.getElementById('category-filter');
       const selectedCategory = categoryFilter.value;
       
-      const categories = Object.keys(AdminSystem.productDB[tabType]);
-      
-      categoryFilter.innerHTML = '<option value="all">Todas las categorías</option>';
-      
-      categories.forEach(cat => {
-          const option = document.createElement('option');
-          option.value = cat;
-          option.textContent = ProductView.getCategoryName(cat);
-          categoryFilter.appendChild(option);
-      });
-      
-      if (selectedCategory && categories.includes(selectedCategory)) {
-          categoryFilter.value = selectedCategory;
-      }
+      fetch(`${window.API_URL}/api/categories/${tabType}`)
+          .then(response => response.json())
+          .then(categories => {
+              categoryFilter.innerHTML = '<option value="all">Todas las categorías</option>';
+              
+              categories.forEach(cat => {
+                  const option = document.createElement('option');
+                  option.value = cat;
+                  option.textContent = ProductView.getCategoryName(cat);
+                  categoryFilter.appendChild(option);
+              });
+              
+              if (selectedCategory && categories.includes(selectedCategory)) {
+                  categoryFilter.value = selectedCategory;
+              }
+          })
+          .catch(error => {
+              console.error('Error cargando categorías:', error);
+          });
   },
   
   filterProducts: function() {
