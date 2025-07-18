@@ -1,36 +1,9 @@
 const AdminSystem = {
-  productDB: {
-      fisico: {},
-      digital: {}
-  },
-  categories: {
-      fisico: [],
-      digital: []
-  },
   productType: 'fisico',
   categoryType: 'fisico',
   
   init: function() {
-      this.loadData();
       document.getElementById('admin-button').style.display = this.isAdminUser() ? 'block' : 'none';
-  },
-  
-  loadData: function() {
-      const savedProducts = localStorage.getItem('adminProducts');
-      const savedCategories = localStorage.getItem('adminCategories');
-      
-      if (savedProducts) {
-          this.productDB = JSON.parse(savedProducts);
-      }
-      
-      if (savedCategories) {
-          this.categories = JSON.parse(savedCategories);
-      }
-  },
-  
-  saveData: function() {
-      localStorage.setItem('adminProducts', JSON.stringify(this.productDB));
-      localStorage.setItem('adminCategories', JSON.stringify(this.categories));
   },
   
   isAdminUser: function() {
@@ -494,194 +467,242 @@ const AdminSystem = {
           });
       }
       
-      if (!this.productDB[type]) {
-          this.productDB[type] = {};
+      // Enviar el producto al backend
+      try {
+          const response = await fetch(`${window.API_URL}/api/admin/products`, {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'Telegram-ID': UserProfile.getTelegramUserId().toString()
+              },
+              body: JSON.stringify({
+                  type: type,
+                  category: category,
+                  product: product
+              })
+          });
+          
+          if (!response.ok) {
+              throw new Error('Error en la respuesta del servidor');
+          }
+          
+          const savedProduct = await response.json();
+          alert('✅ Producto creado correctamente!');
+          
+          // Actualizar la lista de productos
+          this.renderProductsList();
+          
+          document.getElementById('product-form').style.display = 'none';
+          document.getElementById('add-product-btn').style.display = 'block';
+      } catch (error) {
+          console.error('Error guardando producto:', error);
+          alert('Error al guardar el producto: ' + error.message);
       }
-      
-      if (!this.productDB[type][category]) {
-          this.productDB[type][category] = [];
-      }
-      
-      const existingIndex = this.productDB[type][category].findIndex(p => p.id == product.id);
-      
-      if (existingIndex >= 0) {
-          this.productDB[type][category][existingIndex] = product;
-      } else {
-          this.productDB[type][category].push(product);
-      }
-      
-      ProductView.productDatabase = this.productDB;
-      
-      this.saveData();
-      this.renderProductsList();
-      
-      document.getElementById('product-form').style.display = 'none';
-      document.getElementById('add-product-btn').style.display = 'block';
-      
-      alert('✅ Producto creado correctamente!');
   },
   
   renderProductsList: function() {
       const container = document.getElementById('products-list');
       container.innerHTML = '<h4>📦 Productos Existentes</h4>';
       
-      let allProducts = [];
-      
-      Object.keys(this.productDB).forEach(type => {
-          Object.keys(this.productDB[type]).forEach(category => {
-              this.productDB[type][category].forEach(product => {
-                  allProducts.push({
-                      ...product,
-                      type,
-                      category
+      // Cargar productos desde el backend
+      fetch(`${window.API_URL}/api/products/fisico`)
+          .then(response => response.json())
+          .then(physicalProducts => {
+              fetch(`${window.API_URL}/api/products/digital`)
+                  .then(response => response.json())
+                  .then(digitalProducts => {
+                      const allProducts = [];
+                      
+                      // Procesar productos físicos
+                      Object.keys(physicalProducts).forEach(category => {
+                          physicalProducts[category].forEach(product => {
+                              allProducts.push({
+                                  ...product,
+                                  type: 'fisico',
+                                  category
+                              });
+                          });
+                      });
+                      
+                      // Procesar productos digitales
+                      Object.keys(digitalProducts).forEach(category => {
+                          digitalProducts[category].forEach(product => {
+                              allProducts.push({
+                                  ...product,
+                                  type: 'digital',
+                                  category
+                              });
+                          });
+                      });
+                      
+                      allProducts.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+                      
+                      if (allProducts.length === 0) {
+                          container.innerHTML += '<p>No hay productos disponibles</p>';
+                          return;
+                      }
+                      
+                      allProducts.forEach(product => {
+                          const productEl = document.createElement('div');
+                          productEl.className = 'admin-product-item';
+                          productEl.innerHTML = `
+                              <div class="product-info">
+                                  <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
+                                  <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                                  <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+                              </div>
+                              <div class="product-actions">
+                                  <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
+                                  <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
+                              </div>
+                          `;
+                          container.appendChild(productEl);
+                      });
+                      
+                      container.querySelectorAll('.edit-product').forEach(btn => {
+                          btn.addEventListener('click', (e) => {
+                              const id = e.target.getAttribute('data-id');
+                              const type = e.target.getAttribute('data-type');
+                              const category = e.target.getAttribute('data-category');
+                              this.editProduct(id, type, category);
+                          });
+                      });
+                      
+                      container.querySelectorAll('.delete-product').forEach(btn => {
+                          btn.addEventListener('click', (e) => {
+                              const id = e.target.getAttribute('data-id');
+                              const type = e.target.getAttribute('data-type');
+                              const category = e.target.getAttribute('data-category');
+                              
+                              if (confirm('¿Estás seguro de eliminar este producto?')) {
+                                  this.deleteProduct(id, type, category);
+                              }
+                          });
+                      });
                   });
-              });
+          })
+          .catch(error => {
+              console.error('Error cargando productos:', error);
+              container.innerHTML = '<p>Error cargando productos</p>';
           });
-      });
-      
-      allProducts.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
-      
-      allProducts.forEach(product => {
-          const productEl = document.createElement('div');
-          productEl.className = 'admin-product-item';
-          productEl.innerHTML = `
-              <div class="product-info">
-                  <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
-                  <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                  <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
-              </div>
-              <div class="product-actions">
-                  <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
-                  <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
-              </div>
-          `;
-          container.appendChild(productEl);
-      });
-      
-      if (allProducts.length === 0) {
-          container.innerHTML += '<p>No hay productos disponibles</p>';
-      }
-      
-      container.querySelectorAll('.edit-product').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              const id = e.target.getAttribute('data-id');
-              const type = e.target.getAttribute('data-type');
-              const category = e.target.getAttribute('data-category');
-              this.editProduct(id, type, category);
-          });
-      });
-      
-      container.querySelectorAll('.delete-product').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              const id = e.target.getAttribute('data-id');
-              const type = e.target.getAttribute('data-type');
-              const category = e.target.getAttribute('data-category');
-              
-              if (confirm('¿Estás seguro de eliminar este producto?')) {
-                  this.deleteProduct(id, type, category);
-              }
-          });
-      });
   },
   
   editProduct: function(id, type, category) {
-      const product = this.productDB[type][category].find(p => p.id == id);
-      if (!product) return;
-      
-      const form = document.getElementById('product-form');
-      form.style.display = 'block';
-      document.getElementById('add-product-btn').style.display = 'none';
-      
-      this.productType = type;
-      document.querySelectorAll('.type-tab').forEach(tab => {
-          tab.classList.toggle('active', tab.getAttribute('data-type') === type);
-      });
-      
-      document.getElementById('product-name').value = product.name;
-      document.getElementById('product-description').value = product.description;
-      document.getElementById('product-category').value = product.category;
-      
-      document.querySelectorAll('.price-currency').forEach(input => {
-          const currency = input.dataset.currency;
-          if (product.prices[currency]) {
-              input.value = product.prices[currency];
-          }
-      });
-      
-      if (type === 'fisico') {
-          document.getElementById('product-details').value = product.details || '';
-          document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
-          document.getElementById('color-variant-section').style.display = 
-              product.hasColorVariant ? 'block' : 'none';
-          
-          if (product.colors) {
-              const container = document.getElementById('color-variants-container');
-              container.innerHTML = '';
+      // Obtener producto del backend
+      fetch(`${window.API_URL}/api/products/${type}/${id}`)
+          .then(response => response.json())
+          .then(product => {
+              if (!product) return;
               
-              product.colors.forEach(color => {
-                  container.innerHTML += `
-                      <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                          <input type="color" value="${color.color}" class="color-picker">
-                          <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
-                          <button class="remove-color">❌</button>
-                      </div>
-                  `;
+              const form = document.getElementById('product-form');
+              form.style.display = 'block';
+              document.getElementById('add-product-btn').style.display = 'none';
+              
+              this.productType = type;
+              document.querySelectorAll('.type-tab').forEach(tab => {
+                  tab.classList.toggle('active', tab.getAttribute('data-type') === type);
               });
               
-              container.querySelectorAll('.remove-color').forEach(btn => {
-                  btn.addEventListener('click', (e) => {
-                      e.target.closest('.color-variant').remove();
+              document.getElementById('product-name').value = product.name;
+              document.getElementById('product-description').value = product.description;
+              document.getElementById('product-category').value = product.category;
+              
+              document.querySelectorAll('.price-currency').forEach(input => {
+                  const currency = input.dataset.currency;
+                  if (product.prices[currency]) {
+                      input.value = product.prices[currency];
+                  }
+              });
+              
+              if (type === 'fisico') {
+                  document.getElementById('product-details').value = product.details || '';
+                  document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
+                  document.getElementById('color-variant-section').style.display = 
+                      product.hasColorVariant ? 'block' : 'none';
+                  
+                  if (product.colors) {
+                      const container = document.getElementById('color-variants-container');
+                      container.innerHTML = '';
+                      
+                      product.colors.forEach(color => {
+                          container.innerHTML += `
+                              <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                  <input type="color" value="${color.color}" class="color-picker">
+                                  <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
+                                  <button class="remove-color">❌</button>
+                              </div>
+                          `;
+                      });
+                      
+                      container.querySelectorAll('.remove-color').forEach(btn => {
+                          btn.addEventListener('click', (e) => {
+                              e.target.closest('.color-variant').remove();
+                          });
+                      });
+                  }
+              } else {
+                  const container = document.getElementById('required-fields-container');
+                  container.innerHTML = '';
+                  if (product.requiredFields && product.requiredFields.length > 0) {
+                      product.requiredFields.forEach(field => {
+                          container.innerHTML += `
+                              <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                  <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
+                                  <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
+                                  <label>Requerido</label>
+                                  <button class="remove-field">❌</button>
+                              </div>
+                          `;
+                      });
+                  } else {
+                      container.innerHTML = `
+                          <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                              <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+                              <input type="checkbox" class="field-required" checked>
+                              <label>Requerido</label>
+                              <button class="remove-field">❌</button>
+                          </div>
+                      `;
+                  }
+                  
+                  container.querySelectorAll('.remove-field').forEach(btn => {
+                      btn.addEventListener('click', (e) => {
+                          e.target.closest('.required-field').remove();
+                      });
                   });
-              });
-          }
-      } else {
-          const container = document.getElementById('required-fields-container');
-          container.innerHTML = '';
-          if (product.requiredFields && product.requiredFields.length > 0) {
-              product.requiredFields.forEach(field => {
-                  container.innerHTML += `
-                      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                          <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
-                          <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
-                          <label>Requerido</label>
-                          <button class="remove-field">❌</button>
-                      </div>
-                  `;
-              });
-          } else {
-              container.innerHTML = `
-                  <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                      <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
-                      <input type="checkbox" class="field-required" checked>
-                      <label>Requerido</label>
-                      <button class="remove-field">❌</button>
-                  </div>
-              `;
-          }
-          
-          container.querySelectorAll('.remove-field').forEach(btn => {
-              btn.addEventListener('click', (e) => {
-                  e.target.closest('.required-field').remove();
-              });
+              }
+              
+              document.getElementById('save-product').onclick = () => {
+                  this.saveProduct();
+              };
+          })
+          .catch(error => {
+              console.error('Error cargando producto:', error);
+              alert('Error al cargar el producto para edición');
           });
-      }
-      
-      document.getElementById('save-product').onclick = () => {
-          this.productDB[type][category] = this.productDB[type][category].filter(p => p.id != id);
-          this.saveProduct();
-      };
   },
   
   deleteProduct: function(id, type, category) {
-      this.productDB[type][category] = this.productDB[type][category].filter(p => p.id != id);
+      if (!confirm('¿Estás seguro de eliminar este producto?')) return;
       
-      if (this.productDB[type][category].length === 0) {
-          delete this.productDB[type][category];
-      }
-      
-      this.saveData();
-      this.renderProductsList();
-      ProductView.productDatabase = this.productDB;
+      fetch(`${window.API_URL}/api/admin/products/${type}/${category}/${id}`, {
+          method: 'DELETE',
+          headers: {
+              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+          }
+      })
+      .then(response => {
+          if (response.ok) {
+              this.renderProductsList();
+              alert('✅ Producto eliminado correctamente');
+          } else {
+              throw new Error('Error al eliminar el producto');
+          }
+      })
+      .catch(error => {
+          console.error('Error eliminando producto:', error);
+          alert('Error al eliminar el producto: ' + error.message);
+      });
   },
   
   addCategory: function() {
@@ -693,26 +714,29 @@ const AdminSystem = {
           return;
       }
       
-      const id = name.toLowerCase().replace(/\s+/g, '-');
-      
-      if (!this.categories[type]) {
-          this.categories[type] = [];
-      }
-      
-      if (!this.categories[type].includes(id)) {
-          this.categories[type].push(id);
-          this.saveData();
-          this.renderCategoriesList();
-          
-          if (!ProductView.productDatabase[type]) {
-              ProductView.productDatabase[type] = {};
+      fetch(`${window.API_URL}/api/admin/categories`, {
+          method: 'POST',
+          headers: { 
+              'Content-Type': 'application/json',
+              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+          },
+          body: JSON.stringify({
+              type: type,
+              category: name
+          })
+      })
+      .then(response => {
+          if (response.ok) {
+              alert('✅ Categoría añadida correctamente!');
+              this.renderCategoriesList();
+          } else {
+              throw new Error('Error al añadir categoría');
           }
-          ProductView.productDatabase[type][id] = [];
-          
-          alert('✅ Categoría añadida correctamente!');
-      } else {
-          alert('⚠️ Esta categoría ya existe');
-      }
+      })
+      .catch(error => {
+          console.error('Error añadiendo categoría:', error);
+          alert('Error al añadir categoría: ' + error.message);
+      });
   },
   
   renderCategoriesList: function() {
@@ -720,249 +744,300 @@ const AdminSystem = {
       const container = document.getElementById('categories-list');
       container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
       
-      if (!this.categories[type] || this.categories[type].length === 0) {
-          container.innerHTML += '<p>No hay categorías definidas</p>';
-          return;
-      }
-      
-      this.categories[type].forEach(category => {
-          const categoryEl = document.createElement('div');
-          categoryEl.className = 'admin-category-item';
-          categoryEl.innerHTML = `
-              <div class="category-info">
-                  ${this.getCategoryName(category)}
-                  <span>(${category})</span>
-              </div>
-              <div class="category-actions">
-                  <button class="delete-category" data-type="${type}" data-category="${category}">🗑️ Eliminar</button>
-              </div>
-          `;
-          container.appendChild(categoryEl);
-      });
-      
-      container.querySelectorAll('.delete-category').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-              const type = e.target.getAttribute('data-type');
-              const category = e.target.getAttribute('data-category');
-              
-              if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-                  this.categories[type] = this.categories[type].filter(cat => cat !== category);
-                  
-                  if (this.productDB[type] && this.productDB[type][category]) {
-                      delete this.productDB[type][category];
-                  }
-                  
-                  this.saveData();
-                  this.renderCategoriesList();
-                  this.renderProductsList();
-                  ProductView.productDatabase = this.productDB;
+      fetch(`${window.API_URL}/api/categories/${type}`)
+          .then(response => response.json())
+          .then(categories => {
+              if (!categories || categories.length === 0) {
+                  container.innerHTML += '<p>No hay categorías definidas</p>';
+                  return;
               }
+              
+              categories.forEach(category => {
+                  const categoryEl = document.createElement('div');
+                  categoryEl.className = 'admin-category-item';
+                  categoryEl.innerHTML = `
+                      <div class="category-info">
+                          ${this.getCategoryName(category)}
+                          <span>(${category})</span>
+                      </div>
+                      <div class="category-actions">
+                          <button class="delete-category" data-type="${type}" data-category="${category}">🗑️ Eliminar</button>
+                      </div>
+                  `;
+                  container.appendChild(categoryEl);
+              });
+              
+              container.querySelectorAll('.delete-category').forEach(btn => {
+                  btn.addEventListener('click', (e) => {
+                      const type = e.target.getAttribute('data-type');
+                      const category = e.target.getAttribute('data-category');
+                      
+                      if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
+                          fetch(`${window.API_URL}/api/admin/categories/${type}/${category}`, {
+                              method: 'DELETE',
+                              headers: {
+                                  'Telegram-ID': UserProfile.getTelegramUserId().toString()
+                              }
+                          })
+                          .then(response => {
+                              if (response.ok) {
+                                  this.renderCategoriesList();
+                                  this.renderProductsList();
+                                  alert('✅ Categoría eliminada correctamente');
+                              } else {
+                                  throw new Error('Error al eliminar categoría');
+                              }
+                          })
+                          .catch(error => {
+                              console.error('Error eliminando categoría:', error);
+                              alert('Error al eliminar categoría: ' + error.message);
+                          });
+                      }
+                  });
+              });
+          })
+          .catch(error => {
+              console.error('Error cargando categorías:', error);
+              container.innerHTML = '<p>Error cargando categorías</p>';
           });
-      });
   },
   
   loadOrders: function(filter = 'all') {
       const ordersList = document.getElementById('admin-orders-list');
       ordersList.innerHTML = '';
       
-      const orders = OrdersSystem.getOrders();
-      let filteredOrders = orders;
-      
-      if (filter !== 'all') {
-          filteredOrders = orders.filter(order => order.status === filter);
-      }
-      
-      const statusOrder = {
-          'Pendiente': 1,
-          'En proceso': 2,
-          'Enviado': 3,
-          'Completado': 4
-      };
-      
-      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-      
-      if (filteredOrders.length === 0) {
-          ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-          return;
-      }
-      
-      filteredOrders.forEach(order => {
-          const orderElement = document.createElement('div');
-          orderElement.className = 'admin-order';
-          orderElement.innerHTML = `
-              <div class="order-header">
-                  <div class="order-id">📋 Pedido #${order.id}</div>
-                  <div class="order-date">📅 ${order.date}</div>
-                  <div class="order-status">
-                      <select class="status-select" data-id="${order.id}">
-                          <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                          <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                          <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-                          <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-                      </select>
-                  </div>
-              </div>
-              <div class="order-details">
-                  <div><strong>👤 Cliente:</strong> ${order.data.customer.fullName}</div>
-                  <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
-                  <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
-                  ${order.data.recipient ? `
-                      <div class="recipient-info">
-                          <strong>📦 Entregar a:</strong> ${order.data.recipient.fullName} (CI: ${order.data.recipient.ci})
+      fetch(`${window.API_URL}/api/admin/orders`)
+          .then(response => response.json())
+          .then(orders => {
+              let filteredOrders = orders;
+              
+              if (filter !== 'all') {
+                  filteredOrders = orders.filter(order => order.status === filter);
+              }
+              
+              const statusOrder = {
+                  'Pendiente': 1,
+                  'En proceso': 2,
+                  'Enviado': 3,
+                  'Completado': 4
+              };
+              
+              filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+              
+              if (filteredOrders.length === 0) {
+                  ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+                  return;
+              }
+              
+              filteredOrders.forEach(order => {
+                  const orderElement = document.createElement('div');
+                  orderElement.className = 'admin-order';
+                  orderElement.innerHTML = `
+                      <div class="order-header">
+                          <div class="order-id">📋 Pedido #${order.id}</div>
+                          <div class="order-date">📅 ${order.date}</div>
+                          <div class="order-status">
+                              <select class="status-select" data-id="${order.id}">
+                                  <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                                  <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                                  <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                                  <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+                              </select>
+                          </div>
                       </div>
-                  ` : ''}
-                  <div><strong>💳 Método de pago:</strong> ${order.data.payment.method}</div>
-                  <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
-                  <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
-              </div>
-              <div class="order-actions">
-                  <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
-              </div>
-          `;
-          ordersList.appendChild(orderElement);
-      });
-      
-      document.querySelectorAll('.btn-view').forEach(button => {
-          button.addEventListener('click', (e) => {
-              const orderId = e.target.getAttribute('data-id');
-              this.viewOrderDetails(orderId);
+                      <div class="order-details">
+                          <div><strong>👤 Cliente:</strong> ${order.data.customer.fullName}</div>
+                          <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
+                          <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
+                          ${order.data.recipient ? `
+                              <div class="recipient-info">
+                                  <strong>📦 Entregar a:</strong> ${order.data.recipient.fullName} (CI: ${order.data.recipient.ci})
+                              </div>
+                          ` : ''}
+                          <div><strong>💳 Método de pago:</strong> ${order.data.payment.method}</div>
+                          <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
+                          <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
+                      </div>
+                      <div class="order-actions">
+                          <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+                      </div>
+                  `;
+                  ordersList.appendChild(orderElement);
+              });
+              
+              document.querySelectorAll('.btn-view').forEach(button => {
+                  button.addEventListener('click', (e) => {
+                      const orderId = e.target.getAttribute('data-id');
+                      this.viewOrderDetails(orderId);
+                  });
+              });
+              
+              document.querySelectorAll('.status-select').forEach(select => {
+                  select.addEventListener('change', (e) => {
+                      const orderId = e.target.getAttribute('data-id');
+                      const newStatus = e.target.value;
+                      this.updateOrderStatus(orderId, newStatus);
+                  });
+              });
+          })
+          .catch(error => {
+              console.error('Error cargando pedidos:', error);
+              ordersList.innerHTML = '<p>Error cargando pedidos</p>';
           });
-      });
-      
-      document.querySelectorAll('.status-select').forEach(select => {
-          select.addEventListener('change', (e) => {
-              const orderId = e.target.getAttribute('data-id');
-              const newStatus = e.target.value;
-              this.updateOrderStatus(orderId, newStatus);
-              this.loadOrders(filter);
-          });
-      });
   },
   
   updateOrderStatus: function(orderId, newStatus) {
-      const order = OrdersSystem.getOrderById(orderId);
-      if (order) {
-          OrdersSystem.updateOrderStatus(orderId, newStatus);
-      }
+      fetch(`${window.API_URL}/api/admin/orders/${orderId}`, {
+          method: 'PUT',
+          headers: { 
+              'Content-Type': 'application/json',
+              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+          },
+          body: JSON.stringify({ status: newStatus })
+      })
+      .then(response => {
+          if (response.ok) {
+              this.loadOrders(document.getElementById('order-status-filter').value);
+              alert('✅ Estado actualizado correctamente');
+          } else {
+              throw new Error('Error actualizando estado');
+          }
+      })
+      .catch(error => {
+          console.error('Error actualizando estado:', error);
+          alert('Error actualizando estado: ' + error.message);
+      });
   },
   
   viewOrderDetails: function(orderId) {
-      const order = OrdersSystem.getOrderById(orderId);
-      if (!order) return;
-      
-      const modal = document.getElementById('product-modal');
-      modal.innerHTML = `
-          <div class="modal-content">
-              <div class="modal-header">
-                  <h2>📋 Detalles del Pedido #${order.id}</h2>
-                  <button class="close-modal">&times;</button>
-              </div>
-              <div class="order-details-full">
-                  <div class="order-info">
-                      <div><strong>📅 Fecha:</strong> ${order.date}</div>
-                      <div><strong>🔄 Estado:</strong> ${order.status}</div>
-                      <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
-                  </div>
-                  
-                  <h3>👤 Datos del Cliente</h3>
-                  <div class="customer-info">
-                      <div><strong>Nombre:</strong> ${order.data.customer.fullName}</div>
-                      <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
-                      <div><strong>📱 Teléfono:</strong> ${order.data.customer.phone}</div>
-                      <div><strong>🏠 Dirección:</strong> ${order.data.customer.address}</div>
-                      <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
-                  </div>
-                  
-                  ${order.data.recipient ? `
-                      <h3>📦 Datos del Receptor</h3>
-                      <div class="recipient-info">
-                          <div><strong>Nombre:</strong> ${order.data.recipient.fullName}</div>
-                          <div><strong>🆔 CI:</strong> ${order.data.recipient.ci}</div>
-                          <div><strong>📱 Teléfono:</strong> ${order.data.recipient.phone}</div>
+      fetch(`${window.API_URL}/api/orders/${orderId}`)
+          .then(response => response.json())
+          .then(order => {
+              if (!order) return;
+              
+              const modal = document.getElementById('product-modal');
+              modal.innerHTML = `
+                  <div class="modal-content">
+                      <div class="modal-header">
+                          <h2>📋 Detalles del Pedido #${order.id}</h2>
+                          <button class="close-modal">&times;</button>
                       </div>
-                  ` : ''}
-                  
-                  <h3>💳 Información de Pago</h3>
-                  <div class="payment-info">
-                      <div><strong>Método:</strong> ${order.data.payment.method}</div>
-                      <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
-                      ${order.data.payment.method === 'Saldo Móvil' && order.data.payment.transferProof ? `
-                          <div class="transfer-proof">
-                              <strong>📸 Captura de transferencia:</strong>
-                              <img src="${order.data.payment.transferProof}" 
-                                   alt="Comprobante de transferencia" 
-                                   class="proof-thumbnail"
-                                   style="max-width: 100px; cursor: pointer; margin-top: 10px;">
+                      <div class="order-details-full">
+                          <div class="order-info">
+                              <div><strong>📅 Fecha:</strong> ${order.date}</div>
+                              <div><strong>🔄 Estado:</strong> ${order.status}</div>
+                              <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
                           </div>
-                      ` : ''}
-                  </div>
-                  
-                  <h3>🛒 Productos</h3>
-                  <div class="order-products">
-                      ${order.data.items.map(item => `
-                          <div class="order-product-item">
-                              <div class="product-image-container">
-                                  <img src="${item.imageUrl || 'placeholder.jpg'}" 
-                                       alt="${item.name}" 
-                                       class="order-product-image"
-                                       data-src="${item.imageUrl || 'placeholder.jpg'}">
-                              </div>
-                              <div class="product-details">
-                                  <div>${item.name}</div>
-                                  <div>${item.quantity} x $${item.price.toFixed(2)}</div>
-                                  <div>$${(item.price * item.quantity).toFixed(2)}</div>
-                              </div>
+                          
+                          <h3>👤 Datos del Cliente</h3>
+                          <div class="customer-info">
+                              <div><strong>Nombre:</strong> ${order.data.customer.fullName}</div>
+                              <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
+                              <div><strong>📱 Teléfono:</strong> ${order.data.customer.phone}</div>
+                              <div><strong>🏠 Dirección:</strong> ${order.data.customer.address}</div>
+                              <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
                           </div>
-                      `).join('')}
-                  </div>
-                  
-                  ${order.data.requiredFields && Object.keys(order.data.requiredFields).length > 0 ? `
-                      <h3>📝 Datos Específicos</h3>
-                      <div class="required-fields-info">
-                          ${Object.entries(order.data.requiredFields).map(([field, value]) => `
-                              <div><strong>${field}:</strong> ${value}</div>
-                          `).join('')}
+                          
+                          ${order.data.recipient ? `
+                              <h3>📦 Datos del Receptor</h3>
+                              <div class="recipient-info">
+                                  <div><strong>Nombre:</strong> ${order.data.recipient.fullName}</div>
+                                  <div><strong>🆔 CI:</strong> ${order.data.recipient.ci}</div>
+                                  <div><strong>📱 Teléfono:</strong> ${order.data.recipient.phone}</div>
+                              </div>
+                          ` : ''}
+                          
+                          <h3>💳 Información de Pago</h3>
+                          <div class="payment-info">
+                              <div><strong>Método:</strong> ${order.data.payment.method}</div>
+                              <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
+                              ${order.data.payment.method === 'Saldo Móvil' && order.data.payment.transferProof ? `
+                                  <div class="transfer-proof">
+                                      <strong>📸 Captura de transferencia:</strong>
+                                      <img src="${order.data.payment.transferProof}" 
+                                           alt="Comprobante de transferencia" 
+                                           class="proof-thumbnail"
+                                           style="max-width: 100px; cursor: pointer; margin-top: 10px;">
+                                  </div>
+                              ` : ''}
+                          </div>
+                          
+                          <h3>🛒 Productos</h3>
+                          <div class="order-products">
+                              ${order.data.items.map(item => `
+                                  <div class="order-product-item">
+                                      <div class="product-image-container">
+                                          <img src="${item.imageUrl || 'placeholder.jpg'}" 
+                                               alt="${item.name}" 
+                                               class="order-product-image"
+                                               data-src="${item.imageUrl || 'placeholder.jpg'}">
+                                      </div>
+                                      <div class="product-details">
+                                          <div>${item.name}</div>
+                                          <div>${item.quantity} x $${item.price.toFixed(2)}</div>
+                                          <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                                      </div>
+                                  </div>
+                              `).join('')}
+                          </div>
+                          
+                          ${order.data.requiredFields && Object.keys(order.data.requiredFields).length > 0 ? `
+                              <h3>📝 Datos Específicos</h3>
+                              <div class="required-fields-info">
+                                  ${Object.entries(order.data.requiredFields).map(([field, value]) => `
+                                      <div><strong>${field}:</strong> ${value}</div>
+                                  `).join('')}
+                              </div>
+                          ` : ''}
                       </div>
-                  ` : ''}
-              </div>
-          </div>
-      `;
-      
-      modal.querySelector('.close-modal').addEventListener('click', () => {
-          this.openAdminPanel();
-      });
-      
-      modal.querySelectorAll('.order-product-image, .proof-thumbnail').forEach(img => {
-          img.addEventListener('click', function(e) {
-              const src = this.getAttribute('data-src') || this.src;
-              const modalImg = document.createElement('div');
-              modalImg.className = 'image-modal';
-              modalImg.innerHTML = `
-                  <div class="image-modal-content">
-                      <img src="${src}" alt="Imagen ampliada">
                   </div>
               `;
-              document.body.appendChild(modalImg);
               
-              modalImg.addEventListener('click', function() {
-                  document.body.removeChild(modalImg);
+              modal.querySelector('.close-modal').addEventListener('click', () => {
+                  this.openAdminPanel();
               });
+              
+              modal.querySelectorAll('.order-product-image, .proof-thumbnail').forEach(img => {
+                  img.addEventListener('click', function(e) {
+                      const src = this.getAttribute('data-src') || this.src;
+                      const modalImg = document.createElement('div');
+                      modalImg.className = 'image-modal';
+                      modalImg.innerHTML = `
+                          <div class="image-modal-content">
+                              <img src="${src}" alt="Imagen ampliada">
+                          </div>
+                      `;
+                      document.body.appendChild(modalImg);
+                      
+                      modalImg.addEventListener('click', function() {
+                          document.body.removeChild(modalImg);
+                      });
+                  });
+              });
+          })
+          .catch(error => {
+              console.error('Error cargando detalles del pedido:', error);
+              alert('Error al cargar detalles del pedido');
           });
-      });
   },
   
   renderCategoryOptions: function(type = 'fisico') {
       const categorySelect = document.getElementById('product-category');
       categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
       
-      if (!this.categories[type]) return;
-      
-      this.categories[type].forEach(category => {
-          const option = document.createElement('option');
-          option.value = category;
-          option.textContent = this.getCategoryName(category);
-          categorySelect.appendChild(option);
-      });
+      fetch(`${window.API_URL}/api/categories/${type}`)
+          .then(response => response.json())
+          .then(categories => {
+              categories.forEach(category => {
+                  const option = document.createElement('option');
+                  option.value = category;
+                  option.textContent = this.getCategoryName(category);
+                  categorySelect.appendChild(option);
+              });
+          })
+          .catch(error => {
+              console.error('Error cargando categorías:', error);
+          });
   },
   
   getCategoryName: function(categoryKey) {
