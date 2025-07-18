@@ -74,5 +74,18 @@
     <script src="js/searchFilter.js"></script>
     <script src="js/checkout.js"></script>
     <script src="js/main.js"></script>
+    <script>
+  // Obtener IDs de administradores al cargar la página
+  fetch('/api/admin/ids')
+    .then(response => response.json())
+    .then(adminIds => {
+      window.ADMIN_IDS = adminIds;
+      console.log('Admin IDs cargados:', adminIds);
+    })
+    .catch(error => {
+      console.error('Error cargando admin IDs:', error);
+      window.ADMIN_IDS = [];
+    });
+    </script>
 </body>
 </html>
