@@ -7,25 +7,24 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 6000;
 
-// Configuración de CORS para producción y desarrollo
+// Configuración de CORS solo para desarrollo
 const corsOptions = {
-  origin: function (origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5500',  // Desarrollo: Live Server
-      'https://tu-frontend-en-render.com' // Producción: URL de tu frontend en Render
-    ];
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: 'http://localhost:5500',  // Solo para desarrollo local
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 };
 
-app.use(cors(corsOptions));
+// Usar CORS solo en desarrollo
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors(corsOptions));
+  console.log("⚠️  CORS habilitado para desarrollo");
+}
+
 app.use(express.json());
+
+// SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
+const frontendPath = path.join(__dirname, '../frontend');
+app.use(express.static(frontendPath));
 
 // Base de datos simple (archivos JSON)
 const DB_PATH = path.join(__dirname, 'data');
@@ -71,19 +70,23 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// Ruta de prueba
+// RUTAS PRINCIPALES - SERVIR FRONTEND
 app.get('/', (req, res) => {
-  res.send('Backend de Tienda Virtual');
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Obtener productos por tipo (fisico o digital)
+// Ruta adicional para manejar posibles rutas del frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// API ROUTES - BACKEND
 app.get('/api/products/:type', (req, res) => {
   const { type } = req.params;
   const products = DB.products[type] || {};
   res.json(products);
 });
 
-// Buscar productos
 app.get('/api/products/search/:query', (req, res) => {
   const { query } = req.params;
   const { type } = req.query;
@@ -106,7 +109,6 @@ app.get('/api/products/search/:query', (req, res) => {
       }
     }
   } else {
-    // Buscar en todos los tipos
     for (const productType in DB.products) {
       for (const category in DB.products[productType]) {
         const found = searchInCategory(DB.products[productType][category]);
@@ -121,14 +123,12 @@ app.get('/api/products/search/:query', (req, res) => {
   res.json(results);
 });
 
-// Obtener carrito de un usuario
 app.get('/api/cart/:userId', (req, res) => {
   const { userId } = req.params;
   const cart = DB.carts.find(cart => cart.userId == userId);
   res.json(cart || { userId, items: [] });
 });
 
-// Añadir producto al carrito
 app.post('/api/cart/add', (req, res) => {
   const { userId, productId, tabType } = req.body;
   
@@ -157,7 +157,6 @@ app.post('/api/cart/add', (req, res) => {
   res.json(cart);
 });
 
-// Eliminar producto del carrito
 app.post('/api/cart/remove', (req, res) => {
   const { userId, productId, tabType } = req.body;
   
@@ -179,7 +178,6 @@ app.post('/api/cart/remove', (req, res) => {
   res.json(cart);
 });
 
-// Finalizar compra (checkout)
 app.post('/api/checkout', (req, res) => {
   const { userId, paymentMethod, transferData, recipientData } = req.body;
   
@@ -188,16 +186,14 @@ app.post('/api/checkout', (req, res) => {
     return res.status(400).json({ error: 'Carrito vacío' });
   }
   
-  // Calcular total (simplificado, deberías tener lógica real)
   const total = cart.items.reduce((sum, item) => {
-    // En una implementación real, buscarías el precio real del producto
-    return sum + (item.quantity * 10); // Ejemplo: $10 por producto
+    return sum + (item.quantity * 10);
   }, 0);
   
   const order = {
     id: `ORD-${Date.now()}`,
     userId,
-    items: [...cart.items], // Copia de los items
+    items: [...cart.items],
     payment: {
       method: paymentMethod,
       ...transferData
@@ -211,7 +207,6 @@ app.post('/api/checkout', (req, res) => {
   DB.orders.push(order);
   DB.save('orders.json', DB.orders);
   
-  // Vaciar carrito
   cart.items = [];
   DB.save('carts.json', DB.carts);
   
@@ -222,14 +217,11 @@ app.post('/api/checkout', (req, res) => {
   });
 });
 
-// ===== Rutas de Administración (requieren ser admin) ===== //
-
-// Obtener todas las órdenes
+// ADMIN ROUTES
 app.get('/api/admin/orders', isAdmin, (req, res) => {
   res.json(DB.orders);
 });
 
-// Actualizar estado de una orden
 app.put('/api/admin/orders/:orderId', isAdmin, (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
@@ -246,7 +238,6 @@ app.put('/api/admin/orders/:orderId', isAdmin, (req, res) => {
   res.json(order);
 });
 
-// Añadir nuevo producto
 app.post('/api/admin/products', isAdmin, (req, res) => {
   const { type, category, product } = req.body;
   
@@ -258,7 +249,7 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
     DB.products[type][category] = [];
   }
   
-  product.id = Date.now(); // ID único
+  product.id = Date.now();
   product.createdAt = new Date().toISOString();
   DB.products[type][category].push(product);
   
@@ -269,5 +260,7 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
 // Iniciar el servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
-  console.log(`⚠️  Para producción: ${process.env.NODE_ENV === 'production' ? 'Modo producción' : 'Modo desarrollo'}`);
+  console.log(`📂 Ruta del frontend: ${frontendPath}`);
+  console.log(`🌍 Modo: ${process.env.NODE_ENV === 'production' ? 'Producción' : 'Desarrollo'}`);
+  console.log(`✅ Frontend disponible en: http://localhost:${PORT}`);
 });
