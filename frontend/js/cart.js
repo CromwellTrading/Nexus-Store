@@ -1,5 +1,5 @@
 const CartSystem = {
-  cart: [],
+  cart: { items: [] },
   isCartModalOpen: false,
   
   init: function() {
@@ -7,102 +7,132 @@ const CartSystem = {
       this.updateCartIcon();
   },
   
-  addToCart: function(productId, tabType) {
-      const product = ProductView.getProductById(productId, tabType);
-      if (!product) return;
+  async loadCart() {
+      const userId = UserProfile.getTelegramUserId();
+      if (!userId) return;
       
-      const existingItem = this.cart.find(item => item.id == productId && item.tabType === tabType);
-      
-      if (existingItem) {
-          existingItem.quantity += 1;
-      } else {
-          this.cart.push({
-              id: product.id,
-              name: product.name,
-              price: this.getProductPriceForCart(product),
-              currency: this.getProductCurrencyForCart(product),
-              quantity: 1,
-              tabType: tabType,
-              imageUrl: this.getProductImage(product, tabType)
-          });
-      }
-      
-      this.saveCart();
-      this.updateCartIcon();
-      Notifications.showNotification('🛒 Producto añadido', `${product.name} añadido al carrito!`);
-  },
-  
-  getProductImage: function(product, tabType) {
-      if (tabType === 'fisico' && product.images && product.images.length > 0) {
-          return product.images[0];
-      } else if (tabType === 'digital' && product.image) {
-          return product.image;
-      }
-      return 'placeholder.jpg';
-  },
-  
-  getProductPriceForCart: function(product) {
-      if (product.prices) {
-          const firstCurrency = Object.keys(product.prices)[0];
-          return product.prices[firstCurrency];
-      }
-      return 0;
-  },
-  
-  getProductCurrencyForCart: function(product) {
-      if (product.prices) {
-          return Object.keys(product.prices)[0];
-      }
-      return 'CUP';
-  },
-  
-  removeFromCart: function(productId, tabType) {
-      this.cart = this.cart.filter(item => !(item.id == productId && item.tabType === tabType));
-      this.saveCart();
-      this.updateCartIcon();
-      if (this.isCartModalOpen) {
-          this.openCartModal();
-      }
-  },
-  
-  updateCartItemQuantity: function(productId, tabType, newQuantity) {
-      const item = this.cart.find(item => item.id == productId && item.tabType === tabType);
-      if (item) {
-          if (newQuantity > 0) {
-              item.quantity = newQuantity;
-          } else {
-              this.removeFromCart(productId, tabType);
+      try {
+          const response = await fetch(`${window.API_URL}/api/cart/${userId}`);
+          if (!response.ok) {
+              throw new Error('Error al cargar el carrito');
           }
-          this.saveCart();
+          this.cart = await response.json();
+          this.updateCartIcon();
+      } catch (error) {
+          console.error('Error cargando carrito:', error);
+      }
+  },
+  
+  async addToCart(productId, tabType) {
+      const userId = UserProfile.getTelegramUserId();
+      if (!userId) {
+          alert('Por favor inicia sesión primero');
+          return;
+      }
+      
+      try {
+          const response = await fetch(`${window.API_URL}/api/cart/add`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, productId, tabType })
+          });
+          
+          if (!response.ok) {
+              throw new Error('Error al añadir al carrito');
+          }
+          
+          this.cart = await response.json();
+          this.updateCartIcon();
+          Notifications.showNotification('🛒 Producto añadido', `Producto añadido al carrito!`);
+      } catch (error) {
+          console.error('Error añadiendo al carrito:', error);
+          alert('Error al añadir al carrito: ' + error.message);
+      }
+  },
+  
+  async removeFromCart(productId, tabType) {
+      const userId = UserProfile.getTelegramUserId();
+      try {
+          const response = await fetch(`${window.API_URL}/api/cart/remove`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, productId, tabType })
+          });
+          
+          if (!response.ok) {
+              throw new Error('Error al eliminar del carrito');
+          }
+          
+          this.cart = await response.json();
           this.updateCartIcon();
           if (this.isCartModalOpen) {
               this.openCartModal();
           }
+      } catch (error) {
+          console.error('Error eliminando del carrito:', error);
       }
   },
   
-  openCartModal: function() {
+  async updateCartItemQuantity(productId, tabType, newQuantity) {
+      const userId = UserProfile.getTelegramUserId();
+      try {
+          const response = await fetch(`${window.API_URL}/api/cart/update`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  userId, 
+                  productId, 
+                  tabType, 
+                  quantity: newQuantity 
+              })
+          });
+          
+          if (!response.ok) {
+              throw new Error('Error actualizando cantidad');
+          }
+          
+          this.cart = await response.json();
+          this.updateCartIcon();
+          if (this.isCartModalOpen) {
+              this.openCartModal();
+          }
+      } catch (error) {
+          console.error('Error actualizando cantidad:', error);
+      }
+  },
+  
+  async openCartModal() {
+      await this.loadCart(); // Asegurarse de tener los datos actualizados
       this.isCartModalOpen = true;
-      const modal = document.getElementById('product-modal');
       
+      const modal = document.getElementById('product-modal');
       let cartContent = '<p>Tu carrito está vacío</p>';
-      if (this.cart.length > 0) {
-          cartContent = this.cart.map(item => `
-              <div class="cart-item">
-                  <img src="${item.imageUrl}" alt="${item.name}" style="width: 60px; height: 60px; object-fit: cover;">
-                  <div>
-                      <h3>${item.name}</h3>
-                      <div>${item.price} ${item.currency} x ${item.quantity}</div>
-                      <div>Total: ${(item.price * item.quantity).toFixed(2)} ${item.currency}</div>
+      
+      if (this.cart.items && this.cart.items.length > 0) {
+          cartContent = await Promise.all(this.cart.items.map(async item => {
+              // Obtener detalles del producto
+              const productResponse = await fetch(`${window.API_URL}/api/products/${item.tabType}/${item.productId}`);
+              const product = await productResponse.json();
+              
+              return `
+                  <div class="cart-item">
+                      <img src="${product.image || product.images?.[0] || 'placeholder.jpg'}" 
+                           alt="${product.name}" 
+                           style="width: 60px; height: 60px; object-fit: cover;">
+                      <div>
+                          <h3>${product.name}</h3>
+                          <div>${item.price} ${item.currency} x ${item.quantity}</div>
+                          <div>Total: ${(item.price * item.quantity).toFixed(2)} ${item.currency}</div>
+                      </div>
+                      <div class="cart-buttons">
+                          <button class="decrease-quantity" data-id="${item.productId}" data-tab="${item.tabType}">-</button>
+                          <span>${item.quantity}</span>
+                          <button class="increase-quantity" data-id="${item.productId}" data-tab="${item.tabType}">+</button>
+                          <button class="remove-item" data-id="${item.productId}" data-tab="${item.tabType}">Eliminar</button>
+                      </div>
                   </div>
-                  <div class="cart-buttons">
-                      <button class="decrease-quantity" data-id="${item.id}" data-tab="${item.tabType}">-</button>
-                      <span>${item.quantity}</span>
-                      <button class="increase-quantity" data-id="${item.id}" data-tab="${item.tabType}">+</button>
-                      <button class="remove-item" data-id="${item.id}" data-tab="${item.tabType}">Eliminar</button>
-                  </div>
-              </div>
-          `).join('');
+              `;
+          })).then(items => items.join(''));
       }
       
       modal.innerHTML = `
@@ -117,7 +147,7 @@ const CartSystem = {
               <div style="font-weight: bold; text-align: right; margin-bottom: 20px;">
                   Total: $${this.getCartTotal().toFixed(2)}
               </div>
-              <button id="checkout-button" style="background: var(--success-color); color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem;" ${this.cart.length === 0 ? 'disabled' : ''}>
+              <button id="checkout-button" style="background: var(--success-color); color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem;" ${this.cart.items.length === 0 ? 'disabled' : ''}>
                   Finalizar Compra
               </button>
           </div>
@@ -130,7 +160,7 @@ const CartSystem = {
           modal.style.display = 'none';
       });
       
-      if (this.cart.length > 0) {
+      if (this.cart.items.length > 0) {
           modal.querySelectorAll('.remove-item').forEach(button => {
               button.addEventListener('click', (e) => {
                   const productId = e.target.getAttribute('data-id');
@@ -143,7 +173,7 @@ const CartSystem = {
               button.addEventListener('click', (e) => {
                   const productId = e.target.getAttribute('data-id');
                   const tabType = e.target.getAttribute('data-tab');
-                  const item = this.cart.find(i => i.id == productId && i.tabType === tabType);
+                  const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
                   if (item) {
                       this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
                   }
@@ -154,7 +184,7 @@ const CartSystem = {
               button.addEventListener('click', (e) => {
                   const productId = e.target.getAttribute('data-id');
                   const tabType = e.target.getAttribute('data-tab');
-                  const item = this.cart.find(i => i.id == productId && i.tabType === tabType);
+                  const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
                   if (item) {
                       this.updateCartItemQuantity(productId, tabType, item.quantity - 1);
                   }
@@ -169,12 +199,12 @@ const CartSystem = {
   },
   
   getCartTotal: function() {
-      return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+      return this.cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
   },
   
   updateCartIcon: function() {
       const cartButton = document.getElementById('cart-button');
-      let itemCount = this.cart.reduce((count, item) => count + item.quantity, 0);
+      let itemCount = this.cart.items.reduce((count, item) => count + item.quantity, 0);
       
       let counter = cartButton.querySelector('.cart-counter');
       if (!counter) {
@@ -191,20 +221,21 @@ const CartSystem = {
       }
   },
   
-  saveCart: function() {
-      localStorage.setItem('cart', JSON.stringify(this.cart));
-  },
-  
-  loadCart: function() {
-      const savedCart = localStorage.getItem('cart');
-      if (savedCart) {
-          this.cart = JSON.parse(savedCart);
-      }
-  },
-  
   clearCart: function() {
-      this.cart = [];
-      this.saveCart();
-      this.updateCartIcon();
+      const userId = UserProfile.getTelegramUserId();
+      if (!userId) return;
+      
+      fetch(`${window.API_URL}/api/cart/clear/${userId}`, {
+          method: 'POST'
+      })
+      .then(response => {
+          if (response.ok) {
+              this.cart = { items: [] };
+              this.updateCartIcon();
+          }
+      })
+      .catch(error => {
+          console.error('Error vaciando carrito:', error);
+      });
   }
 };
