@@ -5,49 +5,18 @@ const OrdersSystem = {
       this.loadOrders();
   },
   
-  createOrder: function(orderData) {
-      const newOrder = {
-          id: 'ORD-' + Date.now(),
-          date: new Date().toLocaleString(),
-          data: orderData,
-          status: 'Pendiente',
-          isNew: true
-      };
+  loadOrders: function() {
+      const userId = UserProfile.getTelegramUserId();
+      if (!userId) return;
       
-      this.orders.unshift(newOrder);
-      this.saveOrders();
-      
-      Notifications.showNotification('📦 Pedido creado', 'Tu pedido #' + newOrder.id + ' ha sido registrado');
-      Notifications.addNotification('Nuevo pedido', 'Se ha creado el pedido #' + newOrder.id);
-      
-      return newOrder;
-  },
-  
-  getOrders: function() {
-      return this.orders;
-  },
-  
-  getOrderById: function(orderId) {
-      return this.orders.find(order => order.id === orderId);
-  },
-  
-  updateOrderStatus: function(orderId, newStatus) {
-      const order = this.getOrderById(orderId);
-      if (order) {
-          const oldStatus = order.status;
-          order.status = newStatus;
-          order.isNew = false;
-          order.updatedAt = new Date().toISOString();
-          this.saveOrders();
-          
-          if (oldStatus !== newStatus) {
-              Notifications.showNotification(
-                  '🔄 Estado actualizado', 
-                  'Tu pedido #' + orderId + ' ahora está: ' + newStatus
-              );
-              Notifications.addNotification('Estado actualizado', 'El pedido #' + orderId + ' está ahora: ' + newStatus);
-          }
-      }
+      fetch(`${window.API_URL}/api/orders/${userId}`)
+          .then(response => response.json())
+          .then(orders => {
+              this.orders = orders;
+          })
+          .catch(error => {
+              console.error('Error cargando pedidos:', error);
+          });
   },
   
   openOrdersModal: function() {
@@ -83,7 +52,7 @@ const OrdersSystem = {
                   <button class="close-modal">&times;</button>
               </div>
               ${filterControls}
-              <div class="orders-container">
+              <div class="orders-container" id="orders-container">
                   ${this.getOrdersHTML()}
               </div>
           </div>
@@ -193,25 +162,12 @@ const OrdersSystem = {
       document.querySelectorAll('.view-order-details').forEach(button => {
           button.addEventListener('click', (e) => {
               const orderId = e.target.getAttribute('data-id');
-              const order = this.getOrderById(orderId);
+              const order = this.orders.find(o => o.id === orderId);
               if (order) {
                   order.isNew = false;
-                  this.saveOrders();
-                  Notifications.renderNotificationCount();
+                  AdminSystem.viewOrderDetails(orderId);
               }
-              AdminSystem.viewOrderDetails(orderId);
           });
       });
-  },
-  
-  saveOrders: function() {
-      localStorage.setItem('orders', JSON.stringify(this.orders));
-  },
-  
-  loadOrders: function() {
-      const savedOrders = localStorage.getItem('orders');
-      if (savedOrders) {
-          this.orders = JSON.parse(savedOrders);
-      }
   }
 };
