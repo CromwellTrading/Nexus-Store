@@ -1,15 +1,29 @@
 {
-  "name": "mi-tienda-virtual-backend",
+  "name": "tienda-virtual-backend",
   "version": "1.0.0",
-  "description": "Backend para la tienda virtual",
+  "description": "Backend para tienda virtual en Cuba",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "tienda",
+    "cuba",
+    "ecommerce"
+  ],
+  "author": "Tu Nombre",
+  "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
-    "uuid": "^9.0.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
