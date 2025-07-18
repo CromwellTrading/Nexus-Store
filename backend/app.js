@@ -7,19 +7,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 6000;
 
-// Configuración de CORS solo para desarrollo
+// Configuración de CORS
 const corsOptions = {
-  origin: 'http://localhost:5500',  // Solo para desarrollo local
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 };
 
-// Usar CORS solo en desarrollo
-if (process.env.NODE_ENV !== 'production') {
-  app.use(cors(corsOptions));
-  console.log("⚠️  CORS habilitado para desarrollo");
-}
-
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
@@ -49,7 +44,6 @@ function loadJSON(file) {
     return JSON.parse(data);
   } catch (err) {
     console.error(`Error cargando ${file}:`, err.message);
-    // Si el archivo no existe, devolver estructura por defecto
     if (file === 'products.json') return { fisico: {}, digital: {} };
     if (file === 'categories.json') return { fisico: [], digital: [] };
     if (file === 'carts.json') return [];
@@ -70,14 +64,21 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// RUTAS PRINCIPALES - SERVIR FRONTEND
+// RUTAS PRINCIPALES
 app.get('/', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Ruta adicional para manejar posibles rutas del frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// Nueva ruta para obtener IDs de administradores
+app.get('/api/admin/ids', (req, res) => {
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(Number) 
+    : [];
+  res.json(adminIds);
 });
 
 // API ROUTES - BACKEND
@@ -261,6 +262,7 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
   console.log(`📂 Ruta del frontend: ${frontendPath}`);
-  console.log(`🌍 Modo: ${process.env.NODE_ENV === 'production' ? 'Producción' : 'Desarrollo'}`);
+  console.log(`🌍 Modo: ${process.env.NODE_ENV || 'Desarrollo'}`);
+  console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
   console.log(`✅ Frontend disponible en: http://localhost:${PORT}`);
 });
