@@ -1,7 +1,7 @@
 const CheckoutSystem = {
   init: function() {},
     
-  openCheckout: function(cartItems, total) {
+  openCheckout: function(cart, total) {
       const userData = UserProfile.getUserData();
       const modal = document.getElementById('product-modal');
       
@@ -158,10 +158,10 @@ const CheckoutSystem = {
       `;
       
       modal.style.display = 'flex';
-      this.setupCheckoutEvents(cartItems, total);
+      this.setupCheckoutEvents(cart, total);
   },
   
-  setupCheckoutEvents: function(cartItems, total) {
+  setupCheckoutEvents: function(cart, total) {
       const addRecipient = document.getElementById('add-recipient');
       if (addRecipient) {
           addRecipient.addEventListener('change', function() {
@@ -196,11 +196,11 @@ const CheckoutSystem = {
       document.getElementById('next-to-confirm')?.addEventListener('click', () => {
           const method = document.querySelector('input[name="payment-method"]:checked')?.value;
           
-          if (!this.validatePaymentMethods(cartItems, method)) {
+          if (!this.validatePaymentMethods(cart.items, method)) {
               alert('⚠️ Algunos productos no pueden pagarse con el método seleccionado. Se cobrarán solo los productos disponibles en la moneda correspondiente.');
           }
           
-          const requiredFields = this.getRequiredFields(cartItems);
+          const requiredFields = this.getRequiredFields(cart.items);
           if (requiredFields.length > 0) {
               this.showRequiredFields(requiredFields);
           }
@@ -217,18 +217,18 @@ const CheckoutSystem = {
           radio.addEventListener('change', () => {
               this.updatePaymentInfo();
               this.updateTransferField();
-              this.updateTotalDisplay(cartItems);
+              this.updateTotalDisplay(cart.items);
           });
       });
       
       this.updatePaymentInfo();
       this.updateTransferField();
-      this.updateTotalDisplay(cartItems);
+      this.updateTotalDisplay(cart.items);
       
       const itemsList = document.getElementById('order-items-list');
       if (itemsList) {
           itemsList.innerHTML = '';
-          cartItems.forEach(item => {
+          cart.items.forEach(item => {
               const itemElement = document.createElement('div');
               itemElement.className = 'order-item';
               itemElement.innerHTML = `
@@ -241,33 +241,9 @@ const CheckoutSystem = {
       
       document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
           const method = document.querySelector('input[name="payment-method"]:checked')?.value;
+          const userId = UserProfile.getTelegramUserId();
           
-          const methodToCurrency = {
-              'BPA': 'CUP',
-              'BANDEC': 'CUP',
-              'MLC': 'MLC',
-              'Saldo Móvil': 'Saldo Móvil'
-          };
-          const currency = methodToCurrency[method];
-          
-          const payableItems = cartItems.filter(item => {
-              const product = ProductView.getProductById(item.id, item.tabType);
-              return product.prices && product.prices[currency] !== undefined;
-          });
-          
-          if (payableItems.length === 0) {
-              alert('⚠️ Ninguno de los productos en el carrito puede pagarse con el método seleccionado. Por favor, elija otro método o agregue productos compatibles.');
-              return;
-          }
-          
-          const payableTotal = payableItems.reduce((total, item) => {
-              const product = ProductView.getProductById(item.id, item.tabType);
-              return total + (product.prices[currency] * item.quantity);
-          }, 0);
-          
-          let transferInfo = '';
-          let transferProof = '';
-          
+          const transferData = {};
           if (method === 'Saldo Móvil') {
               const proofFile = document.getElementById('transfer-proof')?.files[0];
               if (!proofFile) {
@@ -291,8 +267,8 @@ const CheckoutSystem = {
                   });
                   
                   const data = await response.json();
-                  transferProof = data.url;
-                  transferInfo = proofFile.name;
+                  transferData.transferProof = data.url;
+                  transferData.transferId = proofFile.name;
               } catch (error) {
                   console.error('Error subiendo comprobante:', error);
                   alert('Error al subir el comprobante. Por favor intente nuevamente.');
@@ -304,59 +280,55 @@ const CheckoutSystem = {
                   alert('Por favor ingrese el ID de transferencia');
                   return;
               }
-              transferInfo = transferId;
+              transferData.transferId = transferId;
           }
           
-          const orderData = {
-              customer: {
-                  fullName: document.getElementById('checkout-fullname').value,
-                  ci: document.getElementById('checkout-ci').value,
-                  phone: document.getElementById('checkout-phone').value,
-                  address: document.getElementById('checkout-address').value,
-                  province: document.getElementById('checkout-province').value
-              },
-              recipient: null,
-              payment: {
-                  method: method,
-                  transferId: transferInfo,
-                  transferProof: transferProof
-              },
-              items: payableItems.map(item => {
-                  const product = ProductView.getProductById(item.id, item.tabType);
-                  return {
-                      id: item.id,
-                      name: item.name,
-                      price: product.prices[currency],
-                      quantity: item.quantity,
-                      tabType: item.tabType,
-                      imageUrl: item.imageUrl
-                  };
-              }),
-              total: payableTotal
-          };
-          
+          const recipientData = {};
           if (document.getElementById('add-recipient')?.checked) {
-              orderData.recipient = {
-                  fullName: document.getElementById('recipient-name').value,
-                  ci: document.getElementById('recipient-ci').value,
-                  phone: document.getElementById('recipient-phone').value
-              };
+              recipientData.fullName = document.getElementById('recipient-name').value;
+              recipientData.ci = document.getElementById('recipient-ci').value;
+              recipientData.phone = document.getElementById('recipient-phone').value;
           }
           
-          const requiredFields = this.getRequiredFields(payableItems);
-          if (requiredFields.length > 0) {
-              orderData.requiredFields = {};
-              requiredFields.forEach(field => {
-                  const fieldId = `field-${field.replace(/\s+/g, '-')}`;
-                  orderData.requiredFields[field] = document.getElementById(fieldId)?.value;
+          const requiredFieldsData = {};
+          if (document.getElementById('required-fields-inputs')) {
+              document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
+                  const input = group.querySelector('input');
+                  const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+                  requiredFieldsData[fieldName] = input.value;
               });
           }
           
-          const newOrder = OrdersSystem.createOrder(orderData);
-          document.getElementById('product-modal').style.display = 'none';
-          CartSystem.clearCart();
-          
-          Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + newOrder.id + ' ha sido creado');
+          // Crear la orden en el backend
+          try {
+              const response = await fetch(`${window.API_URL}/api/checkout`, {
+                  method: 'POST',
+                  headers: { 
+                      'Content-Type': 'application/json',
+                      'Telegram-ID': userId.toString()
+                  },
+                  body: JSON.stringify({
+                      userId: userId,
+                      paymentMethod: method,
+                      transferData: transferData,
+                      recipientData: recipientData,
+                      requiredFields: requiredFieldsData
+                  })
+              });
+              
+              if (!response.ok) {
+                  throw new Error('Error en la respuesta del servidor');
+              }
+              
+              const orderResult = await response.json();
+              document.getElementById('product-modal').style.display = 'none';
+              CartSystem.clearCart();
+              
+              Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
+          } catch (error) {
+              console.error('Error confirmando compra:', error);
+              alert('Error al confirmar la compra: ' + error.message);
+          }
       });
   },
   
@@ -371,7 +343,7 @@ const CheckoutSystem = {
       const selectedCurrency = methodToCurrency[selectedMethod];
       
       for (const item of cartItems) {
-          const product = ProductView.getProductById(item.id, item.tabType);
+          const product = ProductView.getProductById(item.productId, item.tabType);
           
           if (!product.prices || product.prices[selectedCurrency] === undefined) {
               return false;
@@ -394,12 +366,12 @@ const CheckoutSystem = {
       const currency = methodToCurrency[method];
       
       const payableItems = cartItems.filter(item => {
-          const product = ProductView.getProductById(item.id, item.tabType);
+          const product = ProductView.getProductById(item.productId, item.tabType);
           return product.prices && product.prices[currency] !== undefined;
       });
       
       const payableTotal = payableItems.reduce((total, item) => {
-          const product = ProductView.getProductById(item.id, item.tabType);
+          const product = ProductView.getProductById(item.productId, item.tabType);
           return total + (product.prices[currency] * item.quantity);
       }, 0);
       
@@ -437,7 +409,7 @@ const CheckoutSystem = {
       const fields = new Set();
       cartItems.forEach(item => {
           if (item.tabType === 'digital') {
-              const product = ProductView.getProductById(item.id, 'digital');
+              const product = ProductView.getProductById(item.productId, 'digital');
               if (product && product.requiredFields) {
                   product.requiredFields.forEach(field => {
                       if (field.required) {
