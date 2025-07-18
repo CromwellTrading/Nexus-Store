@@ -1,16 +1,21 @@
 document.addEventListener('DOMContentLoaded', function() {
   try {
+      // Configurar la URL de la API
+      window.API_URL = window.location.hostname === 'localhost' 
+          ? 'http://localhost:6000' 
+          : 'https://tu-backend-en-render.com';
+      
       Notifications.init();
       
       Themes.init();
       UserProfile.init();
       AdminSystem.init();
       
-      ProductView.productDatabase = AdminSystem.productDB;
+      // Cargar productos desde el backend
+      ProductView.loadProducts(Tabs.currentTab);
       
       Tabs.init();
       
-      ProductView.init();
       ProductModal.init();
       CartSystem.init();
       SearchFilter.init();
