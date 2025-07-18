@@ -78,6 +78,8 @@ app.get('/api/admin/ids', (req, res) => {
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(Number) 
     : [];
+    
+  console.log('Solicitud de admin IDs recibida. Enviando:', adminIds);
   res.json(adminIds);
 });
 
