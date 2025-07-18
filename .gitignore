@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+
+# Archivos de entorno
+.env
+
+# Archivos de sistema
+.DS_Store
+
+# Archivos de desarrollo
+*.log
+
+# Archivos de datos (opcional, si no quieres rastrearlos)
+backend/data/*.json
