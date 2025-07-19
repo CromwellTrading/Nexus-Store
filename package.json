@@ -15,7 +15,7 @@
     "telegram",
     "bot"
   ],
-  "author": "Tu Nombre",
+  "author": "Asche",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
