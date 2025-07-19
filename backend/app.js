@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 const PORT = process.env.PORT || 6000;
@@ -261,10 +262,122 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
 });
 
 // Iniciar el servidor
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
   console.log(`📂 Ruta del frontend: ${frontendPath}`);
   console.log(`🌍 Modo: ${process.env.NODE_ENV || 'Desarrollo'}`);
   console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
   console.log(`✅ Frontend disponible en: http://localhost:${PORT}`);
 });
+
+// Iniciar el bot de Telegram
+const token = process.env.TELEGRAM_BOT_TOKEN;
+if (token) {
+  const bot = new TelegramBot(token, { polling: true });
+  
+  // IDs de administradores
+  const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
+  
+  // Manejar el comando /start
+  bot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    // Mensaje promocional mejorado con emojis y formato
+    const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟
+
+🔥 <b>VENTA DE PRODUCTOS DIGITALES Y FÍSICOS</b> 🔥
+
+🛒 <b>Productos Físicos:</b>
+- Camisas 👕
+- Ventiladores 💨
+- Electrónicos 📱
+- ¡Y mucho más! 📦
+
+💎 <b>Recargas Digitales:</b>
+- Diamantes de Free Fire 💎
+- Créditos de Mobile Legends 🎮
+- Puntos de Call of Duty 🔫
+- Recargas para todos tus juegos 🕹️
+
+💰 <b>PRECIOS MÁS BAJOS DE CUBA</b> 💰
+💯 La mejor forma de recargarte y obtener tus productos
+⚡️ Entrega inmediata y segura
+
+👇 <b>¡Todo está aquí!</b> 👇`;
+    
+    // Crear botón que abre la tienda como Web App
+    const webAppUrl = `https://${process.env.RENDER_EXTERNAL_URL || `localhost:${PORT}`}/?tgid=${userId}`;
+    
+    const keyboard = {
+      inline_keyboard: [[{
+        text: "🚀 ABRIR TIENDA AHORA",
+        web_app: { url: webAppUrl }
+      }]]
+    };
+    
+    // Enviar mensaje con botón integrado
+    bot.sendMessage(chatId, promoMessage, {
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    });
+  });
+  
+  // Manejar mensajes de administradores
+  bot.on('message', (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const text = msg.text || '';
+    
+    if (ADMIN_IDS.includes(userId)) {
+      if (text === '/admin') {
+        const webAppUrl = `https://${process.env.RENDER_EXTERNAL_URL || `localhost:${PORT}`}/?tgid=${userId}`;
+        
+        const adminMessage = `👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑
+
+¡Hola admin! Puedes acceder al panel de control para:
+- Gestionar productos 🛒
+- Ver pedidos 📋
+- Actualizar métodos de pago 💳
+- Y mucho más...`;
+    
+        bot.sendMessage(chatId, adminMessage, {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [[{
+              text: "⚙️ ABRIR PANEL ADMIN",
+              web_app: { url: webAppUrl }
+            }]]
+          }
+        });
+      }
+    } else if (text === '/admin') {
+      bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', {
+        parse_mode: 'HTML'
+      });
+    }
+  });
+  
+  // Manejar eventos de Web App
+  bot.on('web_app_data', (msg) => {
+    const chatId = msg.chat.id;
+    const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
+    
+    if (data && data.command === 'new_order') {
+      const orderMessage = `🎉 <b>¡PEDIDO CONFIRMADO!</b> 🎉
+      
+✅ Tu pedido #${data.orderId} ha sido recibido
+🛒 Productos: ${data.itemsCount || 1}
+💰 Total: $${data.total || '0.00'}
+📦 Estaremos procesando tu pedido inmediatamente`;
+    
+      bot.sendMessage(chatId, orderMessage, {
+        parse_mode: 'HTML'
+      });
+    }
+  });
+  
+  console.log('🤖 Bot de Telegram iniciado correctamente');
+} else {
+  console.log('⚠️ TELEGRAM_BOT_TOKEN no definido. Bot no iniciado');
+}
