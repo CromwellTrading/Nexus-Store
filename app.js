@@ -1,9 +1,15 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const path = require('path');
-const TelegramBot = require('node-telegram-bot-api');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import TelegramBot from 'node-telegram-bot-api';
+
+// Configuración para obtener __dirname en módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 6000;
@@ -17,9 +23,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
-
-// Obtener ruta absoluta del directorio actual
-const __dirname = path.resolve();
 
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
 const frontendPath = path.join(__dirname, 'frontend');
@@ -55,41 +58,10 @@ if (!fs.existsSync(DB_PATH)) {
   }
 }
 
-const DB = {
-  products: loadJSON('products.json'),
-  categories: loadJSON('categories.json'),
-  carts: loadJSON('carts.json'),
-  orders: loadJSON('orders.json'),
-  users: loadJSON('users.json'),
-  
-  save: (file, data) => {
-    const filePath = path.join(DB_PATH, file);
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-    } catch (err) {
-      console.error(`Error guardando ${filePath}:`, err.message);
-    }
-  }
-};
-
 // Funciones de ayuda para cargar archivos JSON
 function loadJSON(file) {
   const filePath = path.join(DB_PATH, file);
   try {
-    // Verificar si el archivo existe
-    if (!fs.existsSync(filePath)) {
-      console.log(`Archivo ${filePath} no existe. Creando estructura inicial...`);
-      
-      // Crear estructura inicial según el tipo de archivo
-      if (file === 'products.json') return { fisico: {}, digital: {} };
-      if (file === 'categories.json') return { fisico: [], digital: [] };
-      if (file === 'carts.json') return [];
-      if (file === 'orders.json') return [];
-      if (file === 'users.json') return {};
-      
-      return {};
-    }
-    
     const data = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(data);
   } catch (err) {
@@ -106,13 +78,30 @@ function loadJSON(file) {
       else if (file === 'orders.json') initialData = [];
       else if (file === 'users.json') initialData = {};
       
-      DB.save(file, initialData);
+      fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2));
       return initialData;
     }
     
     return {};
   }
 }
+
+const DB = {
+  products: loadJSON('products.json'),
+  categories: loadJSON('categories.json'),
+  carts: loadJSON('carts.json'),
+  orders: loadJSON('orders.json'),
+  users: loadJSON('users.json'),
+  
+  save: (file, data) => {
+    const filePath = path.join(DB_PATH, file);
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (err) {
+      console.error(`Error guardando ${filePath}:`, err.message);
+    }
+  }
+};
 
 // Middleware de autenticación para administradores
 const isAdmin = (req, res, next) => {
