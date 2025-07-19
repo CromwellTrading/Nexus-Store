@@ -6,6 +6,7 @@ const UserProfile = {
       address: "",
       province: "",
       isAdmin: false,
+      telegramUserId: null,
       adminCards: {
           bpa: "",
           bandec: "",
@@ -16,6 +17,7 @@ const UserProfile = {
   
   init: function() {
       this.loadUserData();
+      this.checkAdminStatus();
   },
   
   loadUserData: function() {
@@ -24,22 +26,43 @@ const UserProfile = {
           this.userData = JSON.parse(savedData);
       }
       
-      if (localStorage.getItem('isAdmin') === 'true') {
-          this.userData.isAdmin = true;
-      }
+      // Obtener ID de Telegram de la URL si está presente
+      const urlParams = new URLSearchParams(window.location.search);
+      const tgid = urlParams.get('tgid');
       
-      const telegramUserId = this.getTelegramUserId();
-      if ([5376388604, 718827739].includes(telegramUserId)) {
-          this.userData.isAdmin = true;
-          localStorage.setItem('isAdmin', 'true');
+      if (tgid) {
+          this.userData.telegramUserId = parseInt(tgid);
+          localStorage.setItem('telegramUserId', tgid);
       }
   },
   
+  checkAdminStatus: function() {
+      // Verificar si ya es admin
+      if (this.userData.isAdmin) return;
+      
+      // Obtener IDs de admin del backend
+      this.fetchAdminIds().then(adminIds => {
+          if (adminIds && this.userData.telegramUserId) {
+              this.userData.isAdmin = adminIds.includes(this.userData.telegramUserId);
+              localStorage.setItem('isAdmin', this.userData.isAdmin);
+          }
+      });
+  },
+  
+  fetchAdminIds: async function() {
+      try {
+          const response = await fetch('/api/admin/ids');
+          if (response.ok) {
+              return await response.json();
+          }
+      } catch (error) {
+          console.error('Error obteniendo admin IDs:', error);
+      }
+      return [];
+  },
+  
   getTelegramUserId: function() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const telegramUserId = urlParams.get('tgid');
-      const userId = parseInt(telegramUserId);
-      return isNaN(userId) ? null : userId;
+      return this.userData.telegramUserId;
   },
   
   saveUserData: function() {
@@ -166,3 +189,6 @@ const UserProfile = {
       return this.userData;
   }
 };
+
+// Inicializar al cargar
+UserProfile.init();
