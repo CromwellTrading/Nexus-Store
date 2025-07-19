@@ -3,27 +3,22 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
-      const isAdmin = this.isAdminUser();
-      document.getElementById('admin-button').style.display = isAdmin ? 'block' : 'none';
+      const isAdmin = UserProfile.userData.isAdmin;
+      const adminButton = document.getElementById('admin-button');
       
-      if (isAdmin) {
-          document.getElementById('admin-button').addEventListener('click', () => this.openAdminPanel());
+      if (adminButton) {
+          adminButton.style.display = isAdmin ? 'block' : 'none';
+          
+          if (isAdmin) {
+              adminButton.addEventListener('click', () => this.openAdminPanel());
+          }
       }
       
       console.log('AdminSystem inicializado. Es admin:', isAdmin);
   },
   
   isAdminUser: function() {
-      const telegramUserId = UserProfile.getTelegramUserId();
-      const adminIds = window.ADMIN_IDS || [];
-      
-      console.log('Verificando admin:', {
-          userId: telegramUserId,
-          adminIds: adminIds,
-          isAdmin: adminIds.includes(telegramUserId)
-      });
-      
-      return adminIds.includes(telegramUserId);
+      return UserProfile.userData.isAdmin;
   },
 
   openAdminPanel: function() {
@@ -747,7 +742,7 @@ const AdminSystem = {
               throw new Error('Error al añadir categoría');
           }
       })
-      .catch(error => {
+      .catch(error) {
           console.error('Error añadiendo categoría:', error);
           alert('Error al añadir categoría: ' + error.message);
       });
