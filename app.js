@@ -18,12 +18,43 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Obtener ruta absoluta del directorio actual
+const __dirname = path.resolve();
+
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
-const frontendPath = path.join(__dirname, '../frontend');
+const frontendPath = path.join(__dirname, 'frontend');
+
+// Verificar si la carpeta frontend existe
+try {
+  const files = fs.readdirSync(frontendPath);
+  console.log(`✅ Carpeta frontend encontrada. Contiene ${files.length} archivos`);
+} catch (err) {
+  console.error(`❌ Error accediendo a la carpeta frontend: ${err.message}`);
+  console.log("Intentando crear carpeta frontend...");
+  
+  try {
+    fs.mkdirSync(frontendPath);
+    console.log("✅ Carpeta frontend creada exitosamente");
+  } catch (mkdirErr) {
+    console.error(`❌ Error creando carpeta frontend: ${mkdirErr.message}`);
+  }
+}
+
 app.use(express.static(frontendPath));
 
 // Base de datos simple (archivos JSON)
 const DB_PATH = path.join(__dirname, 'data');
+
+// Crear carpeta de datos si no existe
+if (!fs.existsSync(DB_PATH)) {
+  try {
+    fs.mkdirSync(DB_PATH);
+    console.log("✅ Carpeta 'data' creada exitosamente");
+  } catch (err) {
+    console.error(`❌ Error creando carpeta 'data': ${err.message}`);
+  }
+}
+
 const DB = {
   products: loadJSON('products.json'),
   categories: loadJSON('categories.json'),
@@ -33,7 +64,11 @@ const DB = {
   
   save: (file, data) => {
     const filePath = path.join(DB_PATH, file);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (err) {
+      console.error(`Error guardando ${filePath}:`, err.message);
+    }
   }
 };
 
@@ -41,15 +76,40 @@ const DB = {
 function loadJSON(file) {
   const filePath = path.join(DB_PATH, file);
   try {
+    // Verificar si el archivo existe
+    if (!fs.existsSync(filePath)) {
+      console.log(`Archivo ${filePath} no existe. Creando estructura inicial...`);
+      
+      // Crear estructura inicial según el tipo de archivo
+      if (file === 'products.json') return { fisico: {}, digital: {} };
+      if (file === 'categories.json') return { fisico: [], digital: [] };
+      if (file === 'carts.json') return [];
+      if (file === 'orders.json') return [];
+      if (file === 'users.json') return {};
+      
+      return {};
+    }
+    
     const data = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(data);
   } catch (err) {
     console.error(`Error cargando ${file}:`, err.message);
-    if (file === 'products.json') return { fisico: {}, digital: {} };
-    if (file === 'categories.json') return { fisico: [], digital: [] };
-    if (file === 'carts.json') return [];
-    if (file === 'orders.json') return [];
-    if (file === 'users.json') return [];
+    
+    // Crear archivo vacío si hay error
+    if (err.code === 'ENOENT') {
+      console.log(`Creando ${file} con estructura inicial...`);
+      let initialData = {};
+      
+      if (file === 'products.json') initialData = { fisico: {}, digital: {} };
+      else if (file === 'categories.json') initialData = { fisico: [], digital: [] };
+      else if (file === 'carts.json') initialData = [];
+      else if (file === 'orders.json') initialData = [];
+      else if (file === 'users.json') initialData = {};
+      
+      DB.save(file, initialData);
+      return initialData;
+    }
+    
     return {};
   }
 }
@@ -268,6 +328,21 @@ const server = app.listen(PORT, () => {
   console.log(`🌍 Modo: ${process.env.NODE_ENV || 'Desarrollo'}`);
   console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
   console.log(`✅ Frontend disponible en: http://localhost:${PORT}`);
+  
+  // Diagnóstico adicional
+  try {
+    const frontendFiles = fs.readdirSync(frontendPath);
+    console.log(`📄 Archivos en frontend (${frontendFiles.length}):`, frontendFiles);
+  } catch (err) {
+    console.error('❌ Error leyendo archivos frontend:', err);
+  }
+  
+  try {
+    const dataFiles = fs.readdirSync(DB_PATH);
+    console.log(`📄 Archivos en data (${dataFiles.length}):`, dataFiles);
+  } catch (err) {
+    console.error('❌ Error leyendo archivos de datos:', err);
+  }
 });
 
 // Iniciar el bot de Telegram
@@ -381,3 +456,16 @@ if (token) {
 } else {
   console.log('⚠️ TELEGRAM_BOT_TOKEN no definido. Bot no iniciado');
 }
+
+// Función para diagnóstico de rutas
+app.get('/debug/paths', (req, res) => {
+  res.json({
+    __dirname,
+    frontendPath,
+    DB_PATH,
+    files: {
+      frontend: fs.existsSync(frontendPath) ? fs.readdirSync(frontendPath) : 'NO EXISTE',
+      data: fs.existsSync(DB_PATH) ? fs.readdirSync(DB_PATH) : 'NO EXISTE'
+    }
+  });
+});
