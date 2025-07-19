@@ -65,6 +65,10 @@
     <script src="js/tabs.js"></script>
     <script src="js/themes.js"></script>
     <script src="js/userProfile.js"></script>
+    <script>
+        // Inicializar UserProfile inmediatamente
+        UserProfile.init();
+    </script>
     <script src="js/orders.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/productView.js"></script>
@@ -73,27 +77,16 @@
     <script src="js/searchFilter.js"></script>
     <script src="js/checkout.js"></script>
     <script src="js/main.js"></script>
+    
     <script>
-        // Carga inicial de datos de administrador
-        window.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const response = await fetch('/api/admin/ids');
-                if (response.ok) {
-                    window.ADMIN_IDS = await response.json();
-                    console.log('Admin IDs cargados:', window.ADMIN_IDS);
-                    
-                    // Re-inicializar el sistema de administración
-                    if (window.AdminSystem) {
-                        AdminSystem.init();
-                    }
-                } else {
-                    console.error('Error cargando admin IDs');
-                    window.ADMIN_IDS = [];
-                }
-            } catch (error) {
-                console.error('Error cargando admin IDs:', error);
-                window.ADMIN_IDS = [];
+        // Inicializar sistemas después de cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            // Inicializar AdminSystem después de que UserProfile esté listo
+            if (AdminSystem && typeof AdminSystem.init === 'function') {
+                AdminSystem.init();
             }
+            
+            // Inicializar otros sistemas según sea necesario
         });
     </script>
 </body>
