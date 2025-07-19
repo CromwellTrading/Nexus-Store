@@ -1,21 +1,20 @@
 {
   "name": "tienda-virtual-backend",
   "version": "1.0.0",
-  "description": "Backend para tienda virtual en Cuba con bot de Telegram integrado",
+  "type": "module",
+  "description": "Backend para tienda virtual en Cuba",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node --experimental-modules app.js",
+    "dev": "nodemon --experimental-modules app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "tienda",
     "cuba",
-    "ecommerce",
-    "telegram",
-    "bot"
+    "ecommerce"
   ],
-  "author": "Asche",
+  "author": "Tu Nombre",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
