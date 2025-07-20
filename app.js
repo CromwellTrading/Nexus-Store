@@ -342,10 +342,23 @@ if (token) {
   // IDs de administradores
   const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
   
+  // Función para obtener URL base sin protocolo duplicado
+  const getBaseUrl = () => {
+    if (process.env.RENDER_EXTERNAL_URL) {
+      // Eliminar cualquier protocolo existente
+      return process.env.RENDER_EXTERNAL_URL.replace(/^https?:\/\//, '');
+    }
+    return `localhost:${PORT}`;
+  };
+  
   // Manejar el comando /start
   bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
+    
+    const baseUrl = getBaseUrl();
+    const webAppUrl = `https://${baseUrl}/?tgid=${userId}`;
+    console.log(`🔗 URL generada para Telegram: ${webAppUrl}`);
     
     // Mensaje promocional mejorado con emojis y formato
     const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟
@@ -370,9 +383,6 @@ if (token) {
 
 👇 <b>¡Todo está aquí!</b> 👇`;
     
-    // Crear botón que abre la tienda como Web App
-    const webAppUrl = `https://${process.env.RENDER_EXTERNAL_URL || `localhost:${PORT}`}/?tgid=${userId}`;
-    
     const keyboard = {
       inline_keyboard: [[{
         text: "🚀 ABRIR TIENDA AHORA",
@@ -395,7 +405,9 @@ if (token) {
     
     if (ADMIN_IDS.includes(userId)) {
       if (text === '/admin') {
-        const webAppUrl = `https://${process.env.RENDER_EXTERNAL_URL || `localhost:${PORT}`}/?tgid=${userId}`;
+        const baseUrl = getBaseUrl();
+        const webAppUrl = `https://${baseUrl}/?tgid=${userId}`;
+        console.log(`👑 URL de admin generada para Telegram: ${webAppUrl}`);
         
         const adminMessage = `👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑
 
@@ -448,13 +460,36 @@ if (token) {
 
 // Función para diagnóstico de rutas
 app.get('/debug/paths', (req, res) => {
-  res.json({
+  const response = {
     __dirname,
     frontendPath,
     DB_PATH,
-    files: {
-      frontend: fs.existsSync(frontendPath) ? fs.readdirSync(frontendPath) : 'NO EXISTE',
-      data: fs.existsSync(DB_PATH) ? fs.readdirSync(DB_PATH) : 'NO EXISTE'
+    exists: {
+      frontend: fs.existsSync(frontendPath),
+      data: fs.existsSync(DB_PATH)
+    },
+    files: {}
+  };
+
+  if (response.exists.frontend) {
+    try {
+      response.files.frontend = fs.readdirSync(frontendPath);
+    } catch (err) {
+      response.files.frontend = `Error leyendo: ${err.message}`;
     }
-  });
+  } else {
+    response.files.frontend = 'Carpeta no existe';
+  }
+
+  if (response.exists.data) {
+    try {
+      response.files.data = fs.readdirSync(DB_PATH);
+    } catch (err) {
+      response.files.data = `Error leyendo: ${err.message}`;
+    }
+  } else {
+    response.files.data = 'Carpeta no existe';
+  }
+
+  res.json(response);
 });
