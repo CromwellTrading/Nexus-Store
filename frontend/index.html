@@ -6,6 +6,19 @@
     <title>Nexus Store</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .script-status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10000;
+            font-family: monospace;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -59,35 +72,246 @@
     </div>
     
     <div id="product-modal" style="display: none;"></div>
+    
+    <!-- Panel de diagnóstico -->
+    <div id="script-status" class="script-status">
+        <h3>Estado de Scripts</h3>
+        <div id="status-content"></div>
+    </div>
 
-    <!-- Scripts en el orden correcto con rutas absolutas -->
-    <script src="/js/notifications.js"></script>
-    <script src="/js/tabs.js"></script>
-    <script src="/js/themes.js"></script>
-    <script src="/js/userProfile.js"></script>
+    <!-- Configuración global -->
     <script>
-        // Inicializar UserProfile inmediatamente
-        UserProfile.init();
+        // Configuración global que debe ejecutarse primero
+        window.API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:6000' 
+            : 'https://nexus-store-86r8.onrender.com';
+        
+        console.log("API_URL configurada como:", window.API_URL);
     </script>
-    <script src="/js/orders.js"></script>
-    <script src="/js/admin.js"></script>
+
+    <!-- Scripts en el orden CORRECTO con verificación de carga -->
+    <script src="/js/notifications.js"></script>
+    <script src="/js/themes.js"></script>
+    <script src="/js/tabs.js"></script>
+    <script src="/js/userProfile.js"></script>
     <script src="/js/productView.js"></script>
     <script src="/js/productModal.js"></script>
     <script src="/js/cart.js"></script>
     <script src="/js/searchFilter.js"></script>
+    <script src="/js/orders.js"></script>
     <script src="/js/checkout.js"></script>
+    <script src="/js/admin.js"></script>
     <script src="/js/main.js"></script>
-    
+
+    <!-- Inicialización controlada con diagnóstico -->
     <script>
-        // Inicializar sistemas después de cargar
-        window.addEventListener('DOMContentLoaded', () => {
-            // Inicializar AdminSystem después de que UserProfile esté listo
-            if (AdminSystem && typeof AdminSystem.init === 'function') {
-                AdminSystem.init();
+        // Función para verificar si un script se cargó correctamente
+        function checkScriptLoaded(scriptName) {
+            switch(scriptName) {
+                case 'Notifications': return typeof Notifications !== 'undefined';
+                case 'Themes': return typeof Themes !== 'undefined';
+                case 'Tabs': return typeof Tabs !== 'undefined';
+                case 'UserProfile': return typeof UserProfile !== 'undefined';
+                case 'ProductView': return typeof ProductView !== 'undefined';
+                case 'ProductModal': return typeof ProductModal !== 'undefined';
+                case 'CartSystem': return typeof CartSystem !== 'undefined';
+                case 'SearchFilter': return typeof SearchFilter !== 'undefined';
+                case 'OrdersSystem': return typeof OrdersSystem !== 'undefined';
+                case 'CheckoutSystem': return typeof CheckoutSystem !== 'undefined';
+                case 'AdminSystem': return typeof AdminSystem !== 'undefined';
+                default: return false;
+            }
+        }
+        
+        // Actualizar el panel de diagnóstico
+        function updateScriptStatus() {
+            const statusContent = document.getElementById('status-content');
+            const scripts = [
+                'Notifications', 'Themes', 'Tabs', 'UserProfile', 
+                'ProductView', 'ProductModal', 'CartSystem', 'SearchFilter',
+                'OrdersSystem', 'CheckoutSystem', 'AdminSystem'
+            ];
+            
+            let html = '<ul>';
+            scripts.forEach(script => {
+                const loaded = checkScriptLoaded(script);
+                html += `<li>${script}: <span style="color: ${loaded ? 'green' : 'red'}">${loaded ? '✅' : '❌'}</span></li>`;
+            });
+            html += '</ul>';
+            
+            statusContent.innerHTML = html;
+        }
+        
+        // Verificador de scripts cargados
+        const scriptFiles = [
+            'notifications.js', 'themes.js', 'tabs.js', 'userProfile.js',
+            'productView.js', 'productModal.js', 'cart.js', 'searchFilter.js',
+            'orders.js', 'checkout.js', 'admin.js', 'main.js'
+        ];
+        
+        // Verificar si los archivos de script se cargaron
+        function verifyScriptFiles() {
+            const statusContent = document.getElementById('status-content');
+            let filesHtml = '<h4>Archivos cargados:</h4><ul>';
+            
+            scriptFiles.forEach(file => {
+                const scriptEl = document.querySelector(`script[src="/js/${file}"]`);
+                if (!scriptEl) {
+                    filesHtml += `<li>/js/${file}: <span style="color: red">❌ No encontrado</span></li>`;
+                } else {
+                    filesHtml += `<li>/js/${file}: <span style="color: green">✅ Cargado</span></li>`;
+                }
+            });
+            
+            filesHtml += '</ul>';
+            statusContent.innerHTML += filesHtml;
+        }
+        
+        // Inicialización controlada
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                console.log("Iniciando módulos...");
+                
+                // Actualizar estado de scripts
+                updateScriptStatus();
+                verifyScriptFiles();
+                
+                // Inicializar en el orden correcto
+                if (checkScriptLoaded('Notifications')) {
+                    Notifications.init();
+                    console.log("Notifications inicializado");
+                }
+                
+                if (checkScriptLoaded('Themes')) {
+                    Themes.init();
+                    console.log("Themes inicializado");
+                }
+                
+                if (checkScriptLoaded('UserProfile')) {
+                    UserProfile.init();
+                    console.log("UserProfile inicializado");
+                }
+                
+                // Cargar productos
+                if (checkScriptLoaded('ProductView') && checkScriptLoaded('Tabs')) {
+                    ProductView.loadProducts(Tabs.currentTab);
+                    console.log("Productos cargados");
+                }
+                
+                if (checkScriptLoaded('Tabs')) {
+                    Tabs.init();
+                    console.log("Tabs inicializado");
+                }
+                
+                if (checkScriptLoaded('ProductModal')) {
+                    ProductModal.init();
+                    console.log("ProductModal inicializado");
+                }
+                
+                if (checkScriptLoaded('CartSystem')) {
+                    CartSystem.init();
+                    console.log("CartSystem inicializado");
+                }
+                
+                if (checkScriptLoaded('SearchFilter')) {
+                    SearchFilter.init();
+                    console.log("SearchFilter inicializado");
+                }
+                
+                if (checkScriptLoaded('OrdersSystem')) {
+                    OrdersSystem.init();
+                    console.log("OrdersSystem inicializado");
+                }
+                
+                if (checkScriptLoaded('CheckoutSystem')) {
+                    CheckoutSystem.init();
+                    console.log("CheckoutSystem inicializado");
+                }
+                
+                if (checkScriptLoaded('AdminSystem')) {
+                    AdminSystem.init();
+                    console.log("AdminSystem inicializado");
+                }
+                
+                // Configurar eventos
+                if (typeof setupEventListeners === 'function') {
+                    setupEventListeners();
+                    console.log("Event listeners configurados");
+                }
+                
+                console.log("Todos los módulos inicializados correctamente");
+                updateScriptStatus();
+            } catch (error) {
+                console.error("Error durante la inicialización:", error);
+                document.getElementById('status-content').innerHTML += 
+                    `<p style="color: red">Error: ${error.message}</p>`;
+            }
+        });
+
+        // Función para configurar event listeners
+        function setupEventListeners() {
+            const profileButton = document.getElementById('profile-button');
+            if (profileButton) {
+                profileButton.addEventListener('click', function() {
+                    if (typeof UserProfile !== 'undefined' && typeof UserProfile.openProfileModal === 'function') {
+                        UserProfile.openProfileModal();
+                    } else {
+                        console.error("UserProfile no está definido o no tiene openProfileModal");
+                    }
+                });
             }
             
-            // Inicializar otros sistemas según sea necesario
-        });
+            const adminButton = document.getElementById('admin-button');
+            if (adminButton) {
+                adminButton.addEventListener('click', function() {
+                    if (typeof AdminSystem !== 'undefined' && typeof AdminSystem.openAdminPanel === 'function') {
+                        AdminSystem.openAdminPanel();
+                    } else {
+                        console.error("AdminSystem no está definido o no tiene openAdminPanel");
+                    }
+                });
+            }
+            
+            const ordersButton = document.getElementById('orders-button');
+            if (ordersButton) {
+                ordersButton.addEventListener('click', function() {
+                    if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
+                        OrdersSystem.openOrdersModal();
+                        if (typeof Notifications !== 'undefined') {
+                            Notifications.notifications.forEach(n => n.read = true);
+                            Notifications.saveNotifications();
+                            Notifications.renderNotificationCount();
+                        }
+                    } else {
+                        console.error("OrdersSystem no está definido o no tiene openOrdersModal");
+                    }
+                });
+            }
+            
+            const cartButton = document.getElementById('cart-button');
+            if (cartButton) {
+                cartButton.addEventListener('click', function() {
+                    if (typeof CartSystem !== 'undefined' && typeof CartSystem.openCartModal === 'function') {
+                        CartSystem.openCartModal();
+                    } else {
+                        console.error("CartSystem no está definido o no tiene openCartModal");
+                    }
+                });
+            }
+            
+            document.addEventListener('click', function(e) {
+                const modal = document.getElementById('product-modal');
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    if (typeof CartSystem !== 'undefined') {
+                        CartSystem.isCartModalOpen = false;
+                    }
+                }
+            });
+        }
+        
+        // Hacer la función accesible globalmente
+        window.setupEventListeners = setupEventListeners;
     </script>
 </body>
 </html>
