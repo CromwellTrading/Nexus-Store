@@ -17,6 +17,10 @@
             border-radius: 5px;
             z-index: 10000;
             font-family: monospace;
+            font-size: 14px;
+            max-width: 400px;
+            max-height: 300px;
+            overflow: auto;
         }
     </style>
 </head>
@@ -39,7 +43,10 @@
                     <button class="icon-button" id="profile-button"><i class="fas fa-user"></i></button>
                     <button class="icon-button" id="orders-button"><i class="fas fa-clipboard-list"></i></button>
                     <button class="icon-button" id="theme-button"><i class="fas fa-palette"></i></button>
-                    <button class="icon-button" id="admin-button"><i class="fas fa-user-cog"></i></button>
+                    <!-- Botón de admin oculto por defecto -->
+                    <button class="icon-button" id="admin-button" style="display: none;">
+                        <i class="fas fa-user-cog"></i>
+                    </button>
                     <div class="theme-selector" id="theme-selector">
                         <div class="theme-option theme-light" data-theme="light"></div>
                         <div class="theme-option theme-dark" data-theme="dark"></div>
@@ -87,6 +94,9 @@
             : 'https://nexus-store-86r8.onrender.com';
         
         console.log("API_URL configurada como:", window.API_URL);
+        
+        // Variable global para estado de admin
+        window.ADMIN_IDS = [];
     </script>
 
     <!-- Scripts en el orden CORRECTO con verificación de carga -->
@@ -167,14 +177,48 @@
             statusContent.innerHTML += filesHtml;
         }
         
+        // Función para cargar admin IDs
+        async function loadAdminIds() {
+            try {
+                const response = await fetch('/api/admin/ids');
+                if (response.ok) {
+                    window.ADMIN_IDS = await response.json();
+                    console.log('Admin IDs cargados:', window.ADMIN_IDS);
+                    
+                    // Actualizar estado de admin en UserProfile
+                    if (typeof UserProfile !== 'undefined' && UserProfile.userData) {
+                        const telegramUserId = UserProfile.getTelegramUserId();
+                        UserProfile.userData.isAdmin = window.ADMIN_IDS.includes(telegramUserId);
+                        console.log(`Usuario ${telegramUserId} es admin: ${UserProfile.userData.isAdmin}`);
+                        
+                        // Actualizar botón de admin
+                        const adminButton = document.getElementById('admin-button');
+                        if (adminButton) {
+                            adminButton.style.display = UserProfile.userData.isAdmin ? 'block' : 'none';
+                        }
+                        
+                        // Si AdminSystem está disponible, inicializarlo de nuevo
+                        if (typeof AdminSystem !== 'undefined' && typeof AdminSystem.init === 'function') {
+                            AdminSystem.init();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando admin IDs:', error);
+            }
+        }
+        
         // Inicialización controlada
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             try {
                 console.log("Iniciando módulos...");
                 
                 // Actualizar estado de scripts
                 updateScriptStatus();
                 verifyScriptFiles();
+                
+                // Cargar admin IDs primero
+                await loadAdminIds();
                 
                 // Inicializar en el orden correcto
                 if (checkScriptLoaded('Notifications')) {
