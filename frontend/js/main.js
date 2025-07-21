@@ -13,21 +13,23 @@ document.addEventListener('DOMContentLoaded', async function() {
           console.log("Themes inicializado");
       }
       
-      // 2. Inicializar UserProfile y esperar a que termine
+      // 2. Inicializar UserProfile y ESPERAR a que termine
       if (typeof UserProfile !== 'undefined') {
+          console.log("Inicializando UserProfile...");
           await UserProfile.init();
-          console.log("UserProfile inicializado");
-      }
-      
-      // 3. Inicializar componentes que dependen de UserProfile
-      if (typeof AdminSystem !== 'undefined') {
-          AdminSystem.init();
-          console.log("AdminSystem inicializado");
-      }
-      
-      if (typeof OrdersSystem !== 'undefined') {
-          OrdersSystem.init();
-          console.log("OrdersSystem inicializado");
+          console.log("UserProfile inicializado", UserProfile.userData);
+          
+          // 3. Inicializar AdminSystem inmediatamente después de UserProfile
+          if (typeof AdminSystem !== 'undefined') {
+              console.log("Inicializando AdminSystem...");
+              AdminSystem.init();
+          }
+          
+          // 3.1 Inicializar OrdersSystem que también depende de UserProfile
+          if (typeof OrdersSystem !== 'undefined') {
+              OrdersSystem.init();
+              console.log("OrdersSystem inicializado");
+          }
       }
       
       // 4. Inicializar el resto de componentes
