@@ -3,13 +3,17 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
-      // Verificar si UserProfile está disponible
-      if (!UserProfile || !UserProfile.userData) {
-          console.warn("AdminSystem: UserProfile no está disponible. Reintentando en 500ms...");
-          setTimeout(() => this.init(), 500);
-          return;
-      }
-      
+      const checkUserProfile = () => {
+          if (typeof UserProfile !== 'undefined' && UserProfile.userData) {
+              this.initializeAdmin();
+          } else {
+              setTimeout(checkUserProfile, 100);
+          }
+      };
+      checkUserProfile();
+  },
+  
+  initializeAdmin: function() {
       const isAdmin = UserProfile.userData.isAdmin;
       const adminButton = document.getElementById('admin-button');
       
