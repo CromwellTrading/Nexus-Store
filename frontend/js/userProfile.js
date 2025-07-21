@@ -17,7 +17,7 @@ const UserProfile = {
   
   init: function() {
       this.loadUserData();
-      this.checkAdminStatus();
+      return this.checkAdminStatus();
   },
   
   loadUserData: function() {
@@ -37,15 +37,21 @@ const UserProfile = {
   },
   
   checkAdminStatus: function() {
-      // Verificar si ya es admin
-      if (this.userData.isAdmin) return;
-      
-      // Obtener IDs de admin del backend
-      this.fetchAdminIds().then(adminIds => {
-          if (adminIds && this.userData.telegramUserId) {
-              this.userData.isAdmin = adminIds.includes(this.userData.telegramUserId);
-              localStorage.setItem('isAdmin', this.userData.isAdmin);
+      return new Promise((resolve) => {
+          // Verificar si ya es admin
+          if (this.userData.isAdmin) {
+              resolve();
+              return;
           }
+          
+          // Obtener IDs de admin del backend
+          this.fetchAdminIds().then(adminIds => {
+              if (adminIds && this.userData.telegramUserId) {
+                  this.userData.isAdmin = adminIds.includes(this.userData.telegramUserId);
+                  localStorage.setItem('isAdmin', this.userData.isAdmin);
+              }
+              resolve();
+          }).catch(() => resolve());
       });
   },
   
@@ -189,6 +195,3 @@ const UserProfile = {
       return this.userData;
   }
 };
-
-// Inicializar al cargar
-UserProfile.init();
