@@ -3,10 +3,13 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
+      console.log("Iniciando AdminSystem...");
       const checkUserProfile = () => {
           if (typeof UserProfile !== 'undefined' && UserProfile.userData) {
+              console.log("UserProfile disponible, inicializando AdminSystem");
               this.initializeAdmin();
           } else {
+              console.log("UserProfile no disponible, reintentando en 100ms...");
               setTimeout(checkUserProfile, 100);
           }
       };
@@ -14,18 +17,26 @@ const AdminSystem = {
   },
   
   initializeAdmin: function() {
+      console.log("Inicializando AdminSystem con datos de usuario:", UserProfile.userData);
+      
       const isAdmin = UserProfile.userData.isAdmin;
+      console.log("¿Es administrador?", isAdmin);
+      
       const adminButton = document.getElementById('admin-button');
       
       if (adminButton) {
+          console.log("Botón de admin encontrado en el DOM");
           adminButton.style.display = isAdmin ? 'block' : 'none';
           
           if (isAdmin) {
+              console.log("Registrando evento click para botón de admin");
               adminButton.addEventListener('click', () => this.openAdminPanel());
+          } else {
+              console.log("Usuario no es administrador, ocultando botón");
           }
+      } else {
+          console.error("Botón de admin no encontrado en el DOM");
       }
-      
-      console.log('AdminSystem inicializado. Es admin:', isAdmin);
   },
   
   isAdminUser: function() {
