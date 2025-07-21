@@ -3,6 +3,13 @@ const AdminSystem = {
   categoryType: 'fisico',
   
   init: function() {
+      // Verificar si UserProfile está disponible
+      if (!UserProfile || !UserProfile.userData) {
+          console.warn("AdminSystem: UserProfile no está disponible. Reintentando en 500ms...");
+          setTimeout(() => this.init(), 500);
+          return;
+      }
+      
       const isAdmin = UserProfile.userData.isAdmin;
       const adminButton = document.getElementById('admin-button');
       
@@ -742,7 +749,7 @@ const AdminSystem = {
               throw new Error('Error al añadir categoría');
           }
       })
-      .catch(error) {
+      .catch(error => {
           console.error('Error añadiendo categoría:', error);
           alert('Error al añadir categoría: ' + error.message);
       });
@@ -1082,11 +1089,3 @@ const AdminSystem = {
       });
   }
 };
-
-// Inicializar después de cargar
-document.addEventListener('DOMContentLoaded', () => {
-  // Solo inicializar si el elemento admin-button existe
-  if (document.getElementById('admin-button')) {
-      AdminSystem.init();
-  }
-});
