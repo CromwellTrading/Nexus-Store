@@ -32,16 +32,23 @@ const UserProfile = {
       const tgid = urlParams.get('tgid');
       
       if (tgid) {
-          this.userData.telegramUserId = parseInt(tgid);
+          this.userData.telegramUserId = tgid; // Guardar como string
           localStorage.setItem('telegramUserId', tgid);
           console.log("ID de Telegram obtenido de URL:", tgid);
       } else {
           // Intentar obtener de localStorage si no está en URL
           const savedId = localStorage.getItem('telegramUserId');
           if (savedId) {
-              this.userData.telegramUserId = parseInt(savedId);
+              this.userData.telegramUserId = savedId;
               console.log("ID de Telegram obtenido de localStorage:", savedId);
           }
+      }
+
+      // Cargar estado de admin de localStorage
+      const savedIsAdmin = localStorage.getItem('isAdmin');
+      if (savedIsAdmin !== null) {
+          this.userData.isAdmin = (savedIsAdmin === 'true');
+          console.log("Estado de admin cargado de localStorage:", this.userData.isAdmin);
       }
   },
   
@@ -49,11 +56,9 @@ const UserProfile = {
       return new Promise((resolve) => {
           console.log("Verificando estado de administrador...");
           
-          // Si ya es admin, no necesitamos verificar
+          // Si ya es admin, no necesitamos verificar (pero igual verificamos por si cambió)
           if (this.userData.isAdmin) {
-              console.log("Usuario ya marcado como administrador");
-              resolve();
-              return;
+              console.log("Usuario ya marcado como administrador, pero verificando de nuevo...");
           }
           
           // Obtener IDs de admin del backend
@@ -61,23 +66,25 @@ const UserProfile = {
               console.log("IDs de administradores recibidos del backend:", adminIds);
               
               if (adminIds && this.userData.telegramUserId) {
-                  // Convertir ambos a número para comparación segura
-                  const userIdNum = Number(this.userData.telegramUserId);
-                  const adminIdsNum = adminIds.map(id => Number(id));
+                  // Comparar como strings
+                  const userId = this.userData.telegramUserId.toString();
+                  console.log("Comparando ID de usuario:", userId, "con lista de admins:", adminIds);
                   
-                  console.log("Comparando ID de usuario:", userIdNum, "con lista de admins:", adminIdsNum);
-                  
-                  this.userData.isAdmin = adminIdsNum.includes(userIdNum);
+                  this.userData.isAdmin = adminIds.includes(userId);
                   console.log("¿Es administrador?", this.userData.isAdmin);
                   
                   // Guardar estado en localStorage
                   localStorage.setItem('isAdmin', this.userData.isAdmin);
               } else {
                   console.log("No se pudo verificar estado de administrador: falta userID o lista de admins");
+                  this.userData.isAdmin = false;
+                  localStorage.setItem('isAdmin', 'false');
               }
               resolve();
           }).catch(error => {
               console.error("Error verificando admin:", error);
+              this.userData.isAdmin = false;
+              localStorage.setItem('isAdmin', 'false');
               resolve();
           });
       });
