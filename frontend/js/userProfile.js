@@ -5,19 +5,11 @@ const UserProfile = {
       phone: "",
       address: "",
       province: "",
-      isAdmin: false,
-      telegramUserId: null,
-      adminCards: {
-          bpa: "",
-          bandec: "",
-          mlc: ""
-      },
-      adminPhone: ""
+      telegramUserId: null
   },
   
   init: function() {
       this.loadUserData();
-      return this.checkAdminStatus();
   },
   
   loadUserData: function() {
@@ -32,7 +24,7 @@ const UserProfile = {
       const tgid = urlParams.get('tgid');
       
       if (tgid) {
-          this.userData.telegramUserId = tgid; // Guardar como string
+          this.userData.telegramUserId = tgid;
           localStorage.setItem('telegramUserId', tgid);
           console.log("ID de Telegram obtenido de URL:", tgid);
       } else {
@@ -42,70 +34,6 @@ const UserProfile = {
               this.userData.telegramUserId = savedId;
               console.log("ID de Telegram obtenido de localStorage:", savedId);
           }
-      }
-
-      // Cargar estado de admin de localStorage
-      const savedIsAdmin = localStorage.getItem('isAdmin');
-      if (savedIsAdmin !== null) {
-          this.userData.isAdmin = (savedIsAdmin === 'true');
-          console.log("Estado de admin cargado de localStorage:", this.userData.isAdmin);
-      }
-  },
-  
-  checkAdminStatus: function() {
-      return new Promise((resolve) => {
-          console.log("Verificando estado de administrador...");
-          
-          // Si ya es admin, no necesitamos verificar (pero igual verificamos por si cambió)
-          if (this.userData.isAdmin) {
-              console.log("Usuario ya marcado como administrador, pero verificando de nuevo...");
-          }
-          
-          // Obtener IDs de admin del backend
-          this.fetchAdminIds().then(adminIds => {
-              console.log("IDs de administradores recibidos del backend:", adminIds);
-              
-              if (adminIds && this.userData.telegramUserId) {
-                  // Comparar como strings
-                  const userId = this.userData.telegramUserId.toString();
-                  console.log("Comparando ID de usuario:", userId, "con lista de admins:", adminIds);
-                  
-                  this.userData.isAdmin = adminIds.includes(userId);
-                  console.log("¿Es administrador?", this.userData.isAdmin);
-                  
-                  // Guardar estado en localStorage
-                  localStorage.setItem('isAdmin', this.userData.isAdmin);
-              } else {
-                  console.log("No se pudo verificar estado de administrador: falta userID o lista de admins");
-                  this.userData.isAdmin = false;
-                  localStorage.setItem('isAdmin', 'false');
-              }
-              resolve();
-          }).catch(error => {
-              console.error("Error verificando admin:", error);
-              this.userData.isAdmin = false;
-              localStorage.setItem('isAdmin', 'false');
-              resolve();
-          });
-      });
-  },
-  
-  fetchAdminIds: async function() {
-      try {
-          console.log("Solicitando IDs de administradores a:", `${window.API_URL}/api/admin/ids`);
-          const response = await fetch(`${window.API_URL}/api/admin/ids`);
-          
-          if (response.ok) {
-              const ids = await response.json();
-              console.log("IDs de administradores recibidos:", ids);
-              return ids;
-          } else {
-              console.error("Error en respuesta del servidor:", response.status);
-              return [];
-          }
-      } catch (error) {
-          console.error('Error obteniendo admin IDs:', error);
-          return [];
       }
   },
   
@@ -120,32 +48,6 @@ const UserProfile = {
   
   openProfileModal: function() {
       const modal = document.getElementById('product-modal');
-      let adminSection = '';
-      
-      if (this.userData.isAdmin) {
-          adminSection = `
-              <div class="admin-section">
-                  <h3><i class="fas fa-crown"></i> Panel de Administrador</h3>
-                  <div class="form-group">
-                      <label>💳 Tarjeta BPA:</label>
-                      <input type="text" id="admin-bpa" value="${this.userData.adminCards?.bpa || ''}" class="modern-input">
-                  </div>
-                  <div class="form-group">
-                      <label>💳 Tarjeta BANDEC:</label>
-                      <input type="text" id="admin-bandec" value="${this.userData.adminCards?.bandec || ''}" class="modern-input">
-                  </div>
-                  <div class="form-group">
-                      <label>💳 Tarjeta MLC:</label>
-                      <input type="text" id="admin-mlc" value="${this.userData.adminCards?.mlc || ''}" class="modern-input">
-                  </div>
-                  <div class="form-group">
-                      <label>📱 Teléfono para transferencias:</label>
-                      <input type="text" id="admin-phone" value="${this.userData.adminPhone || ''}" class="modern-input">
-                  </div>
-                  <button id="save-admin-data" class="save-btn">💾 Guardar Datos Admin</button>
-              </div>
-          `;
-      }
       
       modal.innerHTML = `
           <div class="modal-content">
@@ -193,7 +95,6 @@ const UserProfile = {
                       </select>
                   </div>
                   <button id="save-profile" class="save-btn">💾 Guardar Perfil</button>
-                  ${adminSection}
               </div>
           </div>
       `;
@@ -201,10 +102,6 @@ const UserProfile = {
       modal.style.display = 'flex';
       
       document.getElementById('save-profile')?.addEventListener('click', () => this.saveProfile());
-      
-      if (this.userData.isAdmin) {
-          document.getElementById('save-admin-data')?.addEventListener('click', () => this.saveAdminData());
-      }
       
       modal.querySelector('.close-modal')?.addEventListener('click', () => {
           modal.style.display = 'none';
@@ -220,18 +117,6 @@ const UserProfile = {
       
       this.saveUserData();
       alert('Perfil guardado correctamente');
-  },
-  
-  saveAdminData: function() {
-      if (!this.userData.adminCards) this.userData.adminCards = {};
-      
-      this.userData.adminCards.bpa = document.getElementById('admin-bpa').value;
-      this.userData.adminCards.bandec = document.getElementById('admin-bandec').value;
-      this.userData.adminCards.mlc = document.getElementById('admin-mlc').value;
-      this.userData.adminPhone = document.getElementById('admin-phone').value;
-      
-      this.saveUserData();
-      alert('✅ Datos de administrador guardados');
   },
   
   getUserData: function() {
