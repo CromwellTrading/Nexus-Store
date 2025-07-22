@@ -1,40 +1,69 @@
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
+  isAdmin: false,
   
   init: function() {
       console.log("Iniciando AdminSystem...");
       
-      // Esperar a que UserProfile esté completamente inicializado
-      const initAfterUserProfile = async () => {
-          // Si UserProfile aún no tiene datos, esperar
-          if (!UserProfile.userData) {
-              console.log("UserProfile no tiene datos, esperando...");
-              await UserProfile.init();
+      // Asegurarnos que UserProfile está inicializado
+      if (!UserProfile.userData) {
+          UserProfile.init();
+      }
+      
+      this.checkAdminStatus().then(() => {
+          this.initializeAdmin();
+      });
+  },
+  
+  checkAdminStatus: async function() {
+      console.log("Verificando estado de administrador...");
+      const telegramUserId = UserProfile.getTelegramUserId();
+      
+      if (!telegramUserId) {
+          console.log("No se encontró ID de Telegram");
+          this.isAdmin = false;
+          return;
+      }
+      
+      try {
+          const adminIds = await this.fetchAdminIds();
+          console.log("IDs de administradores recibidos:", adminIds);
+          
+          // Comparar como strings
+          this.isAdmin = adminIds.includes(telegramUserId.toString());
+          console.log("¿Es administrador?", this.isAdmin);
+      } catch (error) {
+          console.error("Error verificando admin:", error);
+          this.isAdmin = false;
+      }
+  },
+  
+  fetchAdminIds: async function() {
+      try {
+          console.log("Solicitando IDs de administradores...");
+          const response = await fetch(`${window.API_URL}/api/admin/ids`);
+          
+          if (!response.ok) {
+              throw new Error('Error en respuesta del servidor');
           }
           
-          console.log("UserProfile cargado, verificando admin...");
-          this.initializeAdmin();
-      };
-      
-      initAfterUserProfile();
+          return await response.json();
+      } catch (error) {
+          console.error('Error obteniendo admin IDs:', error);
+          return [];
+      }
   },
   
   initializeAdmin: function() {
-      console.log("Inicializando AdminSystem con datos de usuario:", UserProfile.userData);
-      
-      const isAdmin = UserProfile.userData.isAdmin;
-      console.log("¿Es administrador?", isAdmin);
+      console.log("Inicializando AdminSystem. Estado de administrador:", this.isAdmin);
       
       const adminButton = document.getElementById('admin-button');
       
       if (adminButton) {
-          console.log("Botón de admin encontrado en el DOM");
-          // Mostrar siempre el botón para admins
-          adminButton.style.display = isAdmin ? 'block' : 'none';
+          adminButton.style.display = this.isAdmin ? 'block' : 'none';
           
-          // Solo añadir evento si es admin
-          if (isAdmin) {
+          if (this.isAdmin) {
               console.log("Registrando evento click para botón de admin");
               adminButton.addEventListener('click', () => this.openAdminPanel());
           }
@@ -42,13 +71,9 @@ const AdminSystem = {
           console.error("Botón de admin no encontrado en el DOM");
       }
   },
-  
-  isAdminUser: function() {
-      return UserProfile.userData.isAdmin;
-  },
 
   openAdminPanel: function() {
-      if (!this.isAdminUser()) {
+      if (!this.isAdmin) {
           alert('Acceso restringido: solo administradores pueden acceder');
           return;
       }
@@ -232,19 +257,19 @@ const AdminSystem = {
                       <div class="payment-methods-form">
                           <div class="form-group">
                               <label>💳 Tarjeta BPA:</label>
-                              <input type="text" id="admin-bpa" value="${UserProfile.userData.adminCards?.bpa || ''}" class="modern-input" placeholder="Número de tarjeta">
+                              <input type="text" id="admin-bpa" class="modern-input" placeholder="Número de tarjeta">
                           </div>
                           <div class="form-group">
                               <label>💳 Tarjeta BANDEC:</label>
-                              <input type="text" id="admin-bandec" value="${UserProfile.userData.adminCards?.bandec || ''}" class="modern-input" placeholder="Número de tarjeta">
+                              <input type="text" id="admin-bandec" class="modern-input" placeholder="Número de tarjeta">
                           </div>
                           <div class="form-group">
                               <label>💳 Tarjeta MLC:</label>
-                              <input type="text" id="admin-mlc" value="${UserProfile.userData.adminCards?.mlc || ''}" class="modern-input" placeholder="Número de tarjeta">
+                              <input type="text" id="admin-mlc" class="modern-input" placeholder="Número de tarjeta">
                           </div>
                           <div class="form-group">
                               <label>📱 Teléfono para transferencias:</label>
-                              <input type="text" id="admin-phone" value="${UserProfile.userData.adminPhone || ''}" class="modern-input" placeholder="Número de teléfono">
+                              <input type="text" id="admin-phone" class="modern-input" placeholder="Número de teléfono">
                           </div>
                           <button id="save-payment-methods" class="save-btn">💾 Guardar Métodos de Pago</button>
                       </div>
@@ -361,15 +386,26 @@ const AdminSystem = {
       });
       
       document.getElementById('save-payment-methods')?.addEventListener('click', () => {
-          UserProfile.userData.adminCards = {
+          // Guardar métodos de pago en localStorage
+          const paymentData = {
               bpa: document.getElementById('admin-bpa').value,
               bandec: document.getElementById('admin-bandec').value,
-              mlc: document.getElementById('admin-mlc').value
+              mlc: document.getElementById('admin-mlc').value,
+              phone: document.getElementById('admin-phone').value
           };
-          UserProfile.userData.adminPhone = document.getElementById('admin-phone').value;
-          UserProfile.saveUserData();
+          localStorage.setItem('adminPaymentMethods', JSON.stringify(paymentData));
           alert('✅ Métodos de pago actualizados correctamente');
       });
+      
+      // Cargar métodos de pago guardados
+      const savedPaymentMethods = localStorage.getItem('adminPaymentMethods');
+      if (savedPaymentMethods) {
+          const paymentData = JSON.parse(savedPaymentMethods);
+          document.getElementById('admin-bpa').value = paymentData.bpa || '';
+          document.getElementById('admin-bandec').value = paymentData.bandec || '';
+          document.getElementById('admin-mlc').value = paymentData.mlc || '';
+          document.getElementById('admin-phone').value = paymentData.phone || '';
+      }
       
       document.getElementById('order-status-filter')?.addEventListener('change', (e) => {
           this.loadOrders(e.target.value);
