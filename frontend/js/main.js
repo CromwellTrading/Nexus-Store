@@ -2,7 +2,26 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
       console.log("Iniciando inicialización controlada...");
       
-      // 1. Inicializar componentes básicos
+      // 1. Inicializar UserProfile primero y ESPERAR a que termine
+      if (typeof UserProfile !== 'undefined') {
+          console.log("Inicializando UserProfile...");
+          await UserProfile.init();
+          console.log("UserProfile inicializado", UserProfile.userData);
+          
+          // 2. Inicializar AdminSystem solo si es admin
+          if (UserProfile.userData.isAdmin && typeof AdminSystem !== 'undefined') {
+              console.log("Inicializando AdminSystem...");
+              AdminSystem.init();
+          }
+          
+          // 3. Inicializar OrdersSystem que también depende de UserProfile
+          if (typeof OrdersSystem !== 'undefined') {
+              OrdersSystem.init();
+              console.log("OrdersSystem inicializado");
+          }
+      }
+      
+      // 4. Inicializar el resto de componentes
       if (typeof Notifications !== 'undefined') {
           Notifications.init();
           console.log("Notifications inicializado");
@@ -13,26 +32,6 @@ document.addEventListener('DOMContentLoaded', async function() {
           console.log("Themes inicializado");
       }
       
-      // 2. Inicializar UserProfile y ESPERAR a que termine
-      if (typeof UserProfile !== 'undefined') {
-          console.log("Inicializando UserProfile...");
-          await UserProfile.init();
-          console.log("UserProfile inicializado", UserProfile.userData);
-          
-          // 3. Inicializar AdminSystem inmediatamente después de UserProfile
-          if (typeof AdminSystem !== 'undefined') {
-              console.log("Inicializando AdminSystem...");
-              AdminSystem.init();
-          }
-          
-          // 3.1 Inicializar OrdersSystem que también depende de UserProfile
-          if (typeof OrdersSystem !== 'undefined') {
-              OrdersSystem.init();
-              console.log("OrdersSystem inicializado");
-          }
-      }
-      
-      // 4. Inicializar el resto de componentes
       if (typeof Tabs !== 'undefined') {
           Tabs.init();
           console.log("Tabs inicializado");
