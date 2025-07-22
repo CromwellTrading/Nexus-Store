@@ -123,10 +123,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Nueva ruta para obtener IDs de administradores
+// Nueva ruta para obtener IDs de administradores (CORREGIDA)
 app.get('/api/admin/ids', (req, res) => {
   const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(Number) 
+    ? process.env.ADMIN_IDS.split(',') // Mantener como array de strings
     : [];
     
   console.log('Solicitud de admin IDs recibida. Enviando:', adminIds);
