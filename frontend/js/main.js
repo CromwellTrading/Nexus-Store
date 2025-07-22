@@ -2,26 +2,20 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
       console.log("Iniciando inicialización controlada...");
       
-      // 1. Inicializar UserProfile primero y ESPERAR a que termine
+      // 1. Inicializar UserProfile (solo perfil)
       if (typeof UserProfile !== 'undefined') {
           console.log("Inicializando UserProfile...");
-          await UserProfile.init();
-          console.log("UserProfile inicializado", UserProfile.userData);
-          
-          // 2. Inicializar AdminSystem solo si es admin
-          if (UserProfile.userData.isAdmin && typeof AdminSystem !== 'undefined') {
-              console.log("Inicializando AdminSystem...");
-              AdminSystem.init();
-          }
-          
-          // 3. Inicializar OrdersSystem que también depende de UserProfile
-          if (typeof OrdersSystem !== 'undefined') {
-              OrdersSystem.init();
-              console.log("OrdersSystem inicializado");
-          }
+          UserProfile.init();
+          console.log("UserProfile inicializado");
       }
       
-      // 4. Inicializar el resto de componentes
+      // 2. Inicializar AdminSystem (contiene verificación de admin)
+      if (typeof AdminSystem !== 'undefined') {
+          console.log("Inicializando AdminSystem...");
+          await AdminSystem.init();
+      }
+      
+      // 3. Inicializar el resto de componentes
       if (typeof Notifications !== 'undefined') {
           Notifications.init();
           console.log("Notifications inicializado");
@@ -62,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           console.log("CheckoutSystem inicializado");
       }
       
-      // 5. Configurar eventos
+      // 4. Configurar eventos
       setupEventListeners();
       
       console.log("Todos los módulos inicializados correctamente");
@@ -80,13 +74,8 @@ function setupEventListeners() {
       }
   });
   
-  document.getElementById('admin-button')?.addEventListener('click', function() {
-      if (typeof AdminSystem !== 'undefined' && typeof AdminSystem.openAdminPanel === 'function') {
-          AdminSystem.openAdminPanel();
-      } else {
-          console.error("AdminSystem no está definido o no tiene openAdminPanel");
-      }
-  });
+  // Nota: El botón de admin ahora es controlado por AdminSystem
+  // El evento se registra en AdminSystem.initializeAdmin() si es admin
   
   document.getElementById('orders-button')?.addEventListener('click', function() {
       if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
