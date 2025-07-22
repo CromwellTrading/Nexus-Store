@@ -4,16 +4,20 @@ const AdminSystem = {
   
   init: function() {
       console.log("Iniciando AdminSystem...");
-      const checkUserProfile = () => {
-          if (typeof UserProfile !== 'undefined' && UserProfile.userData) {
-              console.log("UserProfile disponible, inicializando AdminSystem");
-              this.initializeAdmin();
-          } else {
-              console.log("UserProfile no disponible, reintentando en 100ms...");
-              setTimeout(checkUserProfile, 100);
+      
+      // Esperar a que UserProfile esté completamente inicializado
+      const initAfterUserProfile = async () => {
+          // Si UserProfile aún no tiene datos, esperar
+          if (!UserProfile.userData) {
+              console.log("UserProfile no tiene datos, esperando...");
+              await UserProfile.init();
           }
+          
+          console.log("UserProfile cargado, verificando admin...");
+          this.initializeAdmin();
       };
-      checkUserProfile();
+      
+      initAfterUserProfile();
   },
   
   initializeAdmin: function() {
@@ -26,13 +30,13 @@ const AdminSystem = {
       
       if (adminButton) {
           console.log("Botón de admin encontrado en el DOM");
+          // Mostrar siempre el botón para admins
           adminButton.style.display = isAdmin ? 'block' : 'none';
           
+          // Solo añadir evento si es admin
           if (isAdmin) {
               console.log("Registrando evento click para botón de admin");
               adminButton.addEventListener('click', () => this.openAdminPanel());
-          } else {
-              console.log("Usuario no es administrador, ocultando botón");
           }
       } else {
           console.error("Botón de admin no encontrado en el DOM");
