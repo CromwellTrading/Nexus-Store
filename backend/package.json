@@ -1,31 +1,19 @@
 {
-  "name": "tienda-virtual-backend",
+  "name": "nexus-store-backend",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Backend para tienda virtual en Cuba",
+  "description": "Backend para Nexus Store",
   "main": "app.js",
+  "type": "module",
   "scripts": {
-    "start": "node --experimental-modules app.js",
-    "dev": "nodemon --experimental-modules app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js"
   },
-  "keywords": [
-    "tienda",
-    "cuba",
-    "ecommerce"
-  ],
-  "author": "Tu Nombre",
-  "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "node-telegram-bot-api": "^0.61.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.65.0"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   }
 }
