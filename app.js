@@ -106,11 +106,25 @@ const DB = {
 // Middleware de autenticación para administradores
 const isAdmin = (req, res, next) => {
   const telegramId = req.headers['telegram-id'];
-  const adminIds = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [5376388604, 718827739];
   
-  if (!telegramId || !adminIds.includes(Number(telegramId))) {
-    return res.status(403).json({ error: 'Acceso no autorizado. Solo administradores.' });
+  // Convertir ADMIN_IDS a array de strings
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+    : ['5376388604', '718827739'];
+  
+  console.log('👑 Admin IDs:', adminIds);
+  console.log('🔑 Telegram ID recibido:', telegramId);
+  
+  if (!telegramId || !adminIds.includes(telegramId.toString())) {
+    console.log('❌ Acceso no autorizado. Telegram ID no coincide con admin IDs');
+    return res.status(403).json({ 
+      error: 'Acceso no autorizado. Solo administradores pueden acceder.',
+      receivedId: telegramId,
+      adminIds: adminIds
+    });
   }
+  
+  console.log('✅ Acceso autorizado para admin');
   next();
 };
 
@@ -125,11 +139,21 @@ app.get('*', (req, res) => {
 
 // Nueva ruta para obtener IDs de administradores (CORREGIDA)
 app.get('/api/admin/ids', (req, res) => {
+  console.log('📢 Solicitud recibida en /api/admin/ids');
+  console.log('🔑 HEADERS:', req.headers);
+  
+  // Obtener admin IDs como array de strings
   const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',') // Mantener como array de strings
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
     
-  console.log('Solicitud de admin IDs recibida. Enviando:', adminIds);
+  console.log('👑 Admin IDs enviados:', adminIds);
+  
+  // Configurar headers CORS explícitamente para esta ruta
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Telegram-ID');
+  
   res.json(adminIds);
 });
 
