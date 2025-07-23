@@ -163,9 +163,10 @@
     <!-- Configuración global -->
     <script>
         // Configuración global que debe ejecutarse primero
-        window.API_BASE_URL = window.location.hostname === 'localhost' 
-            ? 'http://localhost:6000/api' 
-            : 'https://nexus-store-86r8.onrender.com/api';
+        // Actualización: Ahora el backend está en un servicio separado en Render
+        // Cambiamos la URL base del backend para que apunte al servicio de backend en Render
+        // Reemplaza 'https://nexus-store-backend.onrender.com' con la URL real de tu backend en Render
+        window.API_BASE_URL = 'https://nexus-store-backend.onrender.com';
         
         console.log("API_BASE_URL configurada como:", window.API_BASE_URL);
         
@@ -265,7 +266,8 @@
                 addDebugLog('Probando conexión con API...', 'info');
                 
                 try {
-                    const response = await fetch(`${window.API_BASE_URL}/admin/ids`);
+                    // Nota: La ruta real es /api/admin/ids, pero en el backend separado la base ya es API_BASE_URL
+                    const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
                     const data = await response.json();
                     
                     if (Array.isArray(data)) {
