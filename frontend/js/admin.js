@@ -1,13 +1,10 @@
-// admin.js con sistema de logs detallado
+// admin.js - Sistema de administración optimizado
+"use strict";
 
-// Verificar si existe la función de logging, si no, crear una básica
+// Sistema de logging mejorado
 if (!window.addDebugLog) {
     window.addDebugLog = function(message, type = 'info') {
-        const consoleMethod = type === 'error' ? 'error' : 
-                             type === 'warning' ? 'warn' : 
-                             type === 'success' ? 'log' : 
-                             type === 'debug' ? 'debug' : 'log';
-        console[consoleMethod](`[AdminSystem] ${message}`);
+        console.log(`[${type.toUpperCase()}] ${message}`);
     };
 }
 
@@ -20,12 +17,13 @@ const AdminSystem = {
   init: function() {
       addDebugLog("Iniciando AdminSystem...", "debug");
       
-      // Obtener ID de Telegram directamente de la URL o localStorage
       this.telegramUserId = this.getTelegramUserId();
-      addDebugLog(`ID de Telegram obtenido: ${this.telegramUserId}`, this.telegramUserId ? "info" : "warning");
+      addDebugLog(`ID de Telegram obtenido: ${this.telegramUserId || 'No encontrado'}`, 
+                  this.telegramUserId ? "info" : "warning");
       
       this.checkAdminStatus().then(() => {
-          addDebugLog(`Resultado de verificación admin: ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
+          addDebugLog(`Resultado de verificación admin: ${this.isAdmin}`, 
+                      this.isAdmin ? "success" : "warning");
           this.initializeAdmin();
       }).catch(error => {
           addDebugLog(`Error en checkAdminStatus: ${error.message}`, "error");
@@ -37,7 +35,7 @@ const AdminSystem = {
       const tgid = urlParams.get('tgid');
       
       if (tgid) {
-          addDebugLog(`ID de Telegram encontrado en URL: ${tgid}`, "success");
+          addDebugLog(`ID de Telegram encontrado en URL: ${tgid}`, "info");
           localStorage.setItem('telegramUserId', tgid);
           return tgid;
       }
@@ -48,7 +46,6 @@ const AdminSystem = {
           return savedId;
       }
       
-      addDebugLog("No se encontró ID de Telegram", "warning");
       return null;
   },
   
@@ -63,21 +60,6 @@ const AdminSystem = {
       
       try {
           addDebugLog("Solicitando IDs de administradores al servidor...", "debug");
-          const adminIds = await this.fetchAdminIds();
-          addDebugLog(`IDs de administradores recibidos: ${adminIds.join(', ')}`, "info");
-          
-          // Comparar como strings
-          this.isAdmin = adminIds.includes(this.telegramUserId.toString());
-          addDebugLog(`¿Es administrador? ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
-      } catch (error) {
-          addDebugLog(`Error verificando admin: ${error.message}`, "error");
-          this.isAdmin = false;
-      }
-  },
-  
-  fetchAdminIds: async function() {
-      try {
-          // Actualizado: Usar window.API_BASE_URL
           const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
           
           if (!response.ok) {
@@ -85,33 +67,45 @@ const AdminSystem = {
               throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
           
-          return await response.json();
+          const adminIds = await response.json();
+          addDebugLog(`IDs de administradores recibidos: ${adminIds.join(', ')}`, "info");
+          
+          this.isAdmin = adminIds.includes(this.telegramUserId.toString());
       } catch (error) {
-          addDebugLog(`Error obteniendo admin IDs: ${error.message}`, "error");
-          return [];
+          addDebugLog(`Error verificando admin: ${error.message}`, "error");
+          this.isAdmin = false;
       }
   },
   
   initializeAdmin: function() {
       addDebugLog("Inicializando AdminSystem...", "debug");
-      addDebugLog(`Estado de administrador: ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
       
       const adminButton = document.getElementById('admin-button');
+      const adminIndicator = document.getElementById('admin-indicator');
       
       if (!adminButton) {
           addDebugLog("ERROR: Botón de admin no encontrado en el DOM", "error");
           return;
       }
       
-      adminButton.style.display = this.isAdmin ? 'block' : 'none';
-      addDebugLog(`Botón de admin visible: ${this.isAdmin}`, "info");
-      
       if (this.isAdmin) {
+          adminButton.style.display = 'block';
+          adminButton.classList.add('admin-active');
+          
+          if (adminIndicator) {
+              adminIndicator.style.display = 'block';
+          }
+          
           addDebugLog("Registrando evento click para botón de admin", "debug");
           adminButton.addEventListener('click', () => {
               addDebugLog("Clic en botón de admin", "info");
               this.openAdminPanel();
           });
+      } else {
+          adminButton.style.display = 'none';
+          if (adminIndicator) {
+              adminIndicator.style.display = 'none';
+          }
       }
   },
 
@@ -149,7 +143,6 @@ const AdminSystem = {
               <button class="admin-tab active" data-tab="products">🛒 Productos</button>
               <button class="admin-tab" data-tab="categories">📁 Categorías</button>
               <button class="admin-tab" data-tab="orders">📋 Pedidos</button>
-              <button class="admin-tab" data-tab="payment">💳 Métodos de Pago</button>
           </div>
           
           <div class="admin-content">
@@ -297,32 +290,6 @@ const AdminSystem = {
                   </div>
                   <div class="admin-orders-list" id="admin-orders-list"></div>
               </div>
-              
-              <div class="admin-tab-content" id="admin-payment" style="display: none;">
-                  <div class="admin-section">
-                      <h3>💳 Métodos de Pago</h3>
-                      
-                      <div class="payment-methods-form">
-                          <div class="form-group">
-                              <label>💳 Tarjeta BPA:</label>
-                              <input type="text" id="admin-bpa" class="modern-input" placeholder="Número de tarjeta">
-                          </div>
-                          <div class="form-group">
-                              <label>💳 Tarjeta BANDEC:</label>
-                              <input type="text" id="admin-bandec" class="modern-input" placeholder="Número de tarjeta">
-                          </div>
-                          <div class="form-group">
-                              <label>💳 Tarjeta MLC:</label>
-                              <input type="text" id="admin-mlc" class="modern-input" placeholder="Número de tarjeta">
-                          </div>
-                          <div class="form-group">
-                              <label>📱 Teléfono para transferencias:</label>
-                              <input type="text" id="admin-phone" class="modern-input" placeholder="Número de teléfono">
-                          </div>
-                          <button id="save-payment-methods" class="save-btn">💾 Guardar Métodos de Pago</button>
-                      </div>
-                  </div>
-              </div>
           </div>
       </div>`;
   },
@@ -448,31 +415,6 @@ const AdminSystem = {
           addDebugLog("Añadiendo nueva categoría", "info");
           this.addCategory();
       });
-      
-      document.getElementById('save-payment-methods')?.addEventListener('click', () => {
-          addDebugLog("Guardando métodos de pago", "info");
-          // Guardar métodos de pago en localStorage
-          const paymentData = {
-              bpa: document.getElementById('admin-bpa').value,
-              bandec: document.getElementById('admin-bandec').value,
-              mlc: document.getElementById('admin-mlc').value,
-              phone: document.getElementById('admin-phone').value
-          };
-          localStorage.setItem('adminPaymentMethods', JSON.stringify(paymentData));
-          alert('✅ Métodos de pago actualizados correctamente');
-          addDebugLog("Métodos de pago guardados", "success");
-      });
-      
-      // Cargar métodos de pago guardados
-      const savedPaymentMethods = localStorage.getItem('adminPaymentMethods');
-      if (savedPaymentMethods) {
-          const paymentData = JSON.parse(savedPaymentMethods);
-          document.getElementById('admin-bpa').value = paymentData.bpa || '';
-          document.getElementById('admin-bandec').value = paymentData.bandec || '';
-          document.getElementById('admin-mlc').value = paymentData.mlc || '';
-          document.getElementById('admin-phone').value = paymentData.phone || '';
-          addDebugLog("Métodos de pago cargados desde localStorage", "info");
-      }
       
       document.getElementById('order-status-filter')?.addEventListener('change', (e) => {
           addDebugLog(`Filtrando pedidos por estado: ${e.target.value}`, "info");
@@ -621,7 +563,6 @@ const AdminSystem = {
       // Enviar el producto al backend
       try {
           addDebugLog("Enviando producto al servidor...", "info");
-          // Actualizado: Usar window.API_BASE_URL
           const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
               method: 'POST',
               headers: { 
@@ -661,98 +602,93 @@ const AdminSystem = {
       container.innerHTML = '<h4>📦 Productos Existentes</h4>';
       
       // Cargar productos desde el backend
-      // Actualizado: Usar window.API_BASE_URL
-      fetch(`${window.API_BASE_URL}/api/products/fisico`)
-          .then(response => response.json())
-          .then(physicalProducts => {
-              fetch(`${window.API_BASE_URL}/api/products/digital`)
-                  .then(response => response.json())
-                  .then(digitalProducts => {
-                      const allProducts = [];
-                      
-                      // Procesar productos físicos
-                      Object.keys(physicalProducts).forEach(category => {
-                          physicalProducts[category].forEach(product => {
-                              allProducts.push({
-                                  ...product,
-                                  type: 'fisico',
-                                  category
-                              });
-                          });
-                      });
-                      
-                      // Procesar productos digitales
-                      Object.keys(digitalProducts).forEach(category => {
-                          digitalProducts[category].forEach(product => {
-                              allProducts.push({
-                                  ...product,
-                                  type: 'digital',
-                                  category
-                              });
-                          });
-                      });
-                      
-                      allProducts.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
-                      
-                      if (allProducts.length === 0) {
-                          container.innerHTML += '<p>No hay productos disponibles</p>';
-                          addDebugLog("No se encontraron productos", "info");
-                          return;
-                      }
-                      
-                      addDebugLog(`Mostrando ${allProducts.length} productos`, "info");
-                      
-                      allProducts.forEach(product => {
-                          const productEl = document.createElement('div');
-                          productEl.className = 'admin-product-item';
-                          productEl.innerHTML = `
-                              <div class="product-info">
-                                  <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
-                                  <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                                  <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
-                              </div>
-                              <div class="product-actions">
-                                  <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
-                                  <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
-                              </div>
-                          `;
-                          container.appendChild(productEl);
-                      });
-                      
-                      container.querySelectorAll('.edit-product').forEach(btn => {
-                          btn.addEventListener('click', (e) => {
-                              const id = e.target.getAttribute('data-id');
-                              const type = e.target.getAttribute('data-type');
-                              const category = e.target.getAttribute('data-category');
-                              addDebugLog(`Editando producto: ${id} (${type})`, "info");
-                              this.editProduct(id, type, category);
-                          });
-                      });
-                      
-                      container.querySelectorAll('.delete-product').forEach(btn => {
-                          btn.addEventListener('click', (e) => {
-                              const id = e.target.getAttribute('data-id');
-                              const type = e.target.getAttribute('data-type');
-                              const category = e.target.getAttribute('data-category');
-                              
-                              if (confirm('¿Estás seguro de eliminar este producto?')) {
-                                  addDebugLog(`Eliminando producto: ${id} (${type})`, "info");
-                                  this.deleteProduct(id, type, category);
-                              }
-                          });
-                      });
+      Promise.all([
+        fetch(`${window.API_BASE_URL}/api/products/fisico`).then(res => res.json()),
+        fetch(`${window.API_BASE_URL}/api/products/digital`).then(res => res.json())
+      ])
+      .then(([physicalProducts, digitalProducts]) => {
+          const allProducts = [];
+          
+          // Procesar productos físicos
+          Object.keys(physicalProducts).forEach(category => {
+              physicalProducts[category].forEach(product => {
+                  allProducts.push({
+                      ...product,
+                      type: 'fisico',
+                      category
                   });
-          })
-          .catch(error => {
-              addDebugLog(`Error cargando productos: ${error.message}`, "error");
-              container.innerHTML = '<p>Error cargando productos</p>';
+              });
           });
+          
+          // Procesar productos digitales
+          Object.keys(digitalProducts).forEach(category => {
+              digitalProducts[category].forEach(product => {
+                  allProducts.push({
+                      ...product,
+                      type: 'digital',
+                      category
+                  });
+              });
+          });
+          
+          allProducts.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
+          
+          if (allProducts.length === 0) {
+              container.innerHTML += '<p>No hay productos disponibles</p>';
+              addDebugLog("No se encontraron productos", "info");
+              return;
+          }
+          
+          addDebugLog(`Mostrando ${allProducts.length} productos`, "info");
+          
+          allProducts.forEach(product => {
+              const productEl = document.createElement('div');
+              productEl.className = 'admin-product-item';
+              productEl.innerHTML = `
+                  <div class="product-info">
+                      <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
+                      <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                      <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+                  </div>
+                  <div class="product-actions">
+                      <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
+                      <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
+                  </div>
+              `;
+              container.appendChild(productEl);
+          });
+          
+          container.querySelectorAll('.edit-product').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  const id = e.target.getAttribute('data-id');
+                  const type = e.target.getAttribute('data-type');
+                  const category = e.target.getAttribute('data-category');
+                  addDebugLog(`Editando producto: ${id} (${type})`, "info");
+                  this.editProduct(id, type, category);
+              });
+          });
+          
+          container.querySelectorAll('.delete-product').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  const id = e.target.getAttribute('data-id');
+                  const type = e.target.getAttribute('data-type');
+                  const category = e.target.getAttribute('data-category');
+                  
+                  if (confirm('¿Estás seguro de eliminar este producto?')) {
+                      addDebugLog(`Eliminando producto: ${id} (${type})`, "info");
+                      this.deleteProduct(id, type, category);
+                  }
+              });
+          });
+      })
+      .catch(error => {
+          addDebugLog(`Error cargando productos: ${error.message}`, "error");
+          container.innerHTML = '<p>Error cargando productos</p>';
+      });
   },
   
   editProduct: function(id, type, category) {
       addDebugLog(`Cargando producto para edición: ${id} (${type})`, "info");
-      // Obtener producto del backend
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/products/${type}/${id}`)
           .then(response => response.json())
           .then(product => {
@@ -852,7 +788,6 @@ const AdminSystem = {
   deleteProduct: function(id, type, category) {
       if (!confirm('¿Estás seguro de eliminar este producto?')) return;
       
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/admin/products/${type}/${category}/${id}`, {
           method: 'DELETE',
           headers: {
@@ -886,7 +821,6 @@ const AdminSystem = {
       
       addDebugLog(`Añadiendo categoría: ${name} (${type})`, "info");
       
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/admin/categories`, {
           method: 'POST',
           headers: { 
@@ -919,7 +853,6 @@ const AdminSystem = {
       const container = document.getElementById('categories-list');
       container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
       
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/categories/${type}`)
           .then(response => response.json())
           .then(categories => {
@@ -954,7 +887,6 @@ const AdminSystem = {
                       if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
                           addDebugLog(`Eliminando categoría: ${category} (${type})`, "info");
                           
-                          // Actualizado: Usar window.API_BASE_URL
                           fetch(`${window.API_BASE_URL}/api/admin/categories/${type}/${category}`, {
                               method: 'DELETE',
                               headers: {
@@ -990,7 +922,6 @@ const AdminSystem = {
       const ordersList = document.getElementById('admin-orders-list');
       ordersList.innerHTML = '';
       
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/admin/orders`)
           .then(response => response.json())
           .then(orders => {
@@ -1023,7 +954,7 @@ const AdminSystem = {
                   orderElement.innerHTML = `
                       <div class="order-header">
                           <div class="order-id">📋 Pedido #${order.id}</div>
-                          <div class="order-date">📅 ${order.date}</div>
+                          <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
                           <div class="order-status">
                               <select class="status-select" data-id="${order.id}">
                                   <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
@@ -1034,17 +965,8 @@ const AdminSystem = {
                           </div>
                       </div>
                       <div class="order-details">
-                          <div><strong>👤 Cliente:</strong> ${order.data.customer.fullName}</div>
-                          <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
-                          <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
-                          ${order.data.recipient ? `
-                              <div class="recipient-info">
-                                  <strong>📦 Entregar a:</strong> ${order.data.recipient.fullName} (CI: ${order.data.recipient.ci})
-                              </div>
-                          ` : ''}
-                          <div><strong>💳 Método de pago:</strong> ${order.data.payment.method}</div>
-                          <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
-                          <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
+                          <div><strong>👤 Cliente:</strong> ${order.recipient?.fullName || 'No especificado'}</div>
+                          <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
                       </div>
                       <div class="order-actions">
                           <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
@@ -1077,7 +999,6 @@ const AdminSystem = {
   },
   
   updateOrderStatus: function(orderId, newStatus) {
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
           method: 'PUT',
           headers: { 
@@ -1103,7 +1024,6 @@ const AdminSystem = {
   
   viewOrderDetails: function(orderId) {
       addDebugLog(`Cargando detalles del pedido: ${orderId}`, "debug");
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/orders/${orderId}`)
           .then(response => response.json())
           .then(order => {
@@ -1121,54 +1041,29 @@ const AdminSystem = {
                       </div>
                       <div class="order-details-full">
                           <div class="order-info">
-                              <div><strong>📅 Fecha:</strong> ${order.date}</div>
+                              <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
                               <div><strong>🔄 Estado:</strong> ${order.status}</div>
-                              <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
+                              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
                           </div>
                           
                           <h3>👤 Datos del Cliente</h3>
                           <div class="customer-info">
-                              <div><strong>Nombre:</strong> ${order.data.customer.fullName}</div>
-                              <div><strong>🆔 CI:</strong> ${order.data.customer.ci}</div>
-                              <div><strong>📱 Teléfono:</strong> ${order.data.customer.phone}</div>
-                              <div><strong>🏠 Dirección:</strong> ${order.data.customer.address}</div>
-                              <div><strong>📍 Provincia:</strong> ${order.data.customer.province}</div>
+                              <div><strong>Nombre:</strong> ${order.recipient.fullName}</div>
+                              <div><strong>🆔 CI:</strong> ${order.recipient.ci}</div>
+                              <div><strong>📱 Teléfono:</strong> ${order.recipient.phone}</div>
+                              <div><strong>📍 Provincia:</strong> ${order.recipient.province}</div>
                           </div>
-                          
-                          ${order.data.recipient ? `
-                              <h3>📦 Datos del Receptor</h3>
-                              <div class="recipient-info">
-                                  <div><strong>Nombre:</strong> ${order.data.recipient.fullName}</div>
-                                  <div><strong>🆔 CI:</strong> ${order.data.recipient.ci}</div>
-                                  <div><strong>📱 Teléfono:</strong> ${order.data.recipient.phone}</div>
-                              </div>
-                          ` : ''}
                           
                           <h3>💳 Información de Pago</h3>
                           <div class="payment-info">
-                              <div><strong>Método:</strong> ${order.data.payment.method}</div>
-                              <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId}</div>
-                              ${order.data.payment.method === 'Saldo Móvil' && order.data.payment.transferProof ? `
-                                  <div class="transfer-proof">
-                                      <strong>📸 Captura de transferencia:</strong>
-                                      <img src="${order.data.payment.transferProof}" 
-                                           alt="Comprobante de transferencia" 
-                                           class="proof-thumbnail"
-                                           style="max-width: 100px; cursor: pointer; margin-top: 10px;">
-                                  </div>
-                              ` : ''}
+                              <div><strong>Método:</strong> ${order.payment.method}</div>
+                              <div><strong>🔑 ID Transferencia:</strong> ${order.payment.transferId}</div>
                           </div>
                           
                           <h3>🛒 Productos</h3>
                           <div class="order-products">
-                              ${order.data.items.map(item => `
+                              ${order.items.map(item => `
                                   <div class="order-product-item">
-                                      <div class="product-image-container">
-                                          <img src="${item.imageUrl || 'placeholder.jpg'}" 
-                                               alt="${item.name}" 
-                                               class="order-product-image"
-                                               data-src="${item.imageUrl || 'placeholder.jpg'}">
-                                      </div>
                                       <div class="product-details">
                                           <div>${item.name}</div>
                                           <div>${item.quantity} x $${item.price.toFixed(2)}</div>
@@ -1177,15 +1072,6 @@ const AdminSystem = {
                                   </div>
                               `).join('')}
                           </div>
-                          
-                          ${order.data.requiredFields && Object.keys(order.data.requiredFields).length > 0 ? `
-                              <h3>📝 Datos Específicos</h3>
-                              <div class="required-fields-info">
-                                  ${Object.entries(order.data.requiredFields).map(([field, value]) => `
-                                      <div><strong>${field}:</strong> ${value}</div>
-                                  `).join('')}
-                              </div>
-                          ` : ''}
                       </div>
                   </div>
               `;
@@ -1193,24 +1079,6 @@ const AdminSystem = {
               modal.querySelector('.close-modal').addEventListener('click', () => {
                   addDebugLog("Cerrando detalles del pedido", "info");
                   this.openAdminPanel();
-              });
-              
-              modal.querySelectorAll('.order-product-image, .proof-thumbnail').forEach(img => {
-                  img.addEventListener('click', function(e) {
-                      const src = this.getAttribute('data-src') || this.src;
-                      const modalImg = document.createElement('div');
-                      modalImg.className = 'image-modal';
-                      modalImg.innerHTML = `
-                          <div class="image-modal-content">
-                              <img src="${src}" alt="Imagen ampliada">
-                          </div>
-                      `;
-                      document.body.appendChild(modalImg);
-                      
-                      modalImg.addEventListener('click', function() {
-                          document.body.removeChild(modalImg);
-                      });
-                  });
               });
           })
           .catch(error => {
@@ -1224,7 +1092,6 @@ const AdminSystem = {
       const categorySelect = document.getElementById('product-category');
       categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
       
-      // Actualizado: Usar window.API_BASE_URL
       fetch(`${window.API_BASE_URL}/api/categories/${type}`)
           .then(response => response.json())
           .then(categories => {
