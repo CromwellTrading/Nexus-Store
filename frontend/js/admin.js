@@ -1,3 +1,16 @@
+// admin.js con sistema de logs detallado
+
+// Verificar si existe la función de logging, si no, crear una básica
+if (!window.addDebugLog) {
+    window.addDebugLog = function(message, type = 'info') {
+        const consoleMethod = type === 'error' ? 'error' : 
+                             type === 'warning' ? 'warn' : 
+                             type === 'success' ? 'log' : 
+                             type === 'debug' ? 'debug' : 'log';
+        console[consoleMethod](`[AdminSystem] ${message}`);
+    };
+}
+
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -5,88 +18,112 @@ const AdminSystem = {
   telegramUserId: null,
   
   init: function() {
-      console.log("Iniciando AdminSystem...");
+      addDebugLog("Iniciando AdminSystem...", "debug");
       
       // Obtener ID de Telegram directamente de la URL o localStorage
       this.telegramUserId = this.getTelegramUserId();
-      console.log("ID de Telegram obtenido:", this.telegramUserId);
+      addDebugLog(`ID de Telegram obtenido: ${this.telegramUserId}`, this.telegramUserId ? "info" : "warning");
       
       this.checkAdminStatus().then(() => {
+          addDebugLog(`Resultado de verificación admin: ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
           this.initializeAdmin();
+      }).catch(error => {
+          addDebugLog(`Error en checkAdminStatus: ${error.message}`, "error");
       });
   },
   
   getTelegramUserId: function() {
       const urlParams = new URLSearchParams(window.location.search);
       const tgid = urlParams.get('tgid');
+      
       if (tgid) {
+          addDebugLog(`ID de Telegram encontrado en URL: ${tgid}`, "success");
           localStorage.setItem('telegramUserId', tgid);
           return tgid;
       }
-      return localStorage.getItem('telegramUserId');
+      
+      const savedId = localStorage.getItem('telegramUserId');
+      if (savedId) {
+          addDebugLog(`ID de Telegram encontrado en localStorage: ${savedId}`, "info");
+          return savedId;
+      }
+      
+      addDebugLog("No se encontró ID de Telegram", "warning");
+      return null;
   },
   
   checkAdminStatus: async function() {
-      console.log("Verificando estado de administrador...");
+      addDebugLog("Verificando estado de administrador...", "debug");
       
       if (!this.telegramUserId) {
-          console.log("No se encontró ID de Telegram");
+          addDebugLog("No hay ID de Telegram - acceso denegado", "warning");
           this.isAdmin = false;
           return;
       }
       
       try {
+          addDebugLog("Solicitando IDs de administradores al servidor...", "debug");
           const adminIds = await this.fetchAdminIds();
-          console.log("IDs de administradores recibidos:", adminIds);
+          addDebugLog(`IDs de administradores recibidos: ${adminIds.join(', ')}`, "info");
           
           // Comparar como strings
           this.isAdmin = adminIds.includes(this.telegramUserId.toString());
-          console.log("¿Es administrador?", this.isAdmin);
+          addDebugLog(`¿Es administrador? ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
       } catch (error) {
-          console.error("Error verificando admin:", error);
+          addDebugLog(`Error verificando admin: ${error.message}`, "error");
           this.isAdmin = false;
       }
   },
   
   fetchAdminIds: async function() {
       try {
-          console.log("Solicitando IDs de administradores...");
           const response = await fetch(`${window.API_URL}/api/admin/ids`);
           
           if (!response.ok) {
-              throw new Error('Error en respuesta del servidor');
+              const errorText = await response.text();
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
           
           return await response.json();
       } catch (error) {
-          console.error('Error obteniendo admin IDs:', error);
+          addDebugLog(`Error obteniendo admin IDs: ${error.message}`, "error");
           return [];
       }
   },
   
   initializeAdmin: function() {
-      console.log("Inicializando AdminSystem. Estado de administrador:", this.isAdmin);
+      addDebugLog("Inicializando AdminSystem...", "debug");
+      addDebugLog(`Estado de administrador: ${this.isAdmin}`, this.isAdmin ? "success" : "warning");
       
       const adminButton = document.getElementById('admin-button');
       
-      if (adminButton) {
-          adminButton.style.display = this.isAdmin ? 'block' : 'none';
-          
-          if (this.isAdmin) {
-              console.log("Registrando evento click para botón de admin");
-              adminButton.addEventListener('click', () => this.openAdminPanel());
-          }
-      } else {
-          console.error("Botón de admin no encontrado en el DOM");
+      if (!adminButton) {
+          addDebugLog("ERROR: Botón de admin no encontrado en el DOM", "error");
+          return;
+      }
+      
+      adminButton.style.display = this.isAdmin ? 'block' : 'none';
+      addDebugLog(`Botón de admin visible: ${this.isAdmin}`, "info");
+      
+      if (this.isAdmin) {
+          addDebugLog("Registrando evento click para botón de admin", "debug");
+          adminButton.addEventListener('click', () => {
+              addDebugLog("Clic en botón de admin", "info");
+              this.openAdminPanel();
+          });
       }
   },
 
   openAdminPanel: function() {
+      addDebugLog("Intentando abrir panel de administración", "debug");
+      
       if (!this.isAdmin) {
+          addDebugLog("Acceso denegado: no es administrador", "error");
           alert('Acceso restringido: solo administradores pueden acceder');
           return;
       }
       
+      addDebugLog("Mostrando panel de administración", "success");
       const modal = document.getElementById('product-modal');
       modal.innerHTML = this.getAdminPanelHTML();
       modal.style.display = 'flex';
@@ -95,6 +132,7 @@ const AdminSystem = {
       
       modal.querySelector('.close-modal').addEventListener('click', () => {
           modal.style.display = 'none';
+          addDebugLog("Panel de administración cerrado", "info");
       });
   },
   
@@ -289,9 +327,13 @@ const AdminSystem = {
   },
   
   setupAdminEvents: function() {
+      addDebugLog("Configurando eventos del panel admin", "debug");
+      
       document.querySelectorAll('.admin-tab').forEach(tab => {
           tab.addEventListener('click', () => {
               const tabType = tab.getAttribute('data-tab');
+              addDebugLog(`Cambiando a pestaña: ${tabType}`, "info");
+              
               document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
               tab.classList.add('active');
               
@@ -311,6 +353,7 @@ const AdminSystem = {
       });
       
       document.getElementById('add-product-btn').addEventListener('click', () => {
+          addDebugLog("Mostrando formulario de nuevo producto", "info");
           document.getElementById('product-form').style.display = 'block';
           document.getElementById('add-product-btn').style.display = 'none';
           this.resetProductForm();
@@ -320,6 +363,7 @@ const AdminSystem = {
           tab.addEventListener('click', (e) => {
               const type = e.target.getAttribute('data-type');
               this.productType = type;
+              addDebugLog(`Tipo de producto cambiado a: ${type}`, "info");
               
               document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
               e.target.classList.add('active');
@@ -336,16 +380,20 @@ const AdminSystem = {
           tab.addEventListener('click', (e) => {
               const type = e.target.getAttribute('data-type');
               this.categoryType = type;
+              addDebugLog(`Tipo de categoría cambiado a: ${type}`, "info");
               this.renderCategoriesList();
           });
       });
       
       document.getElementById('has-color-variant').addEventListener('change', (e) => {
+          const isChecked = e.target.checked;
+          addDebugLog(`Variantes de color: ${isChecked ? 'activado' : 'desactivado'}`, "info");
           document.getElementById('color-variant-section').style.display = 
-              e.target.checked ? 'block' : 'none';
+              isChecked ? 'block' : 'none';
       });
       
       document.getElementById('add-color-btn').addEventListener('click', () => {
+          addDebugLog("Añadiendo variante de color", "info");
           const container = document.getElementById('color-variants-container');
           const index = container.children.length;
           container.innerHTML += `
@@ -358,12 +406,14 @@ const AdminSystem = {
           
           container.querySelectorAll('.remove-color').forEach(btn => {
               btn.addEventListener('click', (e) => {
+                  addDebugLog("Eliminando variante de color", "info");
                   e.target.closest('.color-variant').remove();
               });
           });
       });
       
       document.getElementById('add-field-btn').addEventListener('click', () => {
+          addDebugLog("Añadiendo campo requerido", "info");
           const container = document.getElementById('required-fields-container');
           container.innerHTML += `
               <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -376,25 +426,30 @@ const AdminSystem = {
           
           container.querySelectorAll('.remove-field').forEach(btn => {
               btn.addEventListener('click', (e) => {
+                  addDebugLog("Eliminando campo requerido", "info");
                   e.target.closest('.required-field').remove();
               });
           });
       });
       
       document.getElementById('save-product').addEventListener('click', () => {
+          addDebugLog("Guardando producto...", "info");
           this.saveProduct();
       });
       
       document.getElementById('cancel-product').addEventListener('click', () => {
+          addDebugLog("Cancelando creación de producto", "info");
           document.getElementById('product-form').style.display = 'none';
           document.getElementById('add-product-btn').style.display = 'block';
       });
       
       document.getElementById('add-category-btn').addEventListener('click', () => {
+          addDebugLog("Añadiendo nueva categoría", "info");
           this.addCategory();
       });
       
       document.getElementById('save-payment-methods')?.addEventListener('click', () => {
+          addDebugLog("Guardando métodos de pago", "info");
           // Guardar métodos de pago en localStorage
           const paymentData = {
               bpa: document.getElementById('admin-bpa').value,
@@ -404,6 +459,7 @@ const AdminSystem = {
           };
           localStorage.setItem('adminPaymentMethods', JSON.stringify(paymentData));
           alert('✅ Métodos de pago actualizados correctamente');
+          addDebugLog("Métodos de pago guardados", "success");
       });
       
       // Cargar métodos de pago guardados
@@ -414,9 +470,11 @@ const AdminSystem = {
           document.getElementById('admin-bandec').value = paymentData.bandec || '';
           document.getElementById('admin-mlc').value = paymentData.mlc || '';
           document.getElementById('admin-phone').value = paymentData.phone || '';
+          addDebugLog("Métodos de pago cargados desde localStorage", "info");
       }
       
       document.getElementById('order-status-filter')?.addEventListener('change', (e) => {
+          addDebugLog(`Filtrando pedidos por estado: ${e.target.value}`, "info");
           this.loadOrders(e.target.value);
       });
       
@@ -426,6 +484,7 @@ const AdminSystem = {
   },
   
   uploadImageToImageKit: async function(file) {
+      addDebugLog(`Subiendo imagen: ${file.name}`, "debug");
       try {
           const formData = new FormData();
           formData.append('file', file);
@@ -441,21 +500,27 @@ const AdminSystem = {
           });
           
           const data = await response.json();
+          addDebugLog(`Imagen subida exitosamente: ${data.url}`, "success");
           return data.url;
       } catch (error) {
-          console.error('Error subiendo imagen:', error);
+          addDebugLog(`Error subiendo imagen: ${error.message}`, "error");
           return null;
       }
   },
 
   handleImageUploads: async function(inputId, previewId, isMultiple = true) {
+      addDebugLog(`Procesando subida de imágenes para: ${inputId}`, "debug");
       const input = document.getElementById(inputId);
       const preview = document.getElementById(previewId);
       preview.innerHTML = '';
       
-      if (!input.files || input.files.length === 0) return [];
+      if (!input.files || input.files.length === 0) {
+          addDebugLog("No se seleccionaron archivos", "warning");
+          return [];
+      }
       
       const urls = [];
+      addDebugLog(`Número de archivos seleccionados: ${input.files.length}`, "info");
       
       for (let i = 0; i < input.files.length; i++) {
           const file = input.files[i];
@@ -493,6 +558,8 @@ const AdminSystem = {
       const category = document.getElementById('product-category').value;
       const details = document.getElementById('product-details').value;
       
+      addDebugLog(`Guardando producto: ${name} (${type})`, "info");
+      
       const priceInputs = document.querySelectorAll('.price-currency');
       const prices = {};
       priceInputs.forEach(input => {
@@ -502,6 +569,7 @@ const AdminSystem = {
       });
       
       if (!name || !description || !category) {
+          addDebugLog("Campos requeridos incompletos", "error");
           alert('Por favor complete todos los campos requeridos');
           return;
       }
@@ -517,6 +585,7 @@ const AdminSystem = {
       };
       
       if (type === 'fisico') {
+          addDebugLog("Guardando producto físico", "debug");
           product.images = await this.handleImageUploads('product-images', 'image-preview', true);
           product.details = details;
           product.hasColorVariant = document.getElementById('has-color-variant').checked;
@@ -530,6 +599,7 @@ const AdminSystem = {
               });
           }
       } else {
+          addDebugLog("Guardando producto digital", "debug");
           const images = await this.handleImageUploads('digital-image', 'digital-image-preview', false);
           product.image = images.length > 0 ? images[0] : '';
           
@@ -549,6 +619,7 @@ const AdminSystem = {
       
       // Enviar el producto al backend
       try {
+          addDebugLog("Enviando producto al servidor...", "info");
           const response = await fetch(`${window.API_URL}/api/admin/products`, {
               method: 'POST',
               headers: { 
@@ -563,10 +634,12 @@ const AdminSystem = {
           });
           
           if (!response.ok) {
-              throw new Error('Error en la respuesta del servidor');
+              const errorText = await response.text();
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
           
           const savedProduct = await response.json();
+          addDebugLog("✅ Producto creado correctamente!", "success");
           alert('✅ Producto creado correctamente!');
           
           // Actualizar la lista de productos
@@ -575,12 +648,13 @@ const AdminSystem = {
           document.getElementById('product-form').style.display = 'none';
           document.getElementById('add-product-btn').style.display = 'block';
       } catch (error) {
-          console.error('Error guardando producto:', error);
+          addDebugLog(`Error guardando producto: ${error.message}`, "error");
           alert('Error al guardar el producto: ' + error.message);
       }
   },
   
   renderProductsList: function() {
+      addDebugLog("Cargando lista de productos...", "debug");
       const container = document.getElementById('products-list');
       container.innerHTML = '<h4>📦 Productos Existentes</h4>';
       
@@ -619,8 +693,11 @@ const AdminSystem = {
                       
                       if (allProducts.length === 0) {
                           container.innerHTML += '<p>No hay productos disponibles</p>';
+                          addDebugLog("No se encontraron productos", "info");
                           return;
                       }
+                      
+                      addDebugLog(`Mostrando ${allProducts.length} productos`, "info");
                       
                       allProducts.forEach(product => {
                           const productEl = document.createElement('div');
@@ -644,6 +721,7 @@ const AdminSystem = {
                               const id = e.target.getAttribute('data-id');
                               const type = e.target.getAttribute('data-type');
                               const category = e.target.getAttribute('data-category');
+                              addDebugLog(`Editando producto: ${id} (${type})`, "info");
                               this.editProduct(id, type, category);
                           });
                       });
@@ -655,6 +733,7 @@ const AdminSystem = {
                               const category = e.target.getAttribute('data-category');
                               
                               if (confirm('¿Estás seguro de eliminar este producto?')) {
+                                  addDebugLog(`Eliminando producto: ${id} (${type})`, "info");
                                   this.deleteProduct(id, type, category);
                               }
                           });
@@ -662,17 +741,21 @@ const AdminSystem = {
                   });
           })
           .catch(error => {
-              console.error('Error cargando productos:', error);
+              addDebugLog(`Error cargando productos: ${error.message}`, "error");
               container.innerHTML = '<p>Error cargando productos</p>';
           });
   },
   
   editProduct: function(id, type, category) {
+      addDebugLog(`Cargando producto para edición: ${id} (${type})`, "info");
       // Obtener producto del backend
       fetch(`${window.API_URL}/api/products/${type}/${id}`)
           .then(response => response.json())
           .then(product => {
-              if (!product) return;
+              if (!product) {
+                  addDebugLog("Producto no encontrado", "error");
+                  return;
+              }
               
               const form = document.getElementById('product-form');
               form.style.display = 'block';
@@ -757,7 +840,7 @@ const AdminSystem = {
               };
           })
           .catch(error => {
-              console.error('Error cargando producto:', error);
+              addDebugLog(`Error cargando producto: ${error.message}`, "error");
               alert('Error al cargar el producto para edición');
           });
   },
@@ -773,6 +856,7 @@ const AdminSystem = {
       })
       .then(response => {
           if (response.ok) {
+              addDebugLog("✅ Producto eliminado correctamente", "success");
               this.renderProductsList();
               alert('✅ Producto eliminado correctamente');
           } else {
@@ -780,7 +864,7 @@ const AdminSystem = {
           }
       })
       .catch(error => {
-          console.error('Error eliminando producto:', error);
+          addDebugLog(`Error eliminando producto: ${error.message}`, "error");
           alert('Error al eliminar el producto: ' + error.message);
       });
   },
@@ -790,9 +874,12 @@ const AdminSystem = {
       const name = document.getElementById('new-category-name').value.trim();
       
       if (!name) {
+          addDebugLog("Nombre de categoría vacío", "warning");
           alert('Por favor ingrese un nombre para la categoría');
           return;
       }
+      
+      addDebugLog(`Añadiendo categoría: ${name} (${type})`, "info");
       
       fetch(`${window.API_URL}/api/admin/categories`, {
           method: 'POST',
@@ -807,6 +894,7 @@ const AdminSystem = {
       })
       .then(response => {
           if (response.ok) {
+              addDebugLog("✅ Categoría añadida correctamente!", "success");
               alert('✅ Categoría añadida correctamente!');
               this.renderCategoriesList();
           } else {
@@ -814,13 +902,14 @@ const AdminSystem = {
           }
       })
       .catch(error => {
-          console.error('Error añadiendo categoría:', error);
+          addDebugLog(`Error añadiendo categoría: ${error.message}`, "error");
           alert('Error al añadir categoría: ' + error.message);
       });
   },
   
   renderCategoriesList: function() {
       const type = this.categoryType;
+      addDebugLog(`Cargando categorías de ${type}`, "debug");
       const container = document.getElementById('categories-list');
       container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
       
@@ -829,8 +918,11 @@ const AdminSystem = {
           .then(categories => {
               if (!categories || categories.length === 0) {
                   container.innerHTML += '<p>No hay categorías definidas</p>';
+                  addDebugLog("No se encontraron categorías", "info");
                   return;
               }
+              
+              addDebugLog(`Mostrando ${categories.length} categorías`, "info");
               
               categories.forEach(category => {
                   const categoryEl = document.createElement('div');
@@ -853,6 +945,8 @@ const AdminSystem = {
                       const category = e.target.getAttribute('data-category');
                       
                       if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
+                          addDebugLog(`Eliminando categoría: ${category} (${type})`, "info");
+                          
                           fetch(`${window.API_URL}/api/admin/categories/${type}/${category}`, {
                               method: 'DELETE',
                               headers: {
@@ -861,6 +955,7 @@ const AdminSystem = {
                           })
                           .then(response => {
                               if (response.ok) {
+                                  addDebugLog("✅ Categoría eliminada correctamente", "success");
                                   this.renderCategoriesList();
                                   this.renderProductsList();
                                   alert('✅ Categoría eliminada correctamente');
@@ -869,7 +964,7 @@ const AdminSystem = {
                               }
                           })
                           .catch(error => {
-                              console.error('Error eliminando categoría:', error);
+                              addDebugLog(`Error eliminando categoría: ${error.message}`, "error");
                               alert('Error al eliminar categoría: ' + error.message);
                           });
                       }
@@ -877,12 +972,13 @@ const AdminSystem = {
               });
           })
           .catch(error => {
-              console.error('Error cargando categorías:', error);
+              addDebugLog(`Error cargando categorías: ${error.message}`, "error");
               container.innerHTML = '<p>Error cargando categorías</p>';
           });
   },
   
   loadOrders: function(filter = 'all') {
+      addDebugLog(`Cargando pedidos (filtro: ${filter})`, "debug");
       const ordersList = document.getElementById('admin-orders-list');
       ordersList.innerHTML = '';
       
@@ -906,8 +1002,11 @@ const AdminSystem = {
               
               if (filteredOrders.length === 0) {
                   ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+                  addDebugLog("No se encontraron pedidos", "info");
                   return;
               }
+              
+              addDebugLog(`Mostrando ${filteredOrders.length} pedidos`, "info");
               
               filteredOrders.forEach(order => {
                   const orderElement = document.createElement('div');
@@ -948,6 +1047,7 @@ const AdminSystem = {
               document.querySelectorAll('.btn-view').forEach(button => {
                   button.addEventListener('click', (e) => {
                       const orderId = e.target.getAttribute('data-id');
+                      addDebugLog(`Viendo detalles del pedido: ${orderId}`, "info");
                       this.viewOrderDetails(orderId);
                   });
               });
@@ -956,12 +1056,13 @@ const AdminSystem = {
                   select.addEventListener('change', (e) => {
                       const orderId = e.target.getAttribute('data-id');
                       const newStatus = e.target.value;
+                      addDebugLog(`Actualizando estado del pedido ${orderId} a ${newStatus}`, "info");
                       this.updateOrderStatus(orderId, newStatus);
                   });
               });
           })
           .catch(error => {
-              console.error('Error cargando pedidos:', error);
+              addDebugLog(`Error cargando pedidos: ${error.message}`, "error");
               ordersList.innerHTML = '<p>Error cargando pedidos</p>';
           });
   },
@@ -977,6 +1078,7 @@ const AdminSystem = {
       })
       .then(response => {
           if (response.ok) {
+              addDebugLog("✅ Estado actualizado correctamente", "success");
               this.loadOrders(document.getElementById('order-status-filter').value);
               alert('✅ Estado actualizado correctamente');
           } else {
@@ -984,16 +1086,20 @@ const AdminSystem = {
           }
       })
       .catch(error => {
-          console.error('Error actualizando estado:', error);
+          addDebugLog(`Error actualizando estado: ${error.message}`, "error");
           alert('Error actualizando estado: ' + error.message);
       });
   },
   
   viewOrderDetails: function(orderId) {
+      addDebugLog(`Cargando detalles del pedido: ${orderId}`, "debug");
       fetch(`${window.API_URL}/api/orders/${orderId}`)
           .then(response => response.json())
           .then(order => {
-              if (!order) return;
+              if (!order) {
+                  addDebugLog("Pedido no encontrado", "error");
+                  return;
+              }
               
               const modal = document.getElementById('product-modal');
               modal.innerHTML = `
@@ -1074,6 +1180,7 @@ const AdminSystem = {
               `;
               
               modal.querySelector('.close-modal').addEventListener('click', () => {
+                  addDebugLog("Cerrando detalles del pedido", "info");
                   this.openAdminPanel();
               });
               
@@ -1096,12 +1203,13 @@ const AdminSystem = {
               });
           })
           .catch(error => {
-              console.error('Error cargando detalles del pedido:', error);
+              addDebugLog(`Error cargando detalles del pedido: ${error.message}`, "error");
               alert('Error al cargar detalles del pedido');
           });
   },
   
   renderCategoryOptions: function(type = 'fisico') {
+      addDebugLog(`Cargando opciones de categoría para tipo: ${type}`, "debug");
       const categorySelect = document.getElementById('product-category');
       categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
       
@@ -1114,9 +1222,10 @@ const AdminSystem = {
                   option.textContent = this.getCategoryName(category);
                   categorySelect.appendChild(option);
               });
+              addDebugLog(`${categories.length} categorías cargadas`, "info");
           })
           .catch(error => {
-              console.error('Error cargando categorías:', error);
+              addDebugLog(`Error cargando categorías: ${error.message}`, "error");
           });
   },
   
@@ -1131,6 +1240,7 @@ const AdminSystem = {
   },
   
   resetProductForm: function() {
+      addDebugLog("Reseteando formulario de producto", "debug");
       document.getElementById('product-name').value = '';
       document.getElementById('product-description').value = '';
       document.getElementById('product-details').value = '';
