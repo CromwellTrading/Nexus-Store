@@ -7,89 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <style>
-        .script-status {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.85);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            z-index: 10000;
-            font-family: monospace;
-            font-size: 14px;
-            width: 500px;
-            max-height: 400px;
-            overflow: auto;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-        }
-        
-        .script-status h3 {
-            margin-top: 0;
-            color: #4fc3f7;
-            border-bottom: 1px solid #444;
-            padding-bottom: 8px;
-        }
-        
-        .log-entry {
-            margin-bottom: 8px;
-            padding: 6px;
-            border-left: 3px solid #4fc3f7;
-            background: rgba(255,255,255,0.05);
-        }
-        
-        .log-error {
-            border-left-color: #f44336;
-            color: #f44336;
-        }
-        
-        .log-warning {
-            border-left-color: #ff9800;
-            color: #ff9800;
-        }
-        
-        .log-success {
-            border-left-color: #4caf50;
-            color: #4caf50;
-        }
-        
-        .log-debug {
-            border-left-color: #9c27b0;
-        }
-        
-        .debug-controls {
-            margin: 10px 0;
-            padding: 10px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 4px;
-        }
-        
-        .debug-btn {
-            background: #2196f3;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 5px;
-            font-size: 12px;
-        }
-        
-        .debug-btn:hover {
-            background: #0d8aee;
-        }
-        
-        #admin-button.admin-active {
-            background-color: #4caf50;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
-        }
-        
+        /* Estilo para el indicador de admin */
         .admin-indicator {
             position: fixed;
             top: 10px;
@@ -101,6 +19,19 @@
             font-size: 12px;
             z-index: 10000;
             display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        /* Animación para el botón de admin */
+        #admin-button.admin-active {
+            background-color: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
     </style>
 </head>
@@ -163,83 +94,24 @@
     </div>
     
     <div id="product-modal" style="display: none;"></div>
-    
-    <!-- Panel de diagnóstico mejorado -->
-    <div id="script-status" class="script-status">
-        <h3>Depuración de Nexus Store</h3>
-        <div class="debug-controls">
-            <button class="debug-btn" id="refresh-logs">Actualizar</button>
-            <button class="debug-btn" id="clear-logs">Limpiar</button>
-            <button class="debug-btn" id="force-admin">Forzar Admin</button>
-            <button class="debug-btn" id="test-api">Probar API</button>
-            <button class="debug-btn" id="toggle-logs">Ocultar</button>
-        </div>
-        <div id="status-content"></div>
-    </div>
 
-    <!-- Configuración global -->
+    <!-- Configuración global simplificada -->
     <script>
-        // Configuración global - Asegúrate de actualizar esta URL con tu backend en Render
-        window.API_BASE_URL = 'https://nexus-store-86r8.onrender.com';
+        // URL de tu backend - ACTUALIZA ESTA VARIABLE CON TU URL
+        window.API_BASE_URL = 'https://nexus-store-backend.onrender.com';
         
         // Variable global para estado de admin
         window.ADMIN_IDS = [];
         
-        // Sistema de logging avanzado
-        const LogSystem = {
-            logs: [],
-            visible: true,
-            
-            addLog: function(message, type = 'info') {
-                const logEntry = {
-                    timestamp: new Date().toLocaleTimeString(),
-                    message: message,
-                    type: type
-                };
-                
-                this.logs.push(logEntry);
-                this.renderLogs();
-                
-                // Registrar en consola
-                const consoleMethod = type === 'error' ? 'error' : 
-                                     type === 'warning' ? 'warn' : 'log';
-                console[consoleMethod](`[${logEntry.timestamp}] ${message}`);
-            },
-            
-            renderLogs: function() {
-                const container = document.getElementById('status-content');
-                if (!container) return;
-                
-                let html = '';
-                this.logs.forEach(log => {
-                    html += `
-                        <div class="log-entry log-${log.type}">
-                            <strong>[${log.timestamp}]</strong> ${log.message}
-                        </div>
-                    `;
-                });
-                
-                container.innerHTML = html;
-                container.scrollTop = container.scrollHeight;
-            },
-            
-            clearLogs: function() {
-                this.logs = [];
-                this.renderLogs();
-            },
-            
-            toggleVisibility: function() {
-                this.visible = !this.visible;
-                const panel = document.getElementById('script-status');
-                panel.style.display = this.visible ? 'block' : 'none';
+        // Función mínima de logging para admin
+        window.addDebugLog = function(message, type = 'info') {
+            if (window.AdminSystem && window.AdminSystem.isAdmin) {
+                console.log(`[${type}] ${message}`);
             }
         };
-        
-        // Función global para fácil acceso
-        window.addDebugLog = LogSystem.addLog.bind(LogSystem);
     </script>
 
-    <!-- Scripts en el orden CORRECTO -->
+    <!-- Scripts esenciales -->
     <script src="/js/notifications.js"></script>
     <script src="/js/themes.js"></script>
     <script src="/js/tabs.js"></script>
@@ -253,111 +125,28 @@
     <script src="/js/admin.js"></script>
     <script src="/js/main.js"></script>
     
-    <!-- Script de inicialización del sistema de depuración -->
+    <!-- Script de inicialización simplificado -->
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Registrar eventos de los controles de depuración
-            document.getElementById('refresh-logs').addEventListener('click', () => {
-                LogSystem.renderLogs();
-                addDebugLog('Logs actualizados manualmente', 'debug');
-            });
-            
-            document.getElementById('clear-logs').addEventListener('click', () => {
-                LogSystem.clearLogs();
-                addDebugLog('Logs limpiados', 'success');
-            });
-            
-            document.getElementById('force-admin').addEventListener('click', () => {
-                addDebugLog('Forzando modo administrador...', 'warning');
-                if (window.AdminSystem) {
-                    window.AdminSystem.isAdmin = true;
-                    window.AdminSystem.initializeAdmin();
-                    addDebugLog('Modo administrador forzado. Botón debería ser visible.', 'success');
-                    
-                    // Destacar visualmente el botón de admin
-                    const adminButton = document.getElementById('admin-button');
-                    if (adminButton) {
-                        adminButton.style.display = 'block';
-                        adminButton.classList.add('admin-active');
-                    }
-                    
-                    // Mostrar indicador de admin
-                    const indicator = document.getElementById('admin-indicator');
-                    if (indicator) {
-                        indicator.style.display = 'block';
-                    }
-                } else {
-                    addDebugLog('Error: AdminSystem no está definido', 'error');
-                }
-            });
-            
-            document.getElementById('test-api').addEventListener('click', async () => {
-                addDebugLog('Probando conexión con API...', 'info');
-                
-                try {
-                    const response = await fetch(`${window.API_BASE_URL}/api/admin/health`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    addDebugLog(`✅ API respondió correctamente. Estado: ${data.status}`, 'success');
-                    
-                    // Probar también los admin IDs
-                    const idsResponse = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
-                    if (!idsResponse.ok) {
-                        throw new Error(`HTTP ${idsResponse.status} en admin/ids`);
-                    }
-                    
-                    const idsData = await idsResponse.json();
-                    addDebugLog(`✅ IDs de admin obtenidos: ${idsData.join(', ')}`, 'success');
-                } catch (error) {
-                    addDebugLog(`❌ Error conectando a API: ${error.message}`, 'error');
-                }
-            });
-            
-            document.getElementById('toggle-logs').addEventListener('click', () => {
-                LogSystem.toggleVisibility();
-                document.getElementById('toggle-logs').textContent = 
-                    LogSystem.visible ? 'Ocultar' : 'Mostrar';
-            });
-            
-            // Mensaje inicial
-            addDebugLog('Sistema de depuración inicializado', 'success');
-            addDebugLog(`URL actual: ${window.location.href}`, 'info');
-            addDebugLog(`Parámetros URL: ${window.location.search}`, 'info');
-            addDebugLog(`API_BASE_URL: ${window.API_BASE_URL}`, 'info');
-            
-            // Verificar si hay un ID de Telegram en la URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const tgid = urlParams.get('tgid');
-            if (tgid) {
-                addDebugLog(`ID de Telegram detectado en URL: ${tgid}`, 'info');
-                localStorage.setItem('telegramUserId', tgid);
-            } else {
-                const savedId = localStorage.getItem('telegramUserId');
-                if (savedId) {
-                    addDebugLog(`ID de Telegram encontrado en localStorage: ${savedId}`, 'info');
-                } else {
-                    addDebugLog('No se detectó ID de Telegram', 'warning');
-                }
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicializar AdminSystem si existe
+            if (window.AdminSystem) {
+                AdminSystem.init();
             }
             
-            // Verificar conexión con el backend
-            setTimeout(async () => {
-                addDebugLog('Verificando estado del backend...', 'debug');
-                try {
-                    const response = await fetch(`${window.API_BASE_URL}/api/admin/health`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        addDebugLog(`✅ Backend conectado: ${data.status}`, 'success');
+            // Mostrar indicador de admin si es necesario
+            const adminIndicator = document.getElementById('admin-indicator');
+            const adminButton = document.getElementById('admin-button');
+            
+            if (adminIndicator && adminButton) {
+                setInterval(() => {
+                    if (window.AdminSystem && window.AdminSystem.isAdmin) {
+                        adminIndicator.style.display = 'block';
+                        adminButton.style.display = 'block';
                     } else {
-                        addDebugLog(`⚠️ Backend respondió con estado: ${response.status}`, 'warning');
+                        adminIndicator.style.display = 'none';
                     }
-                } catch (error) {
-                    addDebugLog(`❌ Error conectando al backend: ${error.message}`, 'error');
-                }
-            }, 1000);
+                }, 1000);
+            }
         });
     </script>
 </body>
