@@ -77,7 +77,8 @@ const AdminSystem = {
   
   fetchAdminIds: async function() {
       try {
-          const response = await fetch(`${window.API_URL}/api/admin/ids`);
+          // Actualizado: Usar window.API_BASE_URL
+          const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
           
           if (!response.ok) {
               const errorText = await response.text();
@@ -620,7 +621,8 @@ const AdminSystem = {
       // Enviar el producto al backend
       try {
           addDebugLog("Enviando producto al servidor...", "info");
-          const response = await fetch(`${window.API_URL}/api/admin/products`, {
+          // Actualizado: Usar window.API_BASE_URL
+          const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
               method: 'POST',
               headers: { 
                   'Content-Type': 'application/json',
@@ -659,10 +661,11 @@ const AdminSystem = {
       container.innerHTML = '<h4>📦 Productos Existentes</h4>';
       
       // Cargar productos desde el backend
-      fetch(`${window.API_URL}/api/products/fisico`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/products/fisico`)
           .then(response => response.json())
           .then(physicalProducts => {
-              fetch(`${window.API_URL}/api/products/digital`)
+              fetch(`${window.API_BASE_URL}/api/products/digital`)
                   .then(response => response.json())
                   .then(digitalProducts => {
                       const allProducts = [];
@@ -749,7 +752,8 @@ const AdminSystem = {
   editProduct: function(id, type, category) {
       addDebugLog(`Cargando producto para edición: ${id} (${type})`, "info");
       // Obtener producto del backend
-      fetch(`${window.API_URL}/api/products/${type}/${id}`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/products/${type}/${id}`)
           .then(response => response.json())
           .then(product => {
               if (!product) {
@@ -848,7 +852,8 @@ const AdminSystem = {
   deleteProduct: function(id, type, category) {
       if (!confirm('¿Estás seguro de eliminar este producto?')) return;
       
-      fetch(`${window.API_URL}/api/admin/products/${type}/${category}/${id}`, {
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/admin/products/${type}/${category}/${id}`, {
           method: 'DELETE',
           headers: {
               'Telegram-ID': this.telegramUserId.toString()
@@ -881,7 +886,8 @@ const AdminSystem = {
       
       addDebugLog(`Añadiendo categoría: ${name} (${type})`, "info");
       
-      fetch(`${window.API_URL}/api/admin/categories`, {
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/admin/categories`, {
           method: 'POST',
           headers: { 
               'Content-Type': 'application/json',
@@ -913,7 +919,8 @@ const AdminSystem = {
       const container = document.getElementById('categories-list');
       container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
       
-      fetch(`${window.API_URL}/api/categories/${type}`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/categories/${type}`)
           .then(response => response.json())
           .then(categories => {
               if (!categories || categories.length === 0) {
@@ -947,7 +954,8 @@ const AdminSystem = {
                       if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
                           addDebugLog(`Eliminando categoría: ${category} (${type})`, "info");
                           
-                          fetch(`${window.API_URL}/api/admin/categories/${type}/${category}`, {
+                          // Actualizado: Usar window.API_BASE_URL
+                          fetch(`${window.API_BASE_URL}/api/admin/categories/${type}/${category}`, {
                               method: 'DELETE',
                               headers: {
                                   'Telegram-ID': this.telegramUserId.toString()
@@ -982,7 +990,8 @@ const AdminSystem = {
       const ordersList = document.getElementById('admin-orders-list');
       ordersList.innerHTML = '';
       
-      fetch(`${window.API_URL}/api/admin/orders`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/admin/orders`)
           .then(response => response.json())
           .then(orders => {
               let filteredOrders = orders;
@@ -1068,7 +1077,8 @@ const AdminSystem = {
   },
   
   updateOrderStatus: function(orderId, newStatus) {
-      fetch(`${window.API_URL}/api/admin/orders/${orderId}`, {
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
           method: 'PUT',
           headers: { 
               'Content-Type': 'application/json',
@@ -1093,7 +1103,8 @@ const AdminSystem = {
   
   viewOrderDetails: function(orderId) {
       addDebugLog(`Cargando detalles del pedido: ${orderId}`, "debug");
-      fetch(`${window.API_URL}/api/orders/${orderId}`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/orders/${orderId}`)
           .then(response => response.json())
           .then(order => {
               if (!order) {
@@ -1213,7 +1224,8 @@ const AdminSystem = {
       const categorySelect = document.getElementById('product-category');
       categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
       
-      fetch(`${window.API_URL}/api/categories/${type}`)
+      // Actualizado: Usar window.API_BASE_URL
+      fetch(`${window.API_BASE_URL}/api/categories/${type}`)
           .then(response => response.json())
           .then(categories => {
               categories.forEach(category => {
@@ -1263,3 +1275,8 @@ const AdminSystem = {
       });
   }
 };
+
+// Inicializar AdminSystem cuando el script se carga
+document.addEventListener('DOMContentLoaded', () => {
+    AdminSystem.init();
+});
