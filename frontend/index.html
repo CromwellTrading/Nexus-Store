@@ -79,7 +79,6 @@
             background: #0d8aee;
         }
         
-        /* Estilo para el botón de admin cuando está activo */
         #admin-button.admin-active {
             background-color: #4caf50;
             animation: pulse 2s infinite;
@@ -90,9 +89,27 @@
             70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
             100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
+        
+        .admin-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #4caf50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 10000;
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <!-- Indicador de modo administrador -->
+    <div id="admin-indicator" class="admin-indicator">
+        <i class="fas fa-user-shield"></i> Modo Administrador
+    </div>
+    
     <div class="container">
         <div class="tabs">
             <button class="tab-button active" data-tab="fisico">Físico</button>
@@ -111,7 +128,6 @@
                     <button class="icon-button" id="profile-button"><i class="fas fa-user"></i></button>
                     <button class="icon-button" id="orders-button"><i class="fas fa-clipboard-list"></i></button>
                     <button class="icon-button" id="theme-button"><i class="fas fa-palette"></i></button>
-                    <!-- Botón de admin oculto por defecto -->
                     <button class="icon-button" id="admin-button" style="display: none;">
                         <i class="fas fa-user-cog"></i>
                     </button>
@@ -150,25 +166,21 @@
     
     <!-- Panel de diagnóstico mejorado -->
     <div id="script-status" class="script-status">
-        <h3>Depuración de Admin System</h3>
+        <h3>Depuración de Nexus Store</h3>
         <div class="debug-controls">
             <button class="debug-btn" id="refresh-logs">Actualizar</button>
             <button class="debug-btn" id="clear-logs">Limpiar</button>
             <button class="debug-btn" id="force-admin">Forzar Admin</button>
             <button class="debug-btn" id="test-api">Probar API</button>
+            <button class="debug-btn" id="toggle-logs">Ocultar</button>
         </div>
         <div id="status-content"></div>
     </div>
 
     <!-- Configuración global -->
     <script>
-        // Configuración global que debe ejecutarse primero
-        // Actualización: Ahora el backend está en un servicio separado en Render
-        // Cambiamos la URL base del backend para que apunte al servicio de backend en Render
-        // Reemplaza 'https://nexus-store-backend.onrender.com' con la URL real de tu backend en Render
+        // Configuración global - Asegúrate de actualizar esta URL con tu backend en Render
         window.API_BASE_URL = 'https://nexus-store-backend.onrender.com';
-        
-        console.log("API_BASE_URL configurada como:", window.API_BASE_URL);
         
         // Variable global para estado de admin
         window.ADMIN_IDS = [];
@@ -176,6 +188,7 @@
         // Sistema de logging avanzado
         const LogSystem = {
             logs: [],
+            visible: true,
             
             addLog: function(message, type = 'info') {
                 const logEntry = {
@@ -187,7 +200,7 @@
                 this.logs.push(logEntry);
                 this.renderLogs();
                 
-                // También registrar en consola
+                // Registrar en consola
                 const consoleMethod = type === 'error' ? 'error' : 
                                      type === 'warning' ? 'warn' : 'log';
                 console[consoleMethod](`[${logEntry.timestamp}] ${message}`);
@@ -213,6 +226,12 @@
             clearLogs: function() {
                 this.logs = [];
                 this.renderLogs();
+            },
+            
+            toggleVisibility: function() {
+                this.visible = !this.visible;
+                const panel = document.getElementById('script-status');
+                panel.style.display = this.visible ? 'block' : 'none';
             }
         };
         
@@ -220,7 +239,7 @@
         window.addDebugLog = LogSystem.addLog.bind(LogSystem);
     </script>
 
-    <!-- Scripts en el orden CORRECTO con verificación de carga -->
+    <!-- Scripts en el orden CORRECTO -->
     <script src="/js/notifications.js"></script>
     <script src="/js/themes.js"></script>
     <script src="/js/tabs.js"></script>
@@ -236,7 +255,7 @@
     
     <!-- Script de inicialización del sistema de depuración -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // Registrar eventos de los controles de depuración
             document.getElementById('refresh-logs').addEventListener('click', () => {
                 LogSystem.renderLogs();
@@ -250,15 +269,25 @@
             
             document.getElementById('force-admin').addEventListener('click', () => {
                 addDebugLog('Forzando modo administrador...', 'warning');
-                window.AdminSystem.isAdmin = true;
-                window.AdminSystem.initializeAdmin();
-                addDebugLog('Modo administrador forzado. Botón debería ser visible.', 'success');
-                
-                // Destacar visualmente el botón de admin
-                const adminButton = document.getElementById('admin-button');
-                if (adminButton) {
-                    adminButton.style.display = 'block';
-                    adminButton.classList.add('admin-active');
+                if (window.AdminSystem) {
+                    window.AdminSystem.isAdmin = true;
+                    window.AdminSystem.initializeAdmin();
+                    addDebugLog('Modo administrador forzado. Botón debería ser visible.', 'success');
+                    
+                    // Destacar visualmente el botón de admin
+                    const adminButton = document.getElementById('admin-button');
+                    if (adminButton) {
+                        adminButton.style.display = 'block';
+                        adminButton.classList.add('admin-active');
+                    }
+                    
+                    // Mostrar indicador de admin
+                    const indicator = document.getElementById('admin-indicator');
+                    if (indicator) {
+                        indicator.style.display = 'block';
+                    }
+                } else {
+                    addDebugLog('Error: AdminSystem no está definido', 'error');
                 }
             });
             
@@ -266,18 +295,31 @@
                 addDebugLog('Probando conexión con API...', 'info');
                 
                 try {
-                    // Nota: La ruta real es /api/admin/ids, pero en el backend separado la base ya es API_BASE_URL
-                    const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
-                    const data = await response.json();
-                    
-                    if (Array.isArray(data)) {
-                        addDebugLog(`✅ API respondió correctamente. IDs: ${data.join(', ')}`, 'success');
-                    } else {
-                        addDebugLog(`⚠️ API respondió con formato inesperado: ${JSON.stringify(data)}`, 'warning');
+                    const response = await fetch(`${window.API_BASE_URL}/api/admin/health`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
+                    
+                    const data = await response.json();
+                    addDebugLog(`✅ API respondió correctamente. Estado: ${data.status}`, 'success');
+                    
+                    // Probar también los admin IDs
+                    const idsResponse = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
+                    if (!idsResponse.ok) {
+                        throw new Error(`HTTP ${idsResponse.status} en admin/ids`);
+                    }
+                    
+                    const idsData = await idsResponse.json();
+                    addDebugLog(`✅ IDs de admin obtenidos: ${idsData.join(', ')}`, 'success');
                 } catch (error) {
                     addDebugLog(`❌ Error conectando a API: ${error.message}`, 'error');
                 }
+            });
+            
+            document.getElementById('toggle-logs').addEventListener('click', () => {
+                LogSystem.toggleVisibility();
+                document.getElementById('toggle-logs').textContent = 
+                    LogSystem.visible ? 'Ocultar' : 'Mostrar';
             });
             
             // Mensaje inicial
@@ -291,9 +333,31 @@
             const tgid = urlParams.get('tgid');
             if (tgid) {
                 addDebugLog(`ID de Telegram detectado en URL: ${tgid}`, 'info');
+                localStorage.setItem('telegramUserId', tgid);
             } else {
-                addDebugLog('No se detectó ID de Telegram en URL', 'warning');
+                const savedId = localStorage.getItem('telegramUserId');
+                if (savedId) {
+                    addDebugLog(`ID de Telegram encontrado en localStorage: ${savedId}`, 'info');
+                } else {
+                    addDebugLog('No se detectó ID de Telegram', 'warning');
+                }
             }
+            
+            // Verificar conexión con el backend
+            setTimeout(async () => {
+                addDebugLog('Verificando estado del backend...', 'debug');
+                try {
+                    const response = await fetch(`${window.API_BASE_URL}/api/admin/health`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        addDebugLog(`✅ Backend conectado: ${data.status}`, 'success');
+                    } else {
+                        addDebugLog(`⚠️ Backend respondió con estado: ${response.status}`, 'warning');
+                    }
+                } catch (error) {
+                    addDebugLog(`❌ Error conectando al backend: ${error.message}`, 'error');
+                }
+            }, 1000);
         });
     </script>
 </body>
