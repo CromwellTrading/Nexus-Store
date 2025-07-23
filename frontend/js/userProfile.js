@@ -4,8 +4,7 @@ const UserProfile = {
       ci: "",
       phone: "",
       address: "",
-      province: "",
-      telegramUserId: null
+      province: ""
   },
   
   init: function() {
@@ -18,27 +17,6 @@ const UserProfile = {
           this.userData = JSON.parse(savedData);
           console.log("Datos de usuario cargados desde localStorage:", this.userData);
       }
-      
-      // Obtener ID de Telegram de la URL si está presente
-      const urlParams = new URLSearchParams(window.location.search);
-      const tgid = urlParams.get('tgid');
-      
-      if (tgid) {
-          this.userData.telegramUserId = tgid;
-          localStorage.setItem('telegramUserId', tgid);
-          console.log("ID de Telegram obtenido de URL:", tgid);
-      } else {
-          // Intentar obtener de localStorage si no está en URL
-          const savedId = localStorage.getItem('telegramUserId');
-          if (savedId) {
-              this.userData.telegramUserId = savedId;
-              console.log("ID de Telegram obtenido de localStorage:", savedId);
-          }
-      }
-  },
-  
-  getTelegramUserId: function() {
-      return this.userData.telegramUserId;
   },
   
   saveUserData: function() {
