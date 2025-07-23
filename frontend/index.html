@@ -78,6 +78,18 @@
         .debug-btn:hover {
             background: #0d8aee;
         }
+        
+        /* Estilo para el botón de admin cuando está activo */
+        #admin-button.admin-active {
+            background-color: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
     </style>
 </head>
 <body>
@@ -143,6 +155,7 @@
             <button class="debug-btn" id="refresh-logs">Actualizar</button>
             <button class="debug-btn" id="clear-logs">Limpiar</button>
             <button class="debug-btn" id="force-admin">Forzar Admin</button>
+            <button class="debug-btn" id="test-api">Probar API</button>
         </div>
         <div id="status-content"></div>
     </div>
@@ -150,11 +163,11 @@
     <!-- Configuración global -->
     <script>
         // Configuración global que debe ejecutarse primero
-        window.API_URL = window.location.hostname === 'localhost' 
-            ? 'http://localhost:6000' 
-            : 'https://nexus-store-86r8.onrender.com';
+        window.API_BASE_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:6000/api' 
+            : 'https://nexus-store-86r8.onrender.com/api';
         
-        console.log("API_URL configurada como:", window.API_URL);
+        console.log("API_BASE_URL configurada como:", window.API_BASE_URL);
         
         // Variable global para estado de admin
         window.ADMIN_IDS = [];
@@ -239,12 +252,46 @@
                 window.AdminSystem.isAdmin = true;
                 window.AdminSystem.initializeAdmin();
                 addDebugLog('Modo administrador forzado. Botón debería ser visible.', 'success');
+                
+                // Destacar visualmente el botón de admin
+                const adminButton = document.getElementById('admin-button');
+                if (adminButton) {
+                    adminButton.style.display = 'block';
+                    adminButton.classList.add('admin-active');
+                }
+            });
+            
+            document.getElementById('test-api').addEventListener('click', async () => {
+                addDebugLog('Probando conexión con API...', 'info');
+                
+                try {
+                    const response = await fetch(`${window.API_BASE_URL}/admin/ids`);
+                    const data = await response.json();
+                    
+                    if (Array.isArray(data)) {
+                        addDebugLog(`✅ API respondió correctamente. IDs: ${data.join(', ')}`, 'success');
+                    } else {
+                        addDebugLog(`⚠️ API respondió con formato inesperado: ${JSON.stringify(data)}`, 'warning');
+                    }
+                } catch (error) {
+                    addDebugLog(`❌ Error conectando a API: ${error.message}`, 'error');
+                }
             });
             
             // Mensaje inicial
             addDebugLog('Sistema de depuración inicializado', 'success');
             addDebugLog(`URL actual: ${window.location.href}`, 'info');
             addDebugLog(`Parámetros URL: ${window.location.search}`, 'info');
+            addDebugLog(`API_BASE_URL: ${window.API_BASE_URL}`, 'info');
+            
+            // Verificar si hay un ID de Telegram en la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const tgid = urlParams.get('tgid');
+            if (tgid) {
+                addDebugLog(`ID de Telegram detectado en URL: ${tgid}`, 'info');
+            } else {
+                addDebugLog('No se detectó ID de Telegram en URL', 'warning');
+            }
         });
     </script>
 </body>
