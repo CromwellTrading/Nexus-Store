@@ -12,38 +12,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 6000;
+const PORT = process.env.PORT || 10000;
 
 // Configuración de CORS
-const corsOptions = {
+app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
-};
-
-app.use(cors(corsOptions));
+}));
 app.use(express.json());
-
-// SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
-const frontendPath = path.join(__dirname, 'frontend');
-
-// Verificar si la carpeta frontend existe
-try {
-  const files = fs.readdirSync(frontendPath);
-  console.log(`✅ Carpeta frontend encontrada. Contiene ${files.length} archivos`);
-} catch (err) {
-  console.error(`❌ Error accediendo a la carpeta frontend: ${err.message}`);
-  console.log("Intentando crear carpeta frontend...");
-  
-  try {
-    fs.mkdirSync(frontendPath);
-    console.log("✅ Carpeta frontend creada exitosamente");
-  } catch (mkdirErr) {
-    console.error(`❌ Error creando carpeta frontend: ${mkdirErr.message}`);
-  }
-}
-
-app.use(express.static(frontendPath));
 
 // Base de datos simple (archivos JSON)
 const DB_PATH = path.join(__dirname, 'data');
@@ -106,53 +83,31 @@ const DB = {
 // Middleware de autenticación para administradores
 const isAdmin = (req, res, next) => {
   const telegramId = req.headers['telegram-id'];
-  
-  // Convertir ADMIN_IDS a array de strings
-  const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
-    : ['5376388604', '718827739'];
-  
-  console.log('👑 Admin IDs:', adminIds);
-  console.log('🔑 Telegram ID recibido:', telegramId);
-  
-  if (!telegramId || !adminIds.includes(telegramId.toString())) {
-    console.log('❌ Acceso no autorizado. Telegram ID no coincide con admin IDs');
-    return res.status(403).json({ 
-      error: 'Acceso no autorizado. Solo administradores pueden acceder.',
-      receivedId: telegramId,
-      adminIds: adminIds
-    });
-  }
-  
-  console.log('✅ Acceso autorizado para admin');
-  next();
-};
-
-// RUTAS PRINCIPALES
-app.get('/', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
-});
-
-// Nueva ruta para obtener IDs de administradores (CORREGIDA)
-app.get('/api/admin/ids', (req, res) => {
-  console.log('📢 Solicitud recibida en /api/admin/ids');
-  console.log('🔑 HEADERS:', req.headers);
-  
-  // Obtener admin IDs como array de strings
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
-    
-  console.log('👑 Admin IDs enviados:', adminIds);
   
-  // Configurar headers CORS explícitamente para esta ruta
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Telegram-ID');
+  if (!telegramId || !adminIds.includes(telegramId.toString())) {
+    return res.status(403).json({ error: 'Acceso no autorizado. Solo administradores pueden acceder.' });
+  }
+  next();
+};
+
+// Ruta de prueba para verificar que el servidor está funcionando
+app.get('/', (req, res) => {
+  res.send('Backend Nexus Store funcionando correctamente');
+});
+
+// Ruta de verificación de salud
+app.get('/api/admin/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// Ruta para obtener IDs de administradores
+app.get('/api/admin/ids', (req, res) => {
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+    : [];
   
   res.json(adminIds);
 });
@@ -335,57 +290,33 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
 });
 
 // Iniciar el servidor
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
-  console.log(`📂 Ruta del frontend: ${frontendPath}`);
-  console.log(`🌍 Modo: ${process.env.NODE_ENV || 'Desarrollo'}`);
   console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
-  console.log(`✅ Frontend disponible en: http://localhost:${PORT}`);
+  console.log(`🤖 Token de bot: ${process.env.TELEGRAM_BOT_TOKEN ? 'Configurado' : 'FALTANTE'}`);
+  console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
   
-  // Diagnóstico adicional
-  try {
-    const frontendFiles = fs.readdirSync(frontendPath);
-    console.log(`📄 Archivos en frontend (${frontendFiles.length}):`, frontendFiles);
-  } catch (err) {
-    console.error('❌ Error leyendo archivos frontend:', err);
-  }
-  
-  try {
-    const dataFiles = fs.readdirSync(DB_PATH);
-    console.log(`📄 Archivos en data (${dataFiles.length}):`, dataFiles);
-  } catch (err) {
-    console.error('❌ Error leyendo archivos de datos:', err);
-  }
-});
-
-// Iniciar el bot de Telegram
-const token = process.env.TELEGRAM_BOT_TOKEN;
-if (token) {
-  const bot = new TelegramBot(token, { polling: true });
-  
-  // IDs de administradores
-  const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
-  
-  // Función para obtener URL base sin protocolo duplicado
-  const getBaseUrl = () => {
-    if (process.env.RENDER_EXTERNAL_URL) {
-      // Eliminar cualquier protocolo existente
-      return process.env.RENDER_EXTERNAL_URL.replace(/^https?:\/\//, '');
-    }
-    return `localhost:${PORT}`;
-  };
-  
-  // Manejar el comando /start
-  bot.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
+  // Solo si el token está configurado, iniciar el bot
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
     
-    const baseUrl = getBaseUrl();
-    const webAppUrl = `https://${baseUrl}/?tgid=${userId}`;
-    console.log(`🔗 URL generada para Telegram: ${webAppUrl}`);
+    // IDs de administradores
+    const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
     
-    // Mensaje promocional mejorado con emojis y formato
-    const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟
+    // Función para obtener URL base
+    const getFrontendUrl = () => {
+      return process.env.FRONTEND_URL || 'https://tu-frontend-en-render.onrender.com';
+    };
+    
+    // Manejar el comando /start
+    bot.onText(/\/start/, (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      
+      const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
+      console.log(`🔗 URL generada para Telegram: ${webAppUrl}`);
+      
+      const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟
 
 🔥 <b>VENTA DE PRODUCTOS DIGITALES Y FÍSICOS</b> 🔥
 
@@ -406,114 +337,78 @@ if (token) {
 ⚡️ Entrega inmediata y segura
 
 👇 <b>¡Todo está aquí!</b> 👇`;
-    
-    const keyboard = {
-      inline_keyboard: [[{
-        text: "🚀 ABRIR TIENDA AHORA",
-        web_app: { url: webAppUrl }
-      }]]
-    };
-    
-    // Enviar mensaje con botón integrado
-    bot.sendMessage(chatId, promoMessage, {
-      parse_mode: 'HTML',
-      reply_markup: keyboard
+      
+      const keyboard = {
+        inline_keyboard: [[{
+          text: "🚀 ABRIR TIENDA AHORA",
+          web_app: { url: webAppUrl }
+        }]]
+      };
+      
+      // Enviar mensaje con botón integrado
+      bot.sendMessage(chatId, promoMessage, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard
+      });
     });
-  });
-  
-  // Manejar mensajes de administradores
-  bot.on('message', (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const text = msg.text || '';
     
-    if (ADMIN_IDS.includes(userId)) {
-      if (text === '/admin') {
-        const baseUrl = getBaseUrl();
-        const webAppUrl = `https://${baseUrl}/?tgid=${userId}`;
-        console.log(`👑 URL de admin generada para Telegram: ${webAppUrl}`);
-        
-        const adminMessage = `👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑
+    // Manejar mensajes de administradores
+    bot.on('message', (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const text = msg.text || '';
+      
+      if (ADMIN_IDS.includes(userId)) {
+        if (text === '/admin') {
+          const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
+          console.log(`👑 URL de admin generada para Telegram: ${webAppUrl}`);
+          
+          const adminMessage = `👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑
 
 ¡Hola admin! Puedes acceder al panel de control para:
 - Gestionar productos 🛒
 - Ver pedidos 📋
 - Actualizar métodos de pago 💳
 - Y mucho más...`;
-    
-        bot.sendMessage(chatId, adminMessage, {
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [[{
-              text: "⚙️ ABRIR PANEL ADMIN",
-              web_app: { url: webAppUrl }
-            }]]
-          }
+      
+          bot.sendMessage(chatId, adminMessage, {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [[{
+                text: "⚙️ ABRIR PANEL ADMIN",
+                web_app: { url: webAppUrl }
+              }]]
+            }
+          });
+        }
+      } else if (text === '/admin') {
+        bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', {
+          parse_mode: 'HTML'
         });
       }
-    } else if (text === '/admin') {
-      bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', {
-        parse_mode: 'HTML'
-      });
-    }
-  });
-  
-  // Manejar eventos de Web App
-  bot.on('web_app_data', (msg) => {
-    const chatId = msg.chat.id;
-    const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
+    });
     
-    if (data && data.command === 'new_order') {
-      const orderMessage = `🎉 <b>¡PEDIDO CONFIRMADO!</b> 🎉
+    // Manejar eventos de Web App
+    bot.on('web_app_data', (msg) => {
+      const chatId = msg.chat.id;
+      const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
       
+      if (data && data.command === 'new_order') {
+        const orderMessage = `🎉 <b>¡PEDIDO CONFIRMADO!</b> 🎉
+        
 ✅ Tu pedido #${data.orderId} ha sido recibido
 🛒 Productos: ${data.itemsCount || 1}
 💰 Total: $${data.total || '0.00'}
 📦 Estaremos procesando tu pedido inmediatamente`;
+      
+        bot.sendMessage(chatId, orderMessage, {
+          parse_mode: 'HTML'
+        });
+      }
+    });
     
-      bot.sendMessage(chatId, orderMessage, {
-        parse_mode: 'HTML'
-      });
-    }
-  });
-  
-  console.log('🤖 Bot de Telegram iniciado correctamente');
-} else {
-  console.log('⚠️ TELEGRAM_BOT_TOKEN no definido. Bot no iniciado');
-}
-
-// Función para diagnóstico de rutas
-app.get('/debug/paths', (req, res) => {
-  const response = {
-    __dirname,
-    frontendPath,
-    DB_PATH,
-    exists: {
-      frontend: fs.existsSync(frontendPath),
-      data: fs.existsSync(DB_PATH)
-    },
-    files: {}
-  };
-
-  if (response.exists.frontend) {
-    try {
-      response.files.frontend = fs.readdirSync(frontendPath);
-    } catch (err) {
-      response.files.frontend = `Error leyendo: ${err.message}`;
-    }
+    console.log('🤖 Bot de Telegram iniciado correctamente');
   } else {
-    response.files.frontend = 'Carpeta no existe';
+    console.log('⚠️ TELEGRAM_BOT_TOKEN no definido. Bot no iniciado');
   }
-
-  if (response.exists.data) {
-    try {
-      response.files.data = fs.readdirSync(DB_PATH);
-    } catch (err) {
-      response.files.data = `Error leyendo: ${err.message}`;
-    }
-  } else {
-    response.files.data = 'Carpeta no existe';
-  }
-
-  res.json(response);
 });
