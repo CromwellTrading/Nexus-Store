@@ -2,25 +2,34 @@ const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
   isAdmin: false,
+  telegramUserId: null,
   
   init: function() {
       console.log("Iniciando AdminSystem...");
       
-      // Asegurarnos que UserProfile está inicializado
-      if (!UserProfile.userData) {
-          UserProfile.init();
-      }
+      // Obtener ID de Telegram directamente de la URL o localStorage
+      this.telegramUserId = this.getTelegramUserId();
+      console.log("ID de Telegram obtenido:", this.telegramUserId);
       
       this.checkAdminStatus().then(() => {
           this.initializeAdmin();
       });
   },
   
+  getTelegramUserId: function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tgid = urlParams.get('tgid');
+      if (tgid) {
+          localStorage.setItem('telegramUserId', tgid);
+          return tgid;
+      }
+      return localStorage.getItem('telegramUserId');
+  },
+  
   checkAdminStatus: async function() {
       console.log("Verificando estado de administrador...");
-      const telegramUserId = UserProfile.getTelegramUserId();
       
-      if (!telegramUserId) {
+      if (!this.telegramUserId) {
           console.log("No se encontró ID de Telegram");
           this.isAdmin = false;
           return;
@@ -31,7 +40,7 @@ const AdminSystem = {
           console.log("IDs de administradores recibidos:", adminIds);
           
           // Comparar como strings
-          this.isAdmin = adminIds.includes(telegramUserId.toString());
+          this.isAdmin = adminIds.includes(this.telegramUserId.toString());
           console.log("¿Es administrador?", this.isAdmin);
       } catch (error) {
           console.error("Error verificando admin:", error);
@@ -544,7 +553,7 @@ const AdminSystem = {
               method: 'POST',
               headers: { 
                   'Content-Type': 'application/json',
-                  'Telegram-ID': UserProfile.getTelegramUserId().toString()
+                  'Telegram-ID': this.telegramUserId.toString()
               },
               body: JSON.stringify({
                   type: type,
@@ -759,7 +768,7 @@ const AdminSystem = {
       fetch(`${window.API_URL}/api/admin/products/${type}/${category}/${id}`, {
           method: 'DELETE',
           headers: {
-              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+              'Telegram-ID': this.telegramUserId.toString()
           }
       })
       .then(response => {
@@ -789,7 +798,7 @@ const AdminSystem = {
           method: 'POST',
           headers: { 
               'Content-Type': 'application/json',
-              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+              'Telegram-ID': this.telegramUserId.toString()
           },
           body: JSON.stringify({
               type: type,
@@ -847,7 +856,7 @@ const AdminSystem = {
                           fetch(`${window.API_URL}/api/admin/categories/${type}/${category}`, {
                               method: 'DELETE',
                               headers: {
-                                  'Telegram-ID': UserProfile.getTelegramUserId().toString()
+                                  'Telegram-ID': this.telegramUserId.toString()
                               }
                           })
                           .then(response => {
@@ -962,7 +971,7 @@ const AdminSystem = {
           method: 'PUT',
           headers: { 
               'Content-Type': 'application/json',
-              'Telegram-ID': UserProfile.getTelegramUserId().toString()
+              'Telegram-ID': this.telegramUserId.toString()
           },
           body: JSON.stringify({ status: newStatus })
       })
@@ -1132,7 +1141,7 @@ const AdminSystem = {
       document.getElementById('digital-image-preview').innerHTML = '';
       document.getElementById('required-fields-container').innerHTML = `
           <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-              <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1; margin-right: 10px;">
+              <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
               <input type="checkbox" class="field-required" checked>
               <label>Requerido</label>
               <button class="remove-field">❌</button>
