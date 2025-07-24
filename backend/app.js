@@ -289,6 +289,34 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
   res.json(product);
 });
 
+// Nueva ruta para crear categorías
+app.post('/api/admin/categories', isAdmin, (req, res) => {
+  const { type, category } = req.body;
+  
+  if (!type || !category) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+  
+  if (!DB.categories[type]) {
+    return res.status(400).json({ error: 'Tipo de producto no válido' });
+  }
+  
+  // Evitar duplicados
+  if (!DB.categories[type].includes(category)) {
+    DB.categories[type].push(category);
+    DB.save('categories.json', DB.categories);
+  }
+  
+  res.json({ success: true, categories: DB.categories[type] });
+});
+
+// Ruta para obtener categorías
+app.get('/api/categories/:type', (req, res) => {
+  const { type } = req.params;
+  const categories = DB.categories[type] || [];
+  res.json(categories);
+});
+
 // Iniciar el servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
