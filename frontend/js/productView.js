@@ -29,7 +29,7 @@ const ProductView = {
   },
   
   loadProducts: function(tabType) {
-      fetch(`${window.API_URL}/api/products/${tabType}`)
+      fetch(`${window.API_BASE_URL}/api/products/${tabType}`)
           .then(response => response.json())
           .then(products => {
               this.displayProducts(tabType, products);
@@ -84,10 +84,21 @@ const ProductView = {
               
               const pricesHTML = this.getPricesHTML(product.prices);
               
+              // Mostrar imagen del producto
+              let imageHTML = '';
+              if (tabType === 'fisico' && product.images && product.images.length > 0) {
+                  imageHTML = `<img src="${product.images[0]}" alt="${product.name}" class="product-image">`;
+              } else if (tabType === 'digital' && product.image) {
+                  imageHTML = `<img src="${product.image}" alt="${product.name}" class="product-image">`;
+              } else {
+                  imageHTML = `<div class="product-image-placeholder">${product.name}</div>`;
+              }
+              
               productItem.innerHTML = `
-                  <div class="product-image">${product.name}</div>
+                  ${imageHTML}
                   <div class="product-details">
                       <h3 class="product-name">${product.name}</h3>
+                      <p class="product-description">${product.description}</p>
                       <div class="product-prices">
                           ${pricesHTML}
                       </div>
@@ -125,8 +136,18 @@ const ProductView = {
               
               const pricesHTML = this.getPricesHTML(product.prices);
               
+              // Mostrar imagen del producto
+              let imageHTML = '';
+              if (tabType === 'fisico' && product.images && product.images.length > 0) {
+                  imageHTML = `<img src="${product.images[0]}" alt="${product.name}" class="product-image">`;
+              } else if (tabType === 'digital' && product.image) {
+                  imageHTML = `<img src="${product.image}" alt="${product.name}" class="product-image">`;
+              } else {
+                  imageHTML = `<div class="product-image-placeholder">${product.name}</div>`;
+              }
+              
               productItem.innerHTML = `
-                  <div class="product-image" style="height: 120px;">${product.name}</div>
+                  ${imageHTML}
                   <h3 class="product-name">${product.name}</h3>
                   <div class="product-prices">
                       ${pricesHTML}
@@ -159,9 +180,19 @@ const ProductView = {
               
               const pricesHTML = this.getPricesHTML(product.prices);
               
+              // Mostrar imagen del producto
+              let imageHTML = '';
+              if (tabType === 'fisico' && product.images && product.images.length > 0) {
+                  imageHTML = `<img src="${product.images[0]}" alt="${product.name}">`;
+              } else if (tabType === 'digital' && product.image) {
+                  imageHTML = `<img src="${product.image}" alt="${product.name}">`;
+              } else {
+                  imageHTML = `<div class="product-image-placeholder">${product.name}</div>`;
+              }
+              
               gridProduct.innerHTML = `
-                  <div class="product-image" style="background: var(--secondary-color); display: flex; align-items: center; justify-content: center; height: 100%;">
-                      ${product.name}
+                  <div class="product-image">
+                      ${imageHTML}
                   </div>
                   <div class="product-overlay">
                       <h3 class="product-name">${product.name}</h3>
@@ -221,7 +252,7 @@ const ProductView = {
   
   getProductById: async function(id, tabType) {
       try {
-          const response = await fetch(`${window.API_URL}/api/products/${tabType}/${id}`);
+          const response = await fetch(`${window.API_BASE_URL}/api/products/${tabType}/${id}`);
           return await response.json();
       } catch (error) {
           console.error('Error obteniendo producto:', error);
