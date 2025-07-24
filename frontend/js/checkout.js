@@ -135,20 +135,20 @@ const CheckoutSystem = {
                           <h4>📦 Resumen del Pedido</h4>
                           <div id="order-items-list"></div>
                           <div class="order-total" id="order-total-display">
-                              <!-- Aquí se mostrará el total dinámicamente -->
+                              Total: $${total.toFixed(2)} CUP
                           </div>
                       </div>
                       
                       <div class="transfer-info">
                           <div class="form-group">
-                            <label>📸 Captura de pantalla de la transferencia:</label>
-                            <input type="file" id="transfer-proof" accept="image/*" required>
-                            <p class="info-note">Por favor, suba una imagen que muestre claramente:</p>
-                            <ul class="info-note">
-                              <li>ID de la transferencia</li>
-                              <li>Monto transferido</li>
-                              <li>Fecha y hora</li>
-                            </ul>
+                              <label>📸 Captura de pantalla de la transferencia:</label>
+                              <input type="file" id="transfer-proof" accept="image/*" required>
+                              <p class="info-note">Por favor, suba una imagen que muestre claramente:</p>
+                              <ul class="info-note">
+                                  <li>ID de la transferencia</li>
+                                  <li>Monto transferido</li>
+                                  <li>Fecha y hora</li>
+                              </ul>
                           </div>
                       </div>
                       
@@ -203,16 +203,6 @@ const CheckoutSystem = {
       
       document.getElementById('back-to-info')?.addEventListener('click', () => this.goToStep(1));
       document.getElementById('next-to-confirm')?.addEventListener('click', () => {
-          const method = document.querySelector('input[name="payment-method"]:checked')?.value;
-          
-          if (!this.validatePaymentMethods(cart.items, method)) {
-              alert('⚠️ Algunos productos no pueden pagarse con el método seleccionado. Se cobrarán solo los productos disponibles en la moneda correspondiente.');
-          }
-          
-          const requiredFields = this.getRequiredFields(cart.items);
-          if (requiredFields.length > 0) {
-              this.showRequiredFields(requiredFields);
-          }
           this.goToStep(3);
       });
       document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
@@ -237,7 +227,7 @@ const CheckoutSystem = {
               itemElement.className = 'order-item';
               itemElement.innerHTML = `
                   <div>${item.name} x ${item.quantity}</div>
-                  <div>$${(item.price * item.quantity).toFixed(2)} ${item.currency}</div>
+                  <div>$${(item.price * item.quantity).toFixed(2)} CUP</div>
               `;
               itemsList.appendChild(itemElement);
           });
@@ -297,7 +287,7 @@ const CheckoutSystem = {
           
           // Crear la orden en el backend
           try {
-              const response = await fetch(`${window.API_URL}/api/checkout`, {
+              const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
                   method: 'POST',
                   headers: { 
                       'Content-Type': 'application/json',
@@ -326,27 +316,6 @@ const CheckoutSystem = {
               alert('Error al confirmar la compra: ' + error.message);
           }
       });
-  },
-  
-  validatePaymentMethods: function(cartItems, selectedMethod) {
-      const methodToCurrency = {
-          'BPA': 'CUP',
-          'BANDEC': 'CUP',
-          'MLC': 'MLC',
-          'Saldo Móvil': 'Saldo Móvil'
-      };
-      
-      const selectedCurrency = methodToCurrency[selectedMethod];
-      
-      for (const item of cartItems) {
-          const product = ProductView.getProductById(item.productId, item.tabType);
-          
-          if (!product.prices || product.prices[selectedCurrency] === undefined) {
-              return false;
-          }
-      }
-      
-      return true;
   },
   
   getRequiredFields: function(cartItems) {
