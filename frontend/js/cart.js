@@ -12,7 +12,7 @@ const CartSystem = {
       if (!userId) return;
       
       try {
-          const response = await fetch(`${window.API_URL}/api/cart/${userId}`);
+          const response = await fetch(`${window.API_BASE_URL}/api/cart/${userId}`);
           if (!response.ok) {
               throw new Error('Error al cargar el carrito');
           }
@@ -31,7 +31,7 @@ const CartSystem = {
       }
       
       try {
-          const response = await fetch(`${window.API_URL}/api/cart/add`, {
+          const response = await fetch(`${window.API_BASE_URL}/api/cart/add`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId, productId, tabType })
@@ -53,7 +53,7 @@ const CartSystem = {
   async removeFromCart(productId, tabType) {
       const userId = UserProfile.getTelegramUserId();
       try {
-          const response = await fetch(`${window.API_URL}/api/cart/remove`, {
+          const response = await fetch(`${window.API_BASE_URL}/api/cart/remove`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId, productId, tabType })
@@ -76,7 +76,7 @@ const CartSystem = {
   async updateCartItemQuantity(productId, tabType, newQuantity) {
       const userId = UserProfile.getTelegramUserId();
       try {
-          const response = await fetch(`${window.API_URL}/api/cart/update`, {
+          const response = await fetch(`${window.API_BASE_URL}/api/cart/update`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
@@ -111,18 +111,24 @@ const CartSystem = {
       if (this.cart.items && this.cart.items.length > 0) {
           cartContent = await Promise.all(this.cart.items.map(async item => {
               // Obtener detalles del producto
-              const productResponse = await fetch(`${window.API_URL}/api/products/${item.tabType}/${item.productId}`);
-              const product = await productResponse.json();
+              const product = await ProductView.getProductById(item.productId, item.tabType);
+              
+              if (!product) return '';
+              
+              // Obtener precio actual
+              const price = product.prices ? 
+                (product.prices.CUP || product.prices.MLC || product.prices['Saldo Móvil'] || 0) : 
+                0;
               
               return `
                   <div class="cart-item">
-                      <img src="${product.image || product.images?.[0] || 'placeholder.jpg'}" 
+                      <img src="${product.image || (product.images && product.images[0]) || 'placeholder.jpg'}" 
                            alt="${product.name}" 
                            style="width: 60px; height: 60px; object-fit: cover;">
                       <div>
                           <h3>${product.name}</h3>
-                          <div>${item.price} ${item.currency} x ${item.quantity}</div>
-                          <div>Total: ${(item.price * item.quantity).toFixed(2)} ${item.currency}</div>
+                          <div>${price} CUP x ${item.quantity}</div>
+                          <div>Total: ${(price * item.quantity).toFixed(2)} CUP</div>
                       </div>
                       <div class="cart-buttons">
                           <button class="decrease-quantity" data-id="${item.productId}" data-tab="${item.tabType}">-</button>
@@ -145,7 +151,7 @@ const CartSystem = {
                   ${cartContent}
               </div>
               <div style="font-weight: bold; text-align: right; margin-bottom: 20px;">
-                  Total: $${this.getCartTotal().toFixed(2)}
+                  Total: $${this.getCartTotal().toFixed(2)} CUP
               </div>
               <button id="checkout-button" style="background: var(--success-color); color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem;" ${this.cart.items.length === 0 ? 'disabled' : ''}>
                   Finalizar Compra
@@ -199,7 +205,9 @@ const CartSystem = {
   },
   
   getCartTotal: function() {
-      return this.cart.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+      return this.cart.items.reduce((total, item) => {
+          return total + (item.quantity * 10); // Precio temporal
+      }, 0);
   },
   
   updateCartIcon: function() {
@@ -225,7 +233,7 @@ const CartSystem = {
       const userId = UserProfile.getTelegramUserId();
       if (!userId) return;
       
-      fetch(`${window.API_URL}/api/cart/clear/${userId}`, {
+      fetch(`${window.API_BASE_URL}/api/cart/clear/${userId}`, {
           method: 'POST'
       })
       .then(response => {
