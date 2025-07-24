@@ -119,6 +119,26 @@ app.get('/api/products/:type', (req, res) => {
   res.json(products);
 });
 
+// Nueva ruta para obtener producto individual
+app.get('/api/products/:type/:id', (req, res) => {
+  const { type, id } = req.params;
+  const products = DB.products[type] || {};
+  
+  let foundProduct = null;
+  
+  // Buscar producto en todas las categorías
+  for (const category in products) {
+    foundProduct = products[category].find(p => p.id == id);
+    if (foundProduct) break;
+  }
+  
+  if (foundProduct) {
+    res.json(foundProduct);
+  } else {
+    res.status(404).json({ error: 'Producto no encontrado' });
+  }
+});
+
 app.get('/api/products/search/:query', (req, res) => {
   const { query } = req.params;
   const { type } = req.query;
@@ -218,14 +238,35 @@ app.post('/api/checkout', (req, res) => {
     return res.status(400).json({ error: 'Carrito vacío' });
   }
   
-  const total = cart.items.reduce((sum, item) => {
-    return sum + (item.quantity * 10);
-  }, 0);
+  // Calcular total real basado en precios de productos
+  let total = 0;
+  const itemsWithDetails = [];
+  
+  cart.items.forEach(item => {
+    let product = null;
+    for (const category in DB.products[item.tabType]) {
+      const found = DB.products[item.tabType][category].find(p => p.id == item.productId);
+      if (found) {
+        product = found;
+        break;
+      }
+    }
+    
+    if (product) {
+      const price = product.prices[paymentMethod] || Object.values(product.prices)[0] || 0;
+      total += price * item.quantity;
+      itemsWithDetails.push({
+        ...item,
+        name: product.name,
+        price: price
+      });
+    }
+  });
   
   const order = {
     id: `ORD-${Date.now()}`,
     userId,
-    items: [...cart.items],
+    items: itemsWithDetails,
     payment: {
       method: paymentMethod,
       ...transferData
@@ -239,6 +280,7 @@ app.post('/api/checkout', (req, res) => {
   DB.orders.push(order);
   DB.save('orders.json', DB.orders);
   
+  // Vaciar carrito
   cart.items = [];
   DB.save('carts.json', DB.carts);
   
