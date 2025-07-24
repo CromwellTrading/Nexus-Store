@@ -140,7 +140,16 @@ const CheckoutSystem = {
                       </div>
                       
                       <div class="transfer-info">
-                          <div id="transfer-field-container"></div>
+                          <div class="form-group">
+                            <label>📸 Captura de pantalla de la transferencia:</label>
+                            <input type="file" id="transfer-proof" accept="image/*" required>
+                            <p class="info-note">Por favor, suba una imagen que muestre claramente:</p>
+                            <ul class="info-note">
+                              <li>ID de la transferencia</li>
+                              <li>Monto transferido</li>
+                              <li>Fecha y hora</li>
+                            </ul>
+                          </div>
                       </div>
                       
                       <div id="required-fields-section" style="display: none; margin-top: 20px;">
@@ -205,7 +214,6 @@ const CheckoutSystem = {
               this.showRequiredFields(requiredFields);
           }
           this.goToStep(3);
-          this.updateTransferField();
       });
       document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
       
@@ -216,14 +224,10 @@ const CheckoutSystem = {
       document.querySelectorAll('input[name="payment-method"]')?.forEach(radio => {
           radio.addEventListener('change', () => {
               this.updatePaymentInfo();
-              this.updateTransferField();
-              this.updateTotalDisplay(cart.items);
           });
       });
       
       this.updatePaymentInfo();
-      this.updateTransferField();
-      this.updateTotalDisplay(cart.items);
       
       const itemsList = document.getElementById('order-items-list');
       if (itemsList) {
@@ -243,44 +247,36 @@ const CheckoutSystem = {
           const method = document.querySelector('input[name="payment-method"]:checked')?.value;
           const userId = UserProfile.getTelegramUserId();
           
+          const proofFile = document.getElementById('transfer-proof')?.files[0];
+          if (!proofFile) {
+              alert('Por favor suba la captura de pantalla de la transferencia');
+              return;
+          }
+          
           const transferData = {};
-          if (method === 'Saldo Móvil') {
-              const proofFile = document.getElementById('transfer-proof')?.files[0];
-              if (!proofFile) {
-                  alert('Por favor suba la captura de pantalla de la transferencia');
-                  return;
-              }
+          
+          // Subir la imagen de comprobante a ImageKit
+          try {
+              const formData = new FormData();
+              formData.append('file', proofFile);
+              formData.append('fileName', proofFile.name);
+              formData.append('publicKey', 'public_hhFA4QLrpbIf5aVDBZfodu08iOA=');
               
-              // Subir la imagen de comprobante a ImageKit
-              try {
-                  const formData = new FormData();
-                  formData.append('file', proofFile);
-                  formData.append('fileName', proofFile.name);
-                  formData.append('publicKey', 'public_hhFA4QLrpbIf5aVDBZfodu08iOA=');
-                  
-                  const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
-                      method: 'POST',
-                      body: formData,
-                      headers: {
-                          'Authorization': `Basic ${btoa('tzsnnmyff' + ':')}`
-                      }
-                  });
-                  
-                  const data = await response.json();
-                  transferData.transferProof = data.url;
-                  transferData.transferId = proofFile.name;
-              } catch (error) {
-                  console.error('Error subiendo comprobante:', error);
-                  alert('Error al subir el comprobante. Por favor intente nuevamente.');
-                  return;
-              }
-          } else {
-              const transferId = document.getElementById('transfer-id')?.value;
-              if (!transferId) {
-                  alert('Por favor ingrese el ID de transferencia');
-                  return;
-              }
-              transferData.transferId = transferId;
+              const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+                  method: 'POST',
+                  body: formData,
+                  headers: {
+                      'Authorization': `Basic ${btoa('tzsnnmyff' + ':')}`
+                  }
+              });
+              
+              const data = await response.json();
+              transferData.transferProof = data.url;
+              transferData.transferId = proofFile.name;
+          } catch (error) {
+              console.error('Error subiendo comprobante:', error);
+              alert('Error al subir el comprobante. Por favor intente nuevamente.');
+              return;
           }
           
           const recipientData = {};
@@ -351,58 +347,6 @@ const CheckoutSystem = {
       }
       
       return true;
-  },
-  
-  updateTotalDisplay: function(cartItems) {
-      const method = document.querySelector('input[name="payment-method"]:checked')?.value;
-      if (!method) return;
-      
-      const methodToCurrency = {
-          'BPA': 'CUP',
-          'BANDEC': 'CUP',
-          'MLC': 'MLC',
-          'Saldo Móvil': 'Saldo Móvil'
-      };
-      const currency = methodToCurrency[method];
-      
-      const payableItems = cartItems.filter(item => {
-          const product = ProductView.getProductById(item.productId, item.tabType);
-          return product.prices && product.prices[currency] !== undefined;
-      });
-      
-      const payableTotal = payableItems.reduce((total, item) => {
-          const product = ProductView.getProductById(item.productId, item.tabType);
-          return total + (product.prices[currency] * item.quantity);
-      }, 0);
-      
-      document.getElementById('order-total-display').innerHTML = `
-          <strong>Total:</strong> ${payableTotal.toFixed(2)} ${currency}
-      `;
-  },
-  
-  updateTransferField: function() {
-      const container = document.getElementById('transfer-field-container');
-      if (!container) return;
-      
-      const method = document.querySelector('input[name="payment-method"]:checked')?.value;
-      
-      if (method === 'Saldo Móvil') {
-          container.innerHTML = `
-              <div class="form-group">
-                  <label>📸 Captura de pantalla de la transferencia:</label>
-                  <input type="file" id="transfer-proof" accept="image/*" required>
-                  <p class="info-note">Por favor, suba una imagen que muestre la transferencia realizada</p>
-              </div>
-          `;
-      } else {
-          container.innerHTML = `
-              <div class="form-group">
-                  <label>🔑 ID de Transferencia:</label>
-                  <input type="text" id="transfer-id" required placeholder="Ingrese el ID de la transferencia">
-                  <p class="info-note">📝 Este ID lo recibirá después de realizar la transferencia</p>
-              </div>
-          `;
-      }
   },
   
   getRequiredFields: function(cartItems) {
