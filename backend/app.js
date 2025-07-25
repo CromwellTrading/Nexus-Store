@@ -325,6 +325,13 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
   
   product.id = Date.now();
   product.createdAt = new Date().toISOString();
+  
+  // Log para depuración de imágenes
+  console.log('Recibiendo nuevo producto con imágenes:', {
+    images: product.images,
+    image: product.image
+  });
+  
   DB.products[type][category].push(product);
   
   DB.save('products.json', DB.products);
