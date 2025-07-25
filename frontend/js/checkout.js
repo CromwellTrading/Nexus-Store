@@ -245,24 +245,25 @@ const CheckoutSystem = {
       
       const transferData = {};
       
-      // Subir la imagen de comprobante a ImageKit
+      // Subir la imagen de comprobante a FreeImage.Host
       try {
         const formData = new FormData();
-        formData.append('file', proofFile);
-        formData.append('fileName', proofFile.name);
-        formData.append('publicKey', 'public_hhFA4QLrpbIf5aVDBZfodu08iOA=');
+        formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
+        formData.append('source', proofFile);
         
-        const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+        const response = await fetch('https://freeimage.host/api/1/upload', {
           method: 'POST',
-          body: formData,
-          headers: {
-            'Authorization': `Basic ${btoa('tzsnnmyff' + ':')}`
-          }
+          body: formData
         });
         
         const data = await response.json();
-        transferData.transferProof = data.url;
-        transferData.transferId = proofFile.name;
+        
+        if (data.success) {
+          transferData.transferProof = data.image.url;
+          transferData.transferId = data.image.name || proofFile.name;
+        } else {
+          throw new Error('Error al subir el comprobante: ' + JSON.stringify(data));
+        }
       } catch (error) {
         console.error('Error subiendo comprobante:', error);
         alert('Error al subir el comprobante. Por favor intente nuevamente.');
