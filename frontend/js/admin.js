@@ -1,4 +1,4 @@
-// admin.js - Versión de producción
+// admin.js - Versión actualizada con FreeImage.Host
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -362,23 +362,24 @@ const AdminSystem = {
     this.loadOrders('all');
   },
   
-  uploadImageToImageKit: async function(file) {
+  uploadImageToFreeImageHost: async function(file) {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileName', file.name);
-      formData.append('publicKey', 'public_hhFA4QLrpbIf5aVDBZfodu08iOA=');
+      formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
+      formData.append('action', 'upload');
+      formData.append('source', file);
       
-      const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+      const response = await fetch('https://freeimage.host/api/1/upload', {
         method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Basic ${btoa('tzsnnmyff' + ':')}`
-        }
+        body: formData
       });
       
       const data = await response.json();
-      return data.url;
+      if (data.success) {
+        return data.image.url;
+      } else {
+        throw new Error(data.error.message || 'Error subiendo imagen');
+      }
     } catch (error) {
       console.error('Error subiendo imagen:', error);
       return null;
@@ -407,7 +408,7 @@ const AdminSystem = {
         img.style.margin = '5px';
         preview.appendChild(img);
         
-        const imageUrl = await this.uploadImageToImageKit(file);
+        const imageUrl = await this.uploadImageToFreeImageHost(file);
         if (imageUrl) {
           urls.push(imageUrl);
         }
