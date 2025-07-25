@@ -1,4 +1,3 @@
-// admin.js - Versión actualizada con FreeImage.Host
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -366,19 +365,20 @@ const AdminSystem = {
     try {
       const formData = new FormData();
       formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
-      formData.append('action', 'upload');
       formData.append('source', file);
-      
+
       const response = await fetch('https://freeimage.host/api/1/upload', {
         method: 'POST',
         body: formData
       });
       
       const data = await response.json();
+      
       if (data.success) {
         return data.image.url;
       } else {
-        throw new Error(data.error.message || 'Error subiendo imagen');
+        console.error('Error subiendo imagen:', data);
+        return null;
       }
     } catch (error) {
       console.error('Error subiendo imagen:', error);
@@ -934,6 +934,12 @@ const AdminSystem = {
               <div class="payment-info">
                 <div><strong>Método:</strong> ${order.payment.method}</div>
                 <div><strong>🔑 ID Transferencia:</strong> ${order.payment.transferId}</div>
+                <div class="transfer-proof">
+                  <strong>📸 Comprobante:</strong>
+                  <a href="${order.payment.transferProof}" target="_blank">
+                    Ver imagen del comprobante
+                  </a>
+                </div>
               </div>
               
               <h3>🛒 Productos</h3>
