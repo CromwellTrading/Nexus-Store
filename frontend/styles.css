@@ -1086,4 +1086,51 @@ body {
         margin-top: 3px;
         align-self: flex-end;
     }
+  /* Añade esto al final de tu archivo styles.css */
+
+/* Estilos para previsualización de imágenes */
+#image-preview, #digital-image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #ccc;
+  border-radius: 5px;
+  min-height: 120px;
+}
+
+#image-preview img, #digital-image-preview img {
+  max-width: 100px;
+  max-height: 100px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+#image-preview img:hover, #digital-image-preview img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Indicador de carga */
+.image-loading {
+  position: relative;
+  background-color: #f5f5f5;
+}
+
+.image-loading::after {
+  content: "Subiendo...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #666;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
 }
