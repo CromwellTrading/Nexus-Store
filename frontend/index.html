@@ -95,59 +95,65 @@
     
     <div id="product-modal" style="display: none;"></div>
 
-    <!-- Configuración global simplificada -->
+    <!-- Configuración global con depuración -->
     <script>
         // URL de tu backend - ACTUALIZA ESTA VARIABLE CON TU URL
         window.API_BASE_URL = 'https://nexus-store-86r8.onrender.com';
         window.API_URL = window.API_BASE_URL; // Para compatibilidad
+        console.log(`[Global] URL de API configurada: ${window.API_BASE_URL}`);
         
         // Variable global para estado de admin
         window.ADMIN_IDS = [];
-        
-        // Función mínima de logging para admin
-        window.addDebugLog = function(message, type = 'info') {
-            if (window.AdminSystem && window.AdminSystem.isAdmin) {
-                console.log(`[${type}] ${message}`);
-            }
-        };
     </script>
 
     <!-- Scripts esenciales -->
-    <script src="/js/themes.js"></script>
-    <script src="/js/tabs.js"></script>
-    <script src="/js/userProfile.js"></script>
-    <script src="/js/notifications.js"></script>
-    <script src="/js/productView.js"></script>
-    <script src="/js/productModal.js"></script>
-    <script src="/js/cart.js"></script>
-    <script src="/js/searchFilter.js"></script>
-    <script src="/js/orders.js"></script>
-    <script src="/js/checkout.js"></script>
-    <script src="/js/admin.js"></script>
-    <script src="/js/main.js"></script>
+    <script src="js/themes.js"></script>
+    <script src="js/tabs.js"></script>
+    <script src="js/userProfile.js"></script>
+    <script src="js/notifications.js"></script>
+    <script src="js/productView.js"></script>
+    <script src="js/productModal.js"></script>
+    <script src="js/cart.js"></script>
+    <script src="js/searchFilter.js"></script>
+    <script src="js/orders.js"></script>
+    <script src="js/checkout.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/main.js"></script>
     
-    <!-- Script de inicialización simplificado -->
+    <!-- Script de inicialización con verificación de admin -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Inicializar AdminSystem si existe
-            if (window.AdminSystem) {
-                AdminSystem.init();
-            }
+            console.log('[Main] Documento completamente cargado');
             
-            // Mostrar indicador de admin si es necesario
-            const adminIndicator = document.getElementById('admin-indicator');
-            const adminButton = document.getElementById('admin-button');
-            
-            if (adminIndicator && adminButton) {
-                setInterval(() => {
-                    if (window.AdminSystem && window.AdminSystem.isAdmin) {
-                        adminIndicator.style.display = 'block';
+            // Verificar el botón de admin periódicamente
+            const checkAdminButton = () => {
+                const adminButton = document.getElementById('admin-button');
+                const adminIndicator = document.getElementById('admin-indicator');
+                
+                if (adminButton && adminIndicator) {
+                    if (window.AdminSystem?.isAdmin) {
+                        console.log('[Main] Usuario es admin, mostrando botón');
                         adminButton.style.display = 'block';
+                        adminButton.classList.add('admin-active');
+                        adminIndicator.style.display = 'block';
+                        return true;
                     } else {
+                        console.log('[Main] Usuario no es admin, ocultando botón');
+                        adminButton.style.display = 'none';
                         adminIndicator.style.display = 'none';
                     }
-                }, 1000);
-            }
+                }
+                return false;
+            };
+            
+            // Verificar cada segundo durante 10 segundos
+            let checks = 0;
+            const intervalId = setInterval(() => {
+                if (checkAdminButton() || checks >= 10) {
+                    clearInterval(intervalId);
+                }
+                checks++;
+            }, 1000);
         });
     </script>
 </body>
