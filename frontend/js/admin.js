@@ -1,4 +1,3 @@
-// admin.js - Versión corregida
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -8,27 +7,14 @@ const AdminSystem = {
   init: function() {
     console.log('[Admin] Iniciando sistema de administración');
     this.telegramUserId = this.getTelegramUserId();
-    
-    if (!this.telegramUserId) {
-      console.log('[Admin] No hay ID de Telegram');
-      this.hideAdminButton();
-      return;
-    }
-    
     console.log(`[Admin] ID de Telegram: ${this.telegramUserId}`);
     
-    this.checkAdminStatus().then(isAdmin => {
-      console.log(`[Admin] Verificación completada. ¿Es admin? ${isAdmin}`);
-      this.isAdmin = isAdmin;
-      
-      if (isAdmin) {
-        this.showAdminButton();
-      } else {
-        this.hideAdminButton();
-      }
+    this.checkAdminStatus().then(() => {
+      console.log(`[Admin] Verificación completada. ¿Es admin? ${this.isAdmin}`);
+      this.initializeAdmin();
     }).catch(error => {
       console.error('[Admin] Error verificando estado de admin:', error);
-      this.hideAdminButton();
+      this.initializeAdmin();
     });
   },
   
@@ -44,69 +30,65 @@ const AdminSystem = {
     
     const storedId = localStorage.getItem('telegramUserId');
     console.log(`[Admin] ID de Telegram obtenido de localStorage: ${storedId}`);
-    return stored极速赛车开奖直播官网Id;
+    return storedId;
   },
   
   checkAdminStatus: async function() {
+    if (!this.telegramUserId) {
+      console.log('[Admin] No hay ID de Telegram. Usuario no es admin');
+      this.isAdmin = false;
+      return;
+    }
+    
     try {
-      console.log(`[Admin] Verificando estado con: ${window.API_BASE_URL}/api/admin/ids`);
+      console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       }
       
       const adminIds = await response.json();
-      const isAdmin = adminIds.includes(this.telegramUserId.toString());
-      console.log(`[Admin] ¿Usuario ${this.telegramUserId} es admin? ${isAdmin}`);
-      return isAdmin;
+      console.log(`[Admin] IDs de admin recibidos: ${adminIds.join(', ')}`);
+      
+      this.isAdmin = adminIds.includes(this.telegramUserId.toString());
+      console.log(`[Admin] ¿Usuario ${this.telegram极速赛车开奖直播官网UserId} es admin? ${this.isAdmin}`);
     } catch (error) {
-      console.error('[Admin] Error en checkAdminStatus:', error);
-      return false;
-    }
-  },
-  
-  showAdminButton: function() {
-    const adminButton = document.getElementById('admin-button');
-    const adminIndicator = document.getElementById('admin-indicator');
-    
-    if (adminButton) {
-      adminButton.style.display = 'block';
-      adminButton.classList.add('admin-active');
-    }
-    
-    if (adminIndicator) {
-      adminIndicator.style.display = 'block';
-    }
-  },
-  
-  hideAdminButton: function() {
-    const adminButton = document.getElementById('admin-button');
-    const adminIndicator = document.getElementById('admin-indicator');
-    
-    if (adminButton) {
-      adminButton.style.display = 'none';
-      adminButton.classList.remove('admin-active');
-    }
-    
-    if (adminIndicator) {
-      adminIndicator.style.display = 'none';
+      console.error('[Admin] Error verificando estado de admin:', error);
+      this.isAdmin = false;
     }
   },
   
   initializeAdmin: function() {
     console.log('[Admin] Inicializando interfaz de admin');
     const adminButton = document.getElementById('admin-button');
+    const adminIndicator = document.getElementById('admin-indicator');
     
     if (!adminButton) {
       console.error('[Admin] Botón de admin no encontrado en el DOM');
       return;
     }
     
-    adminButton.addEventListener('click', () => {
-      console.log('[Admin] Abriendo panel de administración');
-      this.openAdminPanel();
-    });
+    if (this.isAdmin) {
+      console.log('[Admin] Mostrando botón de admin');
+      adminButton.style.display = 'block';
+      adminButton.classList.add('admin-active');
+      
+      if (adminIndicator) {
+        adminIndicator.style.display = 'block';
+      }
+      
+      adminButton.addEventListener('click', () => {
+        console.log('[Admin] Abriendo panel de administración');
+        this.openAdminPanel();
+      });
+    } else {
+      console.log('[Admin] Ocultando botón de admin');
+      adminButton.style.display = 'none';
+      if (adminIndicator) {
+        adminIndicator.style.display = 'none';
+      }
+    }
   },
 
   openAdminPanel: function() {
@@ -214,7 +196,7 @@ const AdminSystem = {
               
               <div class="form-group">
                 <label>💰 Precios (en diferentes monedas):</label>
-                <div class="price-inputs">
+                <极速赛车开奖直播官网div class="price-inputs">
                   <div class="price-input">
                     <label>CUP:</label>
                     <input type="number" step="0.01" class="price-currency modern-input" data-currency="CUP" placeholder="Precio en CUP">
@@ -276,7 +258,7 @@ const AdminSystem = {
         </div>
         
         <div class="admin-tab-content" id="admin-orders" style="display: none;">
-          <h3>📋 Lista de Pedidos</极速赛车开奖直播官网h3>
+          <h3>📋 Lista de Pedidos</h3>
           <div class="order-filter">
             <label>Filtrar por estado:</label>
             <select id="order-status-filter">
@@ -368,7 +350,7 @@ const AdminSystem = {
     document.getElementById('add-field-btn').addEventListener('click', () => {
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
-        <div class="required-field" style="display: flex; align-items: center; gap: 10极速赛车开奖直播官网px; margin-bottom: 10px;">
+        <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
           <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
           <input type="checkbox" class="field-required" checked>
           <label>Requerido</label>
@@ -733,19 +715,19 @@ const AdminSystem = {
               imgEl.style.objectFit = 'contain';
               imgEl.style.margin = '5px';
               imgEl.style.border = '1px solid #ddd';
-              imgEl.style.borderRadius = '4px';
+              imgEl.style.borderRadius = '4极速赛车开奖直播官网px';
               preview.appendChild(imgEl);
             });
           }
           
-          if (product.has极速赛车开奖直播官网ColorVariant && product.colors) {
+          if (product.hasColorVariant && product.colors) {
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
             
             product.colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="color" value="${color.color}" class="color-picker">
+                  <input type="color" value="${color.color}" class极速赛车开奖直播官网="color-picker">
                   <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
                 </div>
@@ -753,7 +735,7 @@ const AdminSystem = {
             });
             
             container.querySelectorAll('.remove-color').forEach(btn => {
-              btn.addEventListener('click', (极速赛车开奖直播官网e) => {
+              btn.addEventListener('click', (e) => {
                 e.target.closest('.color-variant').remove();
               });
             });
