@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* Estilo para el indicador de admin */
         .admin-indicator {
             position: fixed;
             top: 10px;
@@ -22,7 +21,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         
-        /* Animación para el botón de admin */
         #admin-button.admin-active {
             background-color: #4caf50;
             animation: pulse 2s infinite;
@@ -36,7 +34,6 @@
     </style>
 </head>
 <body>
-    <!-- Indicador de modo administrador -->
     <div id="admin-indicator" class="admin-indicator">
         <i class="fas fa-user-shield"></i> Modo Administrador
     </div>
@@ -95,15 +92,14 @@
     
     <div id="product-modal" style="display: none;"></div>
 
-    <!-- Configuración global con depuración -->
     <script>
-        // URL de tu backend - ACTUALIZA ESTA VARIABLE CON TU URL
         window.API_BASE_URL = 'https://nexus-store-86r8.onrender.com';
-        window.API_URL = window.API_BASE_URL; // Para compatibilidad
+        window.API_URL = window.API_BASE_URL;
         console.log(`[Global] URL de API configurada: ${window.API_BASE_URL}`);
+        
+        window.ADMIN_IDS = [];
     </script>
 
-    <!-- Scripts esenciales -->
     <script src="js/themes.js"></script>
     <script src="js/tabs.js"></script>
     <script src="js/userProfile.js"></script>
@@ -117,11 +113,10 @@
     <script src="js/admin.js"></script>
     <script src="js/main.js"></script>
     
-    <!-- Script de inicialización simplificado -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             console.log('[Main] Documento completamente cargado');
-            // La verificación de admin se maneja completamente en admin.js
+            AdminSystem.init();
         });
     </script>
 </body>
