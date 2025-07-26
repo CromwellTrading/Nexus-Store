@@ -101,9 +101,6 @@
         window.API_BASE_URL = 'https://nexus-store-86r8.onrender.com';
         window.API_URL = window.API_BASE_URL; // Para compatibilidad
         console.log(`[Global] URL de API configurada: ${window.API_BASE_URL}`);
-        
-        // Variable global para estado de admin
-        window.ADMIN_IDS = [];
     </script>
 
     <!-- Scripts esenciales -->
@@ -120,40 +117,11 @@
     <script src="js/admin.js"></script>
     <script src="js/main.js"></script>
     
-    <!-- Script de inicialización con verificación de admin -->
+    <!-- Script de inicialización simplificado -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             console.log('[Main] Documento completamente cargado');
-            
-            // Verificar el botón de admin periódicamente
-            const checkAdminButton = () => {
-                const adminButton = document.getElementById('admin-button');
-                const adminIndicator = document.getElementById('admin-indicator');
-                
-                if (adminButton && adminIndicator) {
-                    if (window.AdminSystem?.isAdmin) {
-                        console.log('[Main] Usuario es admin, mostrando botón');
-                        adminButton.style.display = 'block';
-                        adminButton.classList.add('admin-active');
-                        adminIndicator.style.display = 'block';
-                        return true;
-                    } else {
-                        console.log('[Main] Usuario no es admin, ocultando botón');
-                        adminButton.style.display = 'none';
-                        adminIndicator.style.display = 'none';
-                    }
-                }
-                return false;
-            };
-            
-            // Verificar cada segundo durante 10 segundos
-            let checks = 0;
-            const intervalId = setInterval(() => {
-                if (checkAdminButton() || checks >= 10) {
-                    clearInterval(intervalId);
-                }
-                checks++;
-            }, 1000);
+            // La verificación de admin se maneja completamente en admin.js
         });
     </script>
 </body>
