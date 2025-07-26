@@ -25,7 +25,8 @@ console.log(`🖼️ ImageBin Token: ${process.env.IMAGEBIN_API_TOKEN ? 'Configu
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID', '*']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID'],
+  exposedHeaders: ['Telegram-ID']
 }));
 app.use(express.json());
 
@@ -42,6 +43,12 @@ if (!fs.existsSync(DB_PATH)) {
     console.error(`❌ Error creando carpeta 'data': ${err.message}`);
   }
 }
+
+// Inicializar categorías si no existen
+const initialCategories = {
+  fisico: ['electronics', 'clothing', 'home'],
+  digital: ['games', 'software', 'ebooks']
+};
 
 // Funciones de ayuda para cargar archivos JSON
 function loadJSON(file) {
@@ -60,7 +67,7 @@ function loadJSON(file) {
       let initialData = {};
       
       if (file === 'products.json') initialData = { fisico: {}, digital: {} };
-      else if (file === 'categories.json') initialData = { fisico: [], digital: [] };
+      else if (file === 'categories.json') initialData = initialCategories;
       else if (file === 'carts.json') initialData = [];
       else if (file === 'orders.json') initialData = [];
       else if (file === 'users.json') initialData = {};
@@ -82,14 +89,14 @@ const DB = {
   users: loadJSON('users.json'),
   
   save: (file, data) => {
-    const file极速赛车开奖直播官网Path = path.join(DB_PATH, file);
+    const filePath = path.join(DB_PATH, file);
     console.log(`💾 Guardando datos en ${filePath}`);
     
     try {
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
       console.log(`✅ Datos guardados exitosamente en ${file}`);
     } catch (err) {
-      console.error(`❌ Error guardando ${filePath}: ${极速赛车开奖直播官网err.message}`);
+      console.error(`❌ Error guardando ${filePath}: ${err.message}`);
     }
   }
 };
@@ -180,8 +187,10 @@ app.get('/api/admin/ids', (req, res) => {
     : [];
   
   console.log(`📋 IDs de administrador configurados: ${adminIds.join(', ')}`);
-  console.log('📝 Headers recibidos:', req.headers);
   
+  // Permitir acceso desde cualquier origen
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Telegram-ID');
   res.json(adminIds);
 });
 
@@ -455,7 +464,7 @@ app.post('/api/admin/categories', isAdmin, (req, res) => {
   
   if (!DB.categories[type]) {
     console.log("❌ Tipo de producto no válido");
-    return res.status(400).json({ error: 'Tipo de producto no válido' });
+    return res.status(400).json({ error: '极速赛车开奖直播官网Tipo de producto no válido' });
   }
   
   // Evitar duplicados
@@ -487,9 +496,36 @@ app.listen(PORT, () => {
   
   // Solo si el token está configurado, iniciar el bot
   if (process.env.TELEGRAM_BOT_TOKEN) {
-    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-    console.log('🤖 Bot de Telegram iniciado correctamente');
+    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+      polling: {
+        params: {
+          timeout: 60,
+          limit: 1
+        },
+        autoStart: false
+      }
+    });
+
+    console.log('🤖 Intentando iniciar bot de Telegram...');
     
+    // Manejar errores de polling
+    bot.on('polling_error', (error) => {
+      console.error(`❌ Error en polling de Telegram: ${error.code} - ${error.message}`);
+      
+      // Intentar reiniciar después de 5 segundos
+      setTimeout(() => {
+        console.log('🔄 Reiniciando bot de Telegram...');
+        bot.startPolling();
+      }, 5000);
+    });
+
+    // Iniciar polling manualmente
+    bot.startPolling().then(() => {
+      console.log('✅ Bot de Telegram iniciado correctamente');
+    }).catch(err => {
+      console.error('❌ Fallo al iniciar bot:', err);
+    });
+
     // IDs de administradores
     const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
     console.log(`👑 IDs de administrador para Telegram: ${ADMIN_IDS.join(', ')}`);
