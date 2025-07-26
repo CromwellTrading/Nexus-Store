@@ -1,4 +1,4 @@
-// admin.js - Versión de producción
+// admin.js - Versión completa con previsualización de imágenes
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -238,12 +238,12 @@ const AdminSystem = {
             <select id="order-status-filter">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
-              <option value="En proceso">En proceso</option>
+             极速赛车开奖直播官网
               <option value="Enviado">Enviado</option>
               <option value="Completado">Completado</option>
             </select>
           </div>
-          <div class="admin-orders-list" id="admin-orders-list"></div>
+          <div class="admin-orders-list" id="admin-orders-list"></极速赛车开奖直播官网div>
         </div>
       </div>
     </div>`;
@@ -357,9 +357,49 @@ const AdminSystem = {
       this.loadOrders(e.target.value);
     });
     
+    // Eventos para previsualización de imágenes
+    document.getElementById('product-images')?.addEventListener('change', (e) => {
+      this.previewImages(e.target, 'image-preview');
+    });
+    
+    document.getElementById('digital-image')?.addEventListener('change', (e) => {
+      this.previewImages(e.target, 'digital-image-preview', false);
+    });
+    
     this.renderProductsList();
     this.renderCategoriesList();
     this.loadOrders('all');
+  },
+  
+  previewImages: function(input, previewId, isMultiple = true) {
+    const preview = document.getElementById(previewId);
+    preview.innerHTML = '';
+    
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+    
+    for (let i = 0; i < input.files.length; i++) {
+      const file = input.files[i];
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.maxWidth = '100px';
+        img.style.maxHeight = '100px';
+        img.style.objectFit = 'contain';
+        img.style.margin = '5px';
+        img.style.border = '1px solid #ddd';
+        img.style.borderRadius = '4px';
+        img.classList.add('image-loading');
+        preview.appendChild(img);
+      };
+      
+      reader.readAsDataURL(file);
+      
+      if (!isMultiple) break;
+    }
   },
   
   uploadImageToImageBin: async function(file) {
@@ -404,32 +444,37 @@ const AdminSystem = {
   handleImageUploads: async function(inputId, previewId, isMultiple = true) {
     const input = document.getElementById(inputId);
     const preview = document.getElementById(previewId);
-    preview.innerHTML = '';
+    if (!input || !preview) return [];
     
     if (!input.files || input.files.length === 0) {
       return [];
     }
     
     const urls = [];
+    const previewImages = preview.querySelectorAll('img');
     
     for (let i = 0; i < input.files.length; i++) {
       const file = input.files[i];
-      const reader = new FileReader();
       
-      reader.onload = async (e) => {
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.style.maxWidth = '100px';
-        img.style.margin = '5px';
-        preview.appendChild(img);
-        
+      try {
         const imageUrl = await this.uploadImageToImageBin(file);
         if (imageUrl) {
           urls.push(imageUrl);
+          console.log('Imagen subida:', imageUrl);
+          
+          // Actualizar la imagen con la URL final
+          if (previewImages[i]) {
+            previewImages[i].src = imageUrl;
+            previewImages[i].classList.remove('image-loading');
+          }
         }
-      };
-      
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error subiendo imagen:', error);
+        if (previewImages[i]) {
+          previewImages[i].classList.add('image-error');
+          previewImages[i].title = 'Error al subir';
+        }
+      }
       
       if (!isMultiple) break;
     }
@@ -473,7 +518,7 @@ const AdminSystem = {
       product.hasColorVariant = document.getElementById('has-color-variant').checked;
       
       if (product.hasColorVariant) {
-        product.colors = [];
+        product.col极速赛车开奖直播官网ors = [];
         document.querySelectorAll('.color-variant').forEach(variant => {
           const color = variant.querySelector('.color-picker').value;
           const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
@@ -642,14 +687,31 @@ const AdminSystem = {
           document.getElementById('color-variant-section').style.display = 
             product.hasColorVariant ? 'block' : 'none';
           
-          if (product.colors) {
+          // Previsualizar imágenes existentes
+          const preview = document.getElementById('image-preview');
+          preview.innerHTML = '';
+          if (product.images && product.images.length > 0) {
+            product.images.forEach(img => {
+              const imgEl = document.createElement('img');
+              imgEl.src = img;
+              imgEl.style.maxWidth = '100px';
+              imgEl.style.maxHeight = '100px';
+              imgEl.style.objectFit = 'contain';
+              imgEl.style.margin = '5px';
+              imgEl.style.border = '1px solid #ddd';
+              imgEl.style.borderRadius = '4px';
+              preview.appendChild(imgEl);
+            });
+          }
+          
+          if (product.hasColorVariant && product.colors) {
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
             
             product.colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="color" value="${color.color}" class="color-picker">
+                  <input type="color" value="${color.color}" class极速赛车开奖直播官网="color-picker">
                   <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
                 </div>
@@ -663,6 +725,17 @@ const AdminSystem = {
             });
           }
         } else {
+          const preview = document.getElementById('digital-image-preview');
+          preview.innerHTML = '';
+          if (product.image) {
+            const imgEl = document.createElement('img');
+            imgEl.src = product.image;
+            imgEl.style.maxWidth = '200px';
+            imgEl.style.maxHeight = '200px';
+            imgEl.style.objectFit = 'contain';
+            preview.appendChild(imgEl);
+          }
+          
           const container = document.getElementById('required-fields-container');
           container.innerHTML = '';
           if (product.requiredFields && product.requiredFields.length > 0) {
@@ -766,6 +839,11 @@ const AdminSystem = {
     fetch(`${window.API_BASE_URL}/api/categories/${type}`)
       .then(response => response.json())
       .then(categories => {
+        if (!categories || categories.length === 0) {
+          container.innerHTML += '<p>No hay categorías definidas</p>';
+          return;
+        }
+        
         categories.forEach(category => {
           const categoryEl = document.createElement('div');
           categoryEl.className = 'admin-category-item';
@@ -944,6 +1022,7 @@ const AdminSystem = {
               <div class="payment-info">
                 <div><strong>Método:</strong> ${order.payment.method}</div>
                 <div><strong>🔑 ID Transferencia:</strong> ${order.payment.transferId}</div>
+                <div><strong>📸 Comprobante:</strong> <a href="${order.payment.transferProof}" target="_blank">Ver imagen</a></div>
               </div>
               
               <h3>🛒 Productos</h3>
@@ -1007,7 +1086,7 @@ const AdminSystem = {
     document.getElementById('image-preview').innerHTML = '';
     document.getElementById('digital-image-preview').innerHTML = '';
     document.getElementById('required-fields-container').innerHTML = `
-      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+      <极速赛车开奖直播官网div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
         <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
         <input type="checkbox" class="field-required" checked>
         <label>Requerido</label>
