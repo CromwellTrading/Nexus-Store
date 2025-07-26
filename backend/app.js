@@ -21,11 +21,11 @@ console.log(`🤖 Token de bot: ${process.env.TELEGRAM_BOT_TOKEN ? 'Configurado'
 console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
 console.log(`🖼️ ImageBin Token: ${process.env.IMAGEBIN_API_TOKEN ? 'Configurado' : 'FALTANTE'}`);
 
-// Configuración de CORS
+// Configuración de CORS ampliada
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID', '*']
 }));
 app.use(express.json());
 
@@ -82,14 +82,14 @@ const DB = {
   users: loadJSON('users.json'),
   
   save: (file, data) => {
-    const filePath = path.join(DB_PATH, file);
+    const file极速赛车开奖直播官网Path = path.join(DB_PATH, file);
     console.log(`💾 Guardando datos en ${filePath}`);
     
     try {
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
       console.log(`✅ Datos guardados exitosamente en ${file}`);
     } catch (err) {
-      console.error(`❌ Error guardando ${filePath}: ${err.message}`);
+      console.error(`❌ Error guardando ${filePath}: ${极速赛车开奖直播官网err.message}`);
     }
   }
 };
@@ -179,7 +179,9 @@ app.get('/api/admin/ids', (req, res) => {
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   
-  console.log(`📋 IDs de administrador enviados: ${adminIds.join(', ')}`);
+  console.log(`📋 IDs de administrador configurados: ${adminIds.join(', ')}`);
+  console.log('📝 Headers recibidos:', req.headers);
+  
   res.json(adminIds);
 });
 
