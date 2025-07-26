@@ -1,3 +1,4 @@
+// admin.js - Versión de producción
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -361,27 +362,41 @@ const AdminSystem = {
     this.loadOrders('all');
   },
   
-  uploadImageToFreeImageHost: async function(file) {
+  uploadImageToImageBin: async function(file) {
     try {
-      const formData = new FormData();
-      formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
-      formData.append('source', file);
+      // Convertir a base64
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result;
+          
+          try {
+            const response = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Telegram-ID': this.telegramUserId.toString()
+              },
+              body: JSON.stringify({ image: base64 })
+            });
 
-      const response = await fetch('https://freeimage.host/api/1/upload', {
-        method: 'POST',
-        body: formData
+            const data = await response.json();
+            if (data.url) {
+              resolve(data.url);
+            } else {
+              console.error('Error subiendo imagen:', data.error);
+              reject('Error subiendo imagen');
+            }
+          } catch (error) {
+            console.error('Error subiendo imagen:', error);
+            reject('Error de conexión');
+          }
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
       });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        return data.image.url;
-      } else {
-        console.error('Error subiendo imagen:', data);
-        return null;
-      }
     } catch (error) {
-      console.error('Error subiendo imagen:', error);
+      console.error('Error procesando imagen:', error);
       return null;
     }
   },
@@ -408,7 +423,7 @@ const AdminSystem = {
         img.style.margin = '5px';
         preview.appendChild(img);
         
-        const imageUrl = await this.uploadImageToFreeImageHost(file);
+        const imageUrl = await this.uploadImageToImageBin(file);
         if (imageUrl) {
           urls.push(imageUrl);
         }
@@ -751,11 +766,6 @@ const AdminSystem = {
     fetch(`${window.API_BASE_URL}/api/categories/${type}`)
       .then(response => response.json())
       .then(categories => {
-        if (!categories || categories.length === 0) {
-          container.innerHTML += '<p>No hay categorías definidas</p>';
-          return;
-        }
-        
         categories.forEach(category => {
           const categoryEl = document.createElement('div');
           categoryEl.className = 'admin-category-item';
@@ -934,12 +944,6 @@ const AdminSystem = {
               <div class="payment-info">
                 <div><strong>Método:</strong> ${order.payment.method}</div>
                 <div><strong>🔑 ID Transferencia:</strong> ${order.payment.transferId}</div>
-                <div class="transfer-proof">
-                  <strong>📸 Comprobante:</strong>
-                  <a href="${order.payment.transferProof}" target="_blank">
-                    Ver imagen del comprobante
-                  </a>
-                </div>
               </div>
               
               <h3>🛒 Productos</h3>
