@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import TelegramBot from 'node-telegram-bot-api';
+import fetch from 'node-fetch'; // Importar node-fetch para subir imágenes
 
 // Configuración para obtener __dirname en módulos ES
 const __filename = fileURLToPath(import.meta.url);
@@ -92,6 +93,43 @@ const isAdmin = (req, res, next) => {
   }
   next();
 };
+
+// Ruta para subir imágenes al backend
+app.post('/api/upload-image', isAdmin, async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Imagen no proporcionada' });
+    }
+
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const formData = new FormData();
+    const blob = new Blob([buffer]);
+    formData.append('file', blob, 'image.png');
+
+    const response = await fetch('https://imagebin.ca/upload.php', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'token': process.env.IMAGEBIN_API_TOKEN || ''
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      res.json({ url: data.url });
+    } else {
+      console.error('Error subiendo imagen:', data);
+      res.status(500).json({ error: 'Error subiendo imagen: ' + (data.message || 'Error desconocido') });
+    }
+  } catch (error) {
+    console.error('Error subiendo imagen:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
 // Ruta de prueba para verificar que el servidor está funcionando
 app.get('/', (req, res) => {
@@ -325,13 +363,6 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
   
   product.id = Date.now();
   product.createdAt = new Date().toISOString();
-  
-  // Log para depuración de imágenes
-  console.log('Recibiendo nuevo producto con imágenes:', {
-    images: product.images,
-    image: product.image
-  });
-  
   DB.products[type][category].push(product);
   
   DB.save('products.json', DB.products);
@@ -372,6 +403,7 @@ app.listen(PORT, () => {
   console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
   console.log(`🤖 Token de bot: ${process.env.TELEGRAM_BOT_TOKEN ? 'Configurado' : 'FALTANTE'}`);
   console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
+  console.log(`🖼️ ImageBin Token: ${process.env.IMAGEBIN_API_TOKEN ? 'Configurado' : 'FALTANTE'}`);
   
   // Solo si el token está configurado, iniciar el bot
   if (process.env.TELEGRAM_BOT_TOKEN) {
