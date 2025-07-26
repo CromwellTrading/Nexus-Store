@@ -1,4 +1,4 @@
-// admin.js - Versión completa con previsualización de imágenes
+// admin.js - Versión actualizada con Imagebin
 const AdminSystem = {
   productType: 'fisico',
   categoryType: 'fisico',
@@ -25,7 +25,7 @@ const AdminSystem = {
   },
   
   checkAdminStatus: async function() {
-    if (!this.telegramUserId) {
+    if (!this.telegram极速赛车开奖直播官网UserId) {
       this.isAdmin = false;
       return;
     }
@@ -105,10 +105,10 @@ const AdminSystem = {
           <div class="admin-section">
             <h3>📦 Gestionar Productos</h3>
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
-            <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
+            <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8极速赛车开奖直播官网px; background: rgba(0,0,0,0.03);">
               <div class="form-group">
                 <label>📦 Tipo de Producto:</label>
-                <div class="tab-selector">
+                <极速赛车开奖直播官网div class="tab-selector">
                   <button class="type-tab ${this.productType === 'fisico' ? 'active' : ''}" data-type="fisico">Físico</button>
                   <button class="type-tab ${this.productType === 'digital' ? 'active' : ''}" data-type="digital">Digital</button>
                 </div>
@@ -238,12 +238,11 @@ const AdminSystem = {
             <select id="order-status-filter">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
-             极速赛车开奖直播官网
               <option value="Enviado">Enviado</option>
               <option value="Completado">Completado</option>
             </select>
           </div>
-          <div class="admin-orders-list" id="admin-orders-list"></极速赛车开奖直播官网div>
+          <div class="admin-orders-list" id="admin-orders-list"></div>
         </div>
       </div>
     </div>`;
@@ -402,42 +401,33 @@ const AdminSystem = {
     }
   },
   
+  // NUEVA IMPLEMENTACIÓN CON IMAGEBIN
   uploadImageToImageBin: async function(file) {
-    try {
-      // Convertir a base64
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const base64 = reader.result;
-          
-          try {
-            const response = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Telegram-ID': this.telegramUserId.toString()
-              },
-              body: JSON.stringify({ image: base64 })
-            });
+    const formData = new FormData();
+    formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
+    formData.append('file', file);
 
-            const data = await response.json();
-            if (data.url) {
-              resolve(data.url);
-            } else {
-              console.error('Error subiendo imagen:', data.error);
-              reject('Error subiendo imagen');
-            }
-          } catch (error) {
-            console.error('Error subiendo imagen:', error);
-            reject('Error de conexión');
-          }
-        };
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
+    try {
+      const response = await fetch('https://imagebin.ca/upload.php', {
+        method: 'POST',
+        body: formData
       });
+
+      const text = await response.text();
+      // La respuesta de Imagebin es en texto, con el formato:
+      // ... (varias líneas de texto) ...
+      // url:https://imagebin.ca/v/XXXXX
+      const lines = text.split('\n');
+      const urlLine = lines.find(line => line.startsWith('url:'));
+      if (urlLine) {
+        const url = urlLine.split('url:')[1].trim();
+        return url;
+      } else {
+        throw new Error('No se encontró la URL en la respuesta de Imagebin');
+      }
     } catch (error) {
-      console.error('Error procesando imagen:', error);
-      return null;
+      console.error('Error subiendo imagen:', error);
+      throw error;
     }
   },
 
@@ -518,7 +508,7 @@ const AdminSystem = {
       product.hasColorVariant = document.getElementById('has-color-variant').checked;
       
       if (product.hasColorVariant) {
-        product.col极速赛车开奖直播官网ors = [];
+        product.colors = [];
         document.querySelectorAll('.color-variant').forEach(variant => {
           const color = variant.querySelector('.color-picker').value;
           const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
@@ -711,7 +701,7 @@ const AdminSystem = {
             product.colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="color" value="${color.color}" class极速赛车开奖直播官网="color-picker">
+                  <input type="color" value="${color.color}" class="color-picker">
                   <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
                 </div>
@@ -846,7 +836,7 @@ const AdminSystem = {
         
         categories.forEach(category => {
           const categoryEl = document.createElement('div');
-          categoryEl.className = 'admin-category-item';
+          category极速赛车开奖直播官网El.className = 'admin-category-item';
           categoryEl.innerHTML = `
             <div class="category-info">
               ${this.getCategoryName(category)}
@@ -865,7 +855,7 @@ const AdminSystem = {
             const category = e.target.getAttribute('data-category');
             
             if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-              fetch(`${window.API_BASE_URL}/api/admin/categories/${type}/${category}`, {
+              fetch(`${window.API_BASE_URL}/极速赛车开奖直播官网api/admin/categories/${type}/${category}`, {
                 method: 'DELETE',
                 headers: {
                   'Telegram-ID': this.telegramUserId.toString()
@@ -1086,7 +1076,7 @@ const AdminSystem = {
     document.getElementById('image-preview').innerHTML = '';
     document.getElementById('digital-image-preview').innerHTML = '';
     document.getElementById('required-fields-container').innerHTML = `
-      <极速赛车开奖直播官网div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
         <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
         <input type="checkbox" class="field-required" checked>
         <label>Requerido</label>
