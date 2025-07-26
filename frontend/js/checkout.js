@@ -18,7 +18,7 @@ const CheckoutSystem = {
         <div class="checkout-steps">
           <div class="step ${startingStep >= 1 ? 'active' : ''}" data-step="1">👤 Datos</div>
           <div class="step ${startingStep >= 2 ? 'active' : ''}" data-step="2">💳 Pago</div>
-          <div class="step" data-step极速赛车开奖直播官网="3">✅ Confirmar</div>
+          <div class="step" data-step="3">✅ Confirmar</div>
         </div>
         
         <div class="checkout-content" id="checkout-content">
@@ -31,7 +31,7 @@ const CheckoutSystem = {
             <div class="form-group">
               <label>Carnet de Identidad:</label>
               <input type="text" id="checkout-ci" value="${userData.ci || ''}" required>
-            </极速赛车开奖直播官网div>
+            </div>
             <div class="form-group">
               <label>Teléfono:</label>
               <input type="text" id="checkout-phone" value="${userData.phone || ''}" required>
@@ -55,7 +55,7 @@ const CheckoutSystem = {
                 <option value="Ciego de Ávila" ${userData.province === 'Ciego de Ávila' ? 'selected' : ''}>Ciego de Ávila</option>
                 <option value="Camagüey" ${userData.province === 'Camagüey' ? 'selected' : ''}>Camagüey</option>
                 <option value="Las Tunas" ${userData.province === 'Las Tunas' ? 'selected' : ''}>Las Tunas</option>
-                <option value="Granma" ${userData.province === 'Granma' ? 'selected' : ''}>Gran极速赛车开奖直播官网ma</option>
+                <option value="Granma" ${userData.province === 'Granma' ? 'selected' : ''}>Granma</option>
                 <option value="Holguín" ${userData.province === 'Holguín' ? 'selected' : ''}>Holguín</option>
                 <option value="Santiago de Cuba" ${userData.province === 'Santiago de Cuba' ? 'selected' : ''}>Santiago de Cuba</option>
                 <option value="Guantánamo" ${userData.province === 'Guantánamo' ? 'selected' : ''}>Guantánamo</option>
@@ -245,83 +245,76 @@ const CheckoutSystem = {
       
       const transferData = {};
       
-      // Subir la imagen de comprobante al backend
+      // Subir la imagen de comprobante a Imagebin
       try {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result;
-          
-          fetch(`${window.API_BASE_URL}/api/upload-image`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Telegram-ID': userId.toString()
-            },
-            body: JSON.stringify({ image: base64 })
-          })
-          .then(response => response.json())
-          .then(data => {
-            if (data.url) {
-              transferData.transferProof = data.url;
-              transferData.transferId = proofFile.name;
-              
-              // Continuar con la orden
-              const recipientData = {};
-              if (document.getElementById('add-recipient')?.checked) {
-                recipientData.fullName = document.getElementById('recipient-name').value;
-                recipientData.ci = document.getElementById('recipient-ci').value;
-                recipientData.phone = document.getElementById('recipient-phone').value;
-              }
-              
-              const requiredFieldsData = {};
-              if (document.getElementById('required-fields-inputs')) {
-                document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
-                  const input = group.querySelector('input');
-                  const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
-                  requiredFieldsData[fieldName] = input.value;
-                });
-              }
-              
-              // Crear la orden en el backend
-              fetch(`${window.API_BASE_URL}/api/checkout`, {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Telegram-ID': userId.toString()
-                },
-                body: JSON.stringify({
-                  userId: userId,
-                  paymentMethod: method,
-                  transferData: transferData,
-                  recipientData: recipientData,
-                  requiredFields: requiredFieldsData
-                })
-              })
-              .then(response => response.json())
-              .then(orderResult => {
-                document.getElementById('product-modal').style.display = 'none';
-                CartSystem.clearCart();
-                
-                Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
-              })
-              .catch(error => {
-                console.error('Error confirmando compra:', error);
-                alert('Error al confirmar la compra: ' + error.message);
-              });
-            } else {
-              alert('Error al subir el comprobante: ' + (data.error || 'Error desconocido'));
-            }
-          })
-          .catch(error => {
-            console.error('Error subiendo comprobante:', error);
-            alert('Error al subir el comprobante. Por favor intente nuevamente.');
-          });
-        };
-        reader.readAsDataURL(proofFile);
+        const formData = new FormData();
+        formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
+        formData.append('file', proofFile);
+        
+        const response = await fetch('https://imagebin.ca/upload.php', {
+          method: 'POST',
+          body: formData
+        });
+
+        const text = await response.text();
+        const lines = text.split('\n');
+        const urlLine = lines.find(line => line.startsWith('url:'));
+        if (urlLine) {
+          const url = urlLine.split('url:')[1].trim();
+          transferData.transferProof = url;
+          transferData.transferId = proofFile.name;
+        } else {
+          throw new Error('No se encontró la URL en la respuesta de Imagebin');
+        }
       } catch (error) {
-        console.error('Error procesando imagen:', error);
-        alert('Error al procesar la imagen');
+        console.error('Error subiendo comprobante:', error);
+        alert('Error al subir el comprobante: ' + error.message);
+        return;
       }
+      
+      // Continuar con la orden
+      const recipientData = {};
+      if (document.getElementById('add-recipient')?.checked) {
+        recipientData.fullName = document.getElementById('recipient-name').value;
+        recipientData.ci = document.getElementById('recipient-ci').value;
+        recipientData.phone = document.getElementById('recipient-phone').value;
+      }
+      
+      const requiredFieldsData = {};
+      if (document.getElementById('required-fields-inputs')) {
+        document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
+          const input = group.querySelector('input');
+          const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+          requiredFieldsData[fieldName] = input.value;
+        });
+      }
+      
+      // Crear la orden en el backend
+      fetch(`${window.API_BASE_URL}/api/checkout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Telegram-ID': userId.toString()
+        },
+        body: JSON.stringify({
+          userId: userId,
+          paymentMethod: method,
+          transferData: transferData,
+          recipientData: recipientData,
+          requiredFields: requiredFieldsData
+        })
+      })
+      .then(response => response.json())
+      .then(orderResult => {
+        document.getElementById('product-modal').style.display = 'none';
+        CartSystem.clearCart();
+        
+        Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
+      })
+      .catch(error => {
+        console.error('Error confirmando compra:', error);
+        alert('Error al confirmar la compra: ' + error.message);
+      });
     });
   },
   
@@ -364,7 +357,7 @@ const CheckoutSystem = {
     });
     
     const stepEl = document.getElementById(`step-${step}`);
-    if (step极速赛车开奖直播官网El) {
+    if (stepEl) {
       stepEl.style.display = 'block';
     }
     
