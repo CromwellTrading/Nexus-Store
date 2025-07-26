@@ -245,76 +245,82 @@ const CheckoutSystem = {
       
       const transferData = {};
       
-      // Subir la imagen de comprobante a FreeImage.Host
+      // Subir la imagen de comprobante al backend
       try {
-        const formData = new FormData();
-        formData.append('key', '6d207e02198a847aa98d0a2a901485a5');
-        formData.append('source', proofFile);
-        
-        const response = await fetch('https://freeimage.host/api/1/upload', {
-          method: 'POST',
-          body: formData
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          transferData.transferProof = data.image.url;
-          transferData.transferId = data.image.name || proofFile.name;
-        } else {
-          throw new Error('Error al subir el comprobante: ' + JSON.stringify(data));
-        }
-      } catch (error) {
-        console.error('Error subiendo comprobante:', error);
-        alert('Error al subir el comprobante. Por favor intente nuevamente.');
-        return;
-      }
-      
-      const recipientData = {};
-      if (document.getElementById('add-recipient')?.checked) {
-        recipientData.fullName = document.getElementById('recipient-name').value;
-        recipientData.ci = document.getElementById('recipient-ci').value;
-        recipientData.phone = document.getElementById('recipient-phone').value;
-      }
-      
-      const requiredFieldsData = {};
-      if (document.getElementById('required-fields-inputs')) {
-        document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
-          const input = group.querySelector('input');
-          const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
-          requiredFieldsData[fieldName] = input.value;
-        });
-      }
-      
-      // Crear la orden en el backend
-      try {
-        const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Telegram-ID': userId.toString()
-          },
-          body: JSON.stringify({
-            userId: userId,
-            paymentMethod: method,
-            transferData: transferData,
-            recipientData: recipientData,
-            requiredFields: requiredFieldsData
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result;
+          
+          fetch(`${window.API_BASE_URL}/api/upload-image`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Telegram-ID': userId.toString()
+            },
+            body: JSON.stringify({ image: base64 })
           })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Error en la respuesta del servidor');
-        }
-        
-        const orderResult = await response.json();
-        document.getElementById('product-modal').style.display = 'none';
-        CartSystem.clearCart();
-        
-        Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
+          .then(response => response.json())
+          .then(data => {
+            if (data.url) {
+              transferData.transferProof = data.url;
+              transferData.transferId = proofFile.name;
+              
+              // Continuar con la orden
+              const recipientData = {};
+              if (document.getElementById('add-recipient')?.checked) {
+                recipientData.fullName = document.getElementById('recipient-name').value;
+                recipientData.ci = document.getElementById('recipient-ci').value;
+                recipientData.phone = document.getElementById('recipient-phone').value;
+              }
+              
+              const requiredFieldsData = {};
+              if (document.getElementById('required-fields-inputs')) {
+                document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
+                  const input = group.querySelector('input');
+                  const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+                  requiredFieldsData[fieldName] = input.value;
+                });
+              }
+              
+              // Crear la orden en el backend
+              fetch(`${window.API_BASE_URL}/api/checkout`, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Telegram-ID': userId.toString()
+                },
+                body: JSON.stringify({
+                  userId: userId,
+                  paymentMethod: method,
+                  transferData: transferData,
+                  recipientData: recipientData,
+                  requiredFields: requiredFieldsData
+                })
+              })
+              .then(response => response.json())
+              .then(orderResult => {
+                document.getElementById('product-modal').style.display = 'none';
+                CartSystem.clearCart();
+                
+                Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
+              })
+              .catch(error => {
+                console.error('Error confirmando compra:', error);
+                alert('Error al confirmar la compra: ' + error.message);
+              });
+            } else {
+              alert('Error al subir el comprobante: ' + (data.error || 'Error desconocido'));
+            }
+          })
+          .catch(error => {
+            console.error('Error subiendo comprobante:', error);
+            alert('Error al subir el comprobante. Por favor intente nuevamente.');
+          });
+        };
+        reader.readAsDataURL(proofFile);
       } catch (error) {
-        console.error('Error confirmando compra:', error);
-        alert('Error al confirmar la compra: ' + error.message);
+        console.error('Error procesando imagen:', error);
+        alert('Error al procesar la imagen');
       }
     });
   },
