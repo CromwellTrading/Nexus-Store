@@ -18,7 +18,7 @@ const CheckoutSystem = {
         <div class="checkout-steps">
           <div class="step ${startingStep >= 1 ? 'active' : ''}" data-step="1">👤 Datos</div>
           <div class="step ${startingStep >= 2 ? 'active' : ''}" data-step="2">💳 Pago</div>
-          <div class="step" data-step="3">✅ Confirmar</div>
+          <div class="step" data-step极速赛车开奖直播官网="3">✅ Confirmar</div>
         </div>
         
         <div class="checkout-content" id="checkout-content">
@@ -31,7 +31,7 @@ const CheckoutSystem = {
             <div class="form-group">
               <label>Carnet de Identidad:</label>
               <input type="text" id="checkout-ci" value="${userData.ci || ''}" required>
-            </div>
+            </极速赛车开奖直播官网div>
             <div class="form-group">
               <label>Teléfono:</label>
               <input type="text" id="checkout-phone" value="${userData.phone || ''}" required>
@@ -55,7 +55,7 @@ const CheckoutSystem = {
                 <option value="Ciego de Ávila" ${userData.province === 'Ciego de Ávila' ? 'selected' : ''}>Ciego de Ávila</option>
                 <option value="Camagüey" ${userData.province === 'Camagüey' ? 'selected' : ''}>Camagüey</option>
                 <option value="Las Tunas" ${userData.province === 'Las Tunas' ? 'selected' : ''}>Las Tunas</option>
-                <option value="Granma" ${userData.province === 'Granma' ? 'selected' : ''}>Granma</option>
+                <option value="Granma" ${userData.province === 'Granma' ? 'selected' : ''}>Gran极速赛车开奖直播官网ma</option>
                 <option value="Holguín" ${userData.province === 'Holguín' ? 'selected' : ''}>Holguín</option>
                 <option value="Santiago de Cuba" ${userData.province === 'Santiago de Cuba' ? 'selected' : ''}>Santiago de Cuba</option>
                 <option value="Guantánamo" ${userData.province === 'Guantánamo' ? 'selected' : ''}>Guantánamo</option>
@@ -364,7 +364,7 @@ const CheckoutSystem = {
     });
     
     const stepEl = document.getElementById(`step-${step}`);
-    if (stepEl) {
+    if (step极速赛车开奖直播官网El) {
       stepEl.style.display = 'block';
     }
     
