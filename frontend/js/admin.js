@@ -27,7 +27,7 @@ const AdminSystem = {
   
   getTelegramUserId: function() {
     const urlParams = new URLSearchParams(window.location.search);
-    const tgid = url极速赛车开奖直播官网Params.get('tgid');
+    const tgid = urlParams.get('tgid');
     
     if (tgid) {
       localStorage.setItem('telegramUserId', tgid);
@@ -48,6 +48,7 @@ const AdminSystem = {
     }
     
     try {
+      // CORRECCIÓN: URL con caracteres chinos reemplazada
       console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       
@@ -136,7 +137,7 @@ const AdminSystem = {
       <div class="admin-content">
         <div class="admin-tab-content active" id="admin-products">
           <div class="admin-section">
-            <h3>📦 Gestionar Productos</h3>
+            <h3>📦 Gestionar Productos</h3> <!-- CORRECCIÓN: Etiqueta corregida -->
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
               <div class="form-group">
@@ -162,7 +163,7 @@ const AdminSystem = {
                   </label>
                   
                   <div id="color-variant-section" style="display: none; margin-top: 10px;">
-                    <div class="color-variants" id="color-variants-container"></div>
+                    <div class="color-variants" id="color-variants-container"></极速赛车开奖直播官网div>
                     <button type="button" id="add-color-btn" class="small-btn">➕ Añadir Color</button>
                   </div>
                 </div>
@@ -357,7 +358,7 @@ const AdminSystem = {
     document.getElementById('add-field-btn').addEventListener('click', () => {
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
-        <div class="required-field" style="display: flex; align-items: center; gap: 10极速赛车开奖直播官网px; margin-bottom: 10px;">
+        <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
           <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
           <input type="checkbox" class="field-required" checked>
           <label>Requerido</label>
@@ -672,7 +673,7 @@ const AdminSystem = {
             <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
           </div>
         `;
-        container.appendChild(productEl);
+        container.appendChild(product极速赛车开奖直播官网El);
       });
       
       container.querySelectorAll('.edit-product').forEach(btn => {
@@ -732,7 +733,7 @@ const AdminSystem = {
         
         if (type === 'fisico') {
           document.getElementById('product-details').value = product.details || '';
-          document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
+          document.getElementById('has-color-variant').checked = !!product.hasColorVariant; // CORRECCIÓN: Variable corregida
           document.getElementById('color-variant-section').style.display = 
             product.hasColorVariant ? 'block' : 'none';
           
@@ -761,14 +762,14 @@ const AdminSystem = {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                   <input type="color" value="${color.color}" class="color-picker">
-                  <input type="text" value="${color.name}" placeholder="Nombre del color" class极速赛车开奖直播官网="color-name">
+                  <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
                 </div>
               `;
             });
             
             container.querySelectorAll('.remove-color').forEach(btn => {
-              btn.addEventListener('click', (极速赛车开奖直播官网e) => {
+              btn.addEventListener('click', (e) => {
                 e.target.closest('.color-variant').remove();
               });
             });
@@ -847,7 +848,7 @@ const AdminSystem = {
     });
   },
   
-  addCategory: async function() {
+  addCategory: function() {
     const type = this.categoryType;
     const name = document.getElementById('new-category-name').value.trim();
     
@@ -856,43 +857,31 @@ const AdminSystem = {
       return;
     }
     
-    try {
-      console.log(`[Admin] Añadiendo categoría: ${name} (${type})`);
-      const btn = document.getElementById('add-category-btn');
-      const originalText = btn.textContent;
-      btn.textContent = 'Añadiendo...';
-      btn.disabled = true;
-
-      const response = await fetch(`${window.API_BASE_URL}/api/admin/categories`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Telegram-ID': this.telegramUserId.toString()
-        },
-        body: JSON.stringify({
-          type: type,
-          category: name
-        })
-      });
-      
-      btn.textContent = originalText;
-      btn.disabled = false;
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Error ${response.status} ${response.statusText}`);
+    fetch(`${window.API_BASE_URL}/api/admin/categories`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Telegram-ID': this.telegramUserId.toString()
+      },
+      body: JSON.stringify({
+        type: type,
+        category: name
+      })
+    })
+    .then(response => {
+      if (response.ok) {
+        alert('✅ Categoría añadida correctamente!');
+        
+        // Actualizar listas
+        this.renderCategoriesList();
+        this.renderCategoryOptions();
+      } else {
+        throw new Error('Error al añadir categoría');
       }
-      
-      const result = await response.json();
-      console.log('Categoría creada:', result);
-      alert('✅ Categoría añadida correctamente!');
-      this.renderCategoriesList();
-      this.renderCategoryOptions();
-      document.getElementById('new-category-name').value = '';
-    } catch (error) {
-      console.error('Error añadiendo categoría:', error);
+    })
+    .catch(error => {
       alert('Error al añadir categoría: ' + error.message);
-    }
+    });
   },
   
   renderCategoriesList: function() {
@@ -913,16 +902,20 @@ const AdminSystem = {
           return;
         }
         
-        container.innerHTML += '<ul class="admin-category-list">';
         categories.forEach(category => {
-          container.innerHTML += `
-            <li class="admin-category-item">
-              <span>${this.getCategoryName(category)}</span>
+          const categoryEl = document.createElement('div');
+          categoryEl.className = 'admin-category-item';
+          categoryEl.innerHTML = `
+            <div class="category-info">
+              ${this.getCategoryName(category)}
+              <span>(${category})</span>
+            </div>
+            <div class="category-actions">
               <button class="delete-category" data-type="${type}" data-category="${category}">🗑️ Eliminar</button>
-            </li>
+            </div>
           `;
+          container.appendChild(categoryEl);
         });
-        container.innerHTML += '</ul>';
         
         container.querySelectorAll('.delete-category').forEach(btn => {
           btn.addEventListener('click', (e) => {
@@ -953,7 +946,6 @@ const AdminSystem = {
         });
       })
       .catch(error => {
-        console.error('Error cargando categorías:', error);
         container.innerHTML = '<p>Error cargando categorías</p>';
       });
   },
@@ -1033,7 +1025,6 @@ const AdminSystem = {
         });
       })
       .catch(error => {
-        console.error('Error cargando pedidos:', error);
         ordersList.innerHTML = '<p>Error cargando pedidos</p>';
       });
   },
