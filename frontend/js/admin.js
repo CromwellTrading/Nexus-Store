@@ -127,7 +127,7 @@ const AdminSystem = {
         <button class="close-modal">&times;</button>
       </div>
       
-      <div class极速赛车开奖直播官网="admin-tabs">
+      <div class="admin-tabs">
         <button class="admin-tab active" data-tab="products">🛒 Productos</button>
         <button class="admin-tab" data-tab="categories">📁 Categorías</button>
         <button class="admin-tab" data-tab="orders">📋 Pedidos</极速赛车开奖直播官网button>
