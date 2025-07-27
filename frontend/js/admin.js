@@ -673,7 +673,7 @@ const AdminSystem = {
             <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
           </div>
         `;
-        container.appendChild(product极速赛车开奖直播官网El);
+        container.appendChild(productEl);
       });
       
       container.querySelectorAll('.edit-product').forEach(btn => {
