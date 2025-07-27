@@ -9,6 +9,13 @@ const AdminSystem = {
     this.telegramUserId = this.getTelegramUserId();
     console.log(`[Admin] ID de Telegram: ${this.telegramUserId}`);
     
+    // Verificar si ya existe el botón en el DOM
+    const adminButton = document.getElementById('admin-button');
+    if (!adminButton) {
+      console.error('[Admin] Botón de admin no encontrado en el DOM');
+      return;
+    }
+    
     this.checkAdminStatus().then(() => {
       console.log(`[Admin] Verificación completada. ¿Es admin? ${this.isAdmin}`);
       this.initializeAdmin();
@@ -25,11 +32,11 @@ const AdminSystem = {
     if (tgid) {
       localStorage.setItem('telegramUserId', tgid);
       console.log(`[Admin] ID de Telegram obtenido de URL: ${tgid}`);
-      return tg极速赛车开奖直播官网id;
+      return tgid;
     }
     
     const storedId = localStorage.getItem('telegramUserId');
-    console.log(`[Admin] ID de Telegram obtenido de localStorage: ${storedId}`);
+    console.log(`[Admin] ID de Telegram obtenido de localStorage: ${storedId || 'null'}`);
     return storedId;
   },
   
@@ -42,7 +49,7 @@ const AdminSystem = {
     
     try {
       console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
-      const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
+      const response = await fetch(`${window.API_BASE_URL}/极速赛车开奖直播官网api/admin/ids`);
       
       if (!response.ok) {
         throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
@@ -129,7 +136,7 @@ const AdminSystem = {
       <div class="admin-content">
         <div class="admin-tab-content active" id="admin-products">
           <div class="admin-section">
-            <h3>📦 Gestionar Productos</h3>
+            <h3>📦 Gestionar Productos</极速赛车开奖直播官网h3>
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
               <div class="form-group">
@@ -261,7 +268,7 @@ const AdminSystem = {
           <h3>📋 Lista de Pedidos</h3>
           <div class="order-filter">
             <label>Filtrar por estado:</label>
-            <select id极速赛车开奖直播官网="order-status-filter">
+            <select id="order-status-filter">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
               <option value="Enviado">Enviado</option>
@@ -427,7 +434,7 @@ const AdminSystem = {
     }
   },
   
-  // Implementación mejorada de ImageBin
+  // Implementación corregida de ImageBin
   uploadImageToImageBin: async function(file) {
     const formData = new FormData();
     formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
@@ -596,6 +603,11 @@ const AdminSystem = {
   
   renderProductsList: function() {
     const container = document.getElementById('products-list');
+    if (!container) {
+      console.error('[Admin] No se encontró el contenedor de productos');
+      return;
+    }
+    
     container.innerHTML = '<h4>📦 Productos Existentes</h4>';
     
     Promise.all([
@@ -722,7 +734,7 @@ const AdminSystem = {
           document.getElementById('product-details').value = product.details || '';
           document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
           document.getElementById('color-variant-section').style.display = 
-            product.hasColorVariant ? 'block' : 'none';
+            product.has极速赛车开奖直播官网ColorVariant ? 'block' : 'none';
           
           // Previsualizar imágenes existentes
           const preview = document.getElementById('image-preview');
@@ -747,7 +759,7 @@ const AdminSystem = {
             
             product.colors.forEach(color => {
               container.innerHTML += `
-                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10极速赛车开奖直播官网px;">
+                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                   <input type="color" value="${color.color}" class="color-picker">
                   <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
@@ -768,7 +780,7 @@ const AdminSystem = {
             const imgEl = document.createElement('img');
             imgEl.src = product.image;
             imgEl.style.maxWidth = '200px';
-            img极速赛车开奖直播官网El.style.maxHeight = '200px';
+            imgEl.style.maxHeight = '200px';
             imgEl.style.objectFit = 'contain';
             preview.appendChild(imgEl);
           }
@@ -874,6 +886,11 @@ const AdminSystem = {
   renderCategoriesList: function() {
     const type = this.categoryType;
     const container = document.getElementById('categories-list');
+    if (!container) {
+      console.error('[Admin] No se encontró el contenedor de categorías');
+      return;
+    }
+    
     container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
     
     fetch(`${window.API_BASE_URL}/api/categories/${type}`)
@@ -934,6 +951,11 @@ const AdminSystem = {
   
   loadOrders: function(filter = 'all') {
     const ordersList = document.getElementById('admin-orders-list');
+    if (!ordersList) {
+      console.error('[Admin] No se encontró el contenedor de pedidos');
+      return;
+    }
+    
     ordersList.innerHTML = '';
     
     fetch(`${window.API_BASE_URL}/api/admin/orders`)
@@ -1092,6 +1114,11 @@ const AdminSystem = {
   
   renderCategoryOptions: function(type = 'fisico') {
     const categorySelect = document.getElementById('product-category');
+    if (!categorySelect) {
+      console.error('[Admin] No se encontró el selector de categorías');
+      return;
+    }
+    
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
     fetch(`${window.API_BASE_URL}/api/categories/${type}`)
@@ -1140,6 +1167,7 @@ const AdminSystem = {
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialización mejorada
+window.addEventListener('DOMContentLoaded', () => {
   AdminSystem.init();
 });
