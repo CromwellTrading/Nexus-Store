@@ -48,12 +48,11 @@ const AdminSystem = {
     }
     
     try {
-      // CORRECCIÓN: URL con caracteres chinos reemplazada
       console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       
       if (!response.ok) {
-        throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
+        throw new Error(`Error en respuesta: ${response.status} ${极速赛车开奖直播官网response.statusText}`);
       }
       
       const adminIds = await response.json();
@@ -128,16 +127,16 @@ const AdminSystem = {
         <button class="close-modal">&times;</button>
       </div>
       
-      <div class="admin-tabs">
+      <div class极速赛车开奖直播官网="admin-tabs">
         <button class="admin-tab active" data-tab="products">🛒 Productos</button>
         <button class="admin-tab" data-tab="categories">📁 Categorías</button>
-        <button class="admin-tab" data-tab="orders">📋 Pedidos</button>
+        <button class="admin-tab" data-tab="orders">📋 Pedidos</极速赛车开奖直播官网button>
       </div>
       
       <div class="admin-content">
         <div class="admin-tab-content active" id="admin-products">
           <div class="admin-section">
-            <h3>📦 Gestionar Productos</h3> <!-- CORRECCIÓN: Etiqueta corregida -->
+            <h3>📦 Gestionar Productos</h3>
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
               <div class="form-group">
@@ -412,92 +411,30 @@ const AdminSystem = {
       return;
     }
     
-    // Mostrar un mensaje en lugar de las imágenes locales
-    const message = document.createElement('div');
-    message.className = 'image-upload-message';
-    message.textContent = 'Las imágenes se mostrarán aquí después de subirlas a Imagebin.ca';
-    preview.appendChild(message);
+    // Mostrar un mensaje de carga
+    ImageUploader.showLoading(previewId, 'Preparando para subir...');
+    
+    // Subir cada imagen y luego previsualizar
+    const files = Array.from(input.files);
+    files.forEach((file, index) => {
+      // Subir la imagen
+      this.uploadAndPreviewImage(file, previewId, index, files.length);
+    });
   },
   
-  // Implementación corregida de ImageBin
-  uploadImageToImageBin: async function(file) {
-    const formData = new FormData();
-    formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
-    formData.append('file', file);
-
+  uploadAndPreviewImage: async function(file, previewId, index, total) {
     try {
-      const response = await fetch('https://imagebin.ca/upload.php', {
-        method: 'POST',
-        body: formData
-      });
-
-      const text = await response.text();
-      console.log('Respuesta de Imagebin:', text);
+      // Mostrar estado de carga para esta imagen
+      ImageUploader.showLoading(previewId, `Subiendo imagen ${index + 1}/${total}...`);
       
-      // Buscar la línea que contiene 'url:' con expresiones regulares mejoradas
-      const urlRegex = /https?:\/\/[^\s]+/g;
-      const urls = text.match(urlRegex);
+      // Subir la imagen
+      const imageUrl = await ImageUploader.uploadImageToImageBin(file);
       
-      if (urls && urls.length > 0) {
-        // Tomamos la última URL que generalmente es la del archivo
-        const imageUrl = urls[urls.length - 1];
-        console.log('URL de imagen obtenida:', imageUrl);
-        return imageUrl;
-      } else {
-        throw new Error('No se encontró la URL en la respuesta de Imagebin');
-      }
+      // Previsualizar la imagen subida
+      ImageUploader.previewUploadedImage(imageUrl, previewId);
     } catch (error) {
-      console.error('Error subiendo imagen:', error);
-      throw error;
+      ImageUploader.showError(previewId, `Error subiendo imagen: ${error.message}`);
     }
-  },
-
-  handleImageUploads: async function(inputId, previewId, isMultiple = true) {
-    const input = document.getElementById(inputId);
-    const preview = document.getElementById(previewId);
-    if (!input || !preview) return [];
-    
-    if (!input.files || input.files.length === 0) {
-      return [];
-    }
-    
-    const urls = [];
-    preview.innerHTML = '<div class="image-upload-message">Subiendo imágenes a Imagebin.ca...</div>';
-    
-    for (let i = 0; i < input.files.length; i++) {
-      const file = input.files[i];
-      
-      try {
-        const imageUrl = await this.uploadImageToImageBin(file);
-        if (imageUrl) {
-          urls.push(imageUrl);
-          console.log('Imagen subida:', imageUrl);
-          
-          // Actualizar la vista previa con la imagen de Imagebin
-          if (i === 0) {
-            preview.innerHTML = '';
-          }
-          
-          const img = document.createElement('img');
-          img.src = imageUrl;
-          img.alt = 'Imagen subida a Imagebin.ca';
-          img.style.maxWidth = '100px';
-          img.style.maxHeight = '100px';
-          img.style.objectFit = 'contain';
-          img.style.margin = '5px';
-          img.style.border = '1px solid #ddd';
-          img.style.borderRadius = '4px';
-          preview.appendChild(img);
-        }
-      } catch (error) {
-        console.error('Error subiendo imagen:', error);
-        preview.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
-      }
-      
-      if (!isMultiple) break;
-    }
-    
-    return urls;
   },
   
   saveProduct: async function() {
@@ -531,7 +468,27 @@ const AdminSystem = {
     };
     
     if (type === 'fisico') {
-      product.images = await this.handleImageUploads('product-images', 'image-preview', true);
+      // Subir imágenes para producto físico
+      const imageFiles = document.getElementById('product-images').files;
+      if (imageFiles.length > 0) {
+        product.images = [];
+        for (let i = 0; i < imageFiles.length; i++) {
+          try {
+            // Mostrar carga
+            ImageUploader.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}...`);
+            
+            const imageUrl = await ImageUploader.uploadImageToImageBin(imageFiles[i]);
+            product.images.push(imageUrl);
+            
+            // Previsualizar la imagen subida
+            ImageUploader.previewUploadedImage(imageUrl, 'image-preview');
+          } catch (error) {
+            ImageUploader.showError('image-preview', `Error subiendo imagen: ${error.message}`);
+            return;
+          }
+        }
+      }
+      
       product.details = details;
       product.hasColorVariant = document.getElementById('has-color-variant').checked;
       
@@ -544,8 +501,23 @@ const AdminSystem = {
         });
       }
     } else {
-      const images = await this.handleImageUploads('digital-image', 'digital-image-preview', false);
-      product.image = images.length > 0 ? images[0] : '';
+      // Subir imagen para producto digital
+      const imageFile = document.getElementById('digital-image').files[0];
+      if (imageFile) {
+        try {
+          // Mostrar carga
+          ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
+          
+          const imageUrl = await ImageUploader.uploadImageToImageBin(imageFile);
+          product.image = imageUrl;
+          
+          // Previsualizar la imagen subida
+          ImageUploader.previewUploadedImage(imageUrl, 'digital-image-preview');
+        } catch (error) {
+          ImageUploader.showError('digital-image-preview', `Error subiendo imagen: ${error.message}`);
+          return;
+        }
+      }
       
       product.requiredFields = [];
       document.querySelectorAll('.required-field').forEach(field => {
@@ -725,7 +697,7 @@ const AdminSystem = {
         
         if (type === 'fisico') {
           document.getElementById('product-details').value = product.details || '';
-          document.getElementById('has-color-variant').checked = !!product.hasColorVariant; // CORRECCIÓN: Variable corregida
+          document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
           document.getElementById('color-variant-section').style.display = 
             product.hasColorVariant ? 'block' : 'none';
           
@@ -1163,7 +1135,7 @@ const AdminSystem = {
   }
 };
 
-// Inicialización mejorada
+// Inicialización
 window.addEventListener('DOMContentLoaded', () => {
   AdminSystem.init();
 });
