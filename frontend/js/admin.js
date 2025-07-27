@@ -163,7 +163,7 @@ const AdminSystem = {
                   </label>
                   
                   <div id="color-variant-section" style="display: none; margin-top: 10px;">
-                    <div class="color-variants" id="color-variants-container"></极速赛车开奖直播官网div>
+                    <div class="color-variants" id="color-variants-container"></div>
                     <button type="button" id="add-color-btn" class="small-btn">➕ Añadir Color</button>
                   </div>
                 </div>
