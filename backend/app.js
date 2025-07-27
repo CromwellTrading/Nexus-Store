@@ -6,7 +6,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import TelegramBot from 'node-telegram-bot-api';
+import fetch from 'node-fetch';
 
+// Configuración para obtener __dirname en módulos ES
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,17 +19,22 @@ console.log(`🚀 Iniciando servidor en el puerto ${PORT}`);
 console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
 console.log(`🤖 Token de bot: ${process.env.TELEGRAM_BOT_TOKEN ? 'Configurado' : 'FALTANTE'}`);
 console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
+console.log(`🖼️ ImageBin Token: ${process.env.IMAGEBIN_API_TOKEN ? 'Configurado' : 'FALTANTE'}`);
 
+// Configuración de CORS ampliada
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID', '*']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID'],
+  exposedHeaders: ['Telegram-ID']
 }));
 app.use(express.json());
 
+// Base de datos simple (archivos JSON)
 const DB_PATH = path.join(__dirname, 'data');
 console.log(`📂 Ruta de la base de datos: ${DB_PATH}`);
 
+// Crear carpeta de datos si no existe
 if (!fs.existsSync(DB_PATH)) {
   try {
     fs.mkdirSync(DB_PATH);
@@ -37,6 +44,13 @@ if (!fs.existsSync(DB_PATH)) {
   }
 }
 
+// Inicializar categorías si no existen
+const initialCategories = {
+  fisico: ['electronics', 'clothing', 'home'],
+  digital: ['games', 'software', 'ebooks']
+};
+
+// Funciones de ayuda para cargar archivos JSON
 function loadJSON(file) {
   const filePath = path.join(DB_PATH, file);
   console.log(`🔍 Cargando archivo: ${filePath}`);
@@ -47,12 +61,13 @@ function loadJSON(file) {
   } catch (err) {
     console.error(`Error cargando ${file}: ${err.message}`);
     
+    // Crear archivo vacío si hay error
     if (err.code === 'ENOENT') {
       console.log(`Creando ${file} con estructura inicial...`);
       let initialData = {};
       
       if (file === 'products.json') initialData = { fisico: {}, digital: {} };
-      else if (file === 'categories.json') initialData = { fisico: [], digital: [] };
+      else if (file === 'categories.json') initialData = initialCategories;
       else if (file === 'carts.json') initialData = [];
       else if (file === 'orders.json') initialData = [];
       else if (file === 'users.json') initialData = {};
@@ -86,6 +101,7 @@ const DB = {
   }
 };
 
+// Middleware de autenticación para administradores
 const isAdmin = (req, res, next) => {
   console.log("🔐 Verificando acceso de administrador...");
   const telegramId = req.headers['telegram-id'];
@@ -106,16 +122,63 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
+// Ruta para subir imágenes al backend
+app.post('/api/upload-image', isAdmin, async (req, res) => {
+  console.log("🖼️ Recibida solicitud para subir imagen");
+  
+  try {
+    const { image } = req.body;
+    if (!image) {
+      console.log("❌ Imagen no proporcionada");
+      return res.status(400).json({ error: 'Imagen no proporcionada' });
+    }
+
+    console.log("🔧 Procesando imagen base64...");
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    const formData = new FormData();
+    const blob = new Blob([buffer]);
+    formData.append('file', blob, 'image.png');
+
+    console.log("⬆️ Subiendo imagen a ImageBin...");
+    const response = await fetch('https://imagebin.ca/upload.php', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'token': process.env.IMAGEBIN_API_TOKEN || ''
+      }
+    });
+
+    const data = await response.json();
+    console.log("📬 Respuesta de ImageBin:", data);
+    
+    if (data.success) {
+      console.log("✅ Imagen subida exitosamente");
+      res.json({ url: data.url });
+    } else {
+      console.error('❌ Error subiendo imagen:', data);
+      res.status(500).json({ error: 'Error subiendo imagen: ' + (data.message || 'Error desconocido') });
+    }
+  } catch (error) {
+    console.error('❌ Error subiendo imagen:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Ruta de prueba para verificar que el servidor está funcionando
 app.get('/', (req, res) => {
   console.log("🌐 Recibida solicitud en la raíz");
   res.send('Backend Nexus Store funcionando correctamente');
 });
 
+// Ruta de verificación de salud
 app.get('/api/admin/health', (req, res) => {
   console.log("🩺 Verificación de salud solicitada");
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
+// Ruta para obtener IDs de administradores
 app.get('/api/admin/ids', (req, res) => {
   console.log("👑 Solicitud de IDs de administrador recibida");
   
@@ -124,11 +187,14 @@ app.get('/api/admin/ids', (req, res) => {
     : [];
   
   console.log(`📋 IDs de administrador configurados: ${adminIds.join(', ')}`);
-  console.log('📝 Headers recibidos:', req.headers);
   
+  // Permitir acceso desde cualquier origen
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Telegram-ID');
   res.json(adminIds);
 });
 
+// API ROUTES - BACKEND
 app.get('/api/products/:type', (req, res) => {
   const { type } = req.params;
   console.log(`🛒 Solicitud de productos tipo: ${type}`);
@@ -139,6 +205,7 @@ app.get('/api/products/:type', (req, res) => {
   res.json(products);
 });
 
+// Nueva ruta para obtener producto individual
 app.get('/api/products/:type/:id', (req, res) => {
   const { type, id } = req.params;
   console.log(`🔍 Buscando producto ${id} de tipo ${type}`);
@@ -147,6 +214,7 @@ app.get('/api/products/:type/:id', (req, res) => {
   
   let foundProduct = null;
   
+  // Buscar producto en todas las categorías
   for (const category in products) {
     foundProduct = products[category].find(p => p.id == id);
     if (foundProduct) break;
@@ -262,7 +330,7 @@ app.post('/api/cart/remove', (req, res) => {
     item.productId == productId && item.tabType === tabType
   );
   
-  if (itemIndex === -极速赛车开奖直播官网1) {
+  if (itemIndex === -1) {
     console.log("❌ Producto no encontrado en el carrito");
     return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
   }
@@ -283,6 +351,7 @@ app.post('/api/checkout', (req, res) => {
     return res.status(400).json({ error: 'Carrito vacío' });
   }
   
+  // Calcular total real basado en precios de productos
   let total = 0;
   const itemsWithDetails = [];
   
@@ -324,6 +393,7 @@ app.post('/api/checkout', (req, res) => {
   DB.orders.push(order);
   DB.save('orders.json', DB.orders);
   
+  // Vaciar carrito
   cart.items = [];
   DB.save('carts.json', DB.carts);
   
@@ -335,6 +405,7 @@ app.post('/api/checkout', (req, res) => {
   });
 });
 
+// ADMIN ROUTES
 app.get('/api/admin/orders', isAdmin, (req, res) => {
   console.log("📋 Solicitud de pedidos de administrador");
   res.json(DB.orders);
@@ -371,17 +442,17 @@ app.post('/api/admin/products', isAdmin, (req, res) => {
     DB.products[type][category] = [];
   }
   
-  // Asegurar que el producto tenga un ID único
-  product.id = product.id || Date.now();
-  product.dateCreated = product.dateCreated || new Date().toISOString();
-  
+  product.id = Date.now();
+  product.createdAt = new Date().toISOString();
   DB.products[type][category].push(product);
+  
   DB.save('products.json', DB.products);
   
   console.log(`✅ Producto ${product.name} creado exitosamente`);
   res.json(product);
 });
 
+// Nueva ruta para crear categorías
 app.post('/api/admin/categories', isAdmin, (req, res) => {
   const { type, category } = req.body;
   console.log(`📂 Creando nueva categoría: ${category} en ${type}`);
@@ -393,9 +464,10 @@ app.post('/api/admin/categories', isAdmin, (req, res) => {
   
   if (!DB.categories[type]) {
     console.log("❌ Tipo de producto no válido");
-    return res.status(400).json({ error: 'Tipo de producto no válido' });
+    return res.status(400).json({ error: '极速赛车开奖直播官网Tipo de producto no válido' });
   }
   
+  // Evitar duplicados
   if (!DB.categories[type].includes(category)) {
     DB.categories[type].push(category);
     DB.save('categories.json', DB.categories);
@@ -407,6 +479,7 @@ app.post('/api/admin/categories', isAdmin, (req, res) => {
   res.json({ success: true, categories: DB.categories[type] });
 });
 
+// Ruta para obtener categorías
 app.get('/api/categories/:type', (req, res) => {
   const { type } = req.params;
   console.log(`📂 Solicitud de categorías para tipo: ${type}`);
@@ -417,20 +490,52 @@ app.get('/api/categories/:type', (req, res) => {
   res.json(categories);
 });
 
+// Iniciar el servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en el puerto ${PORT}`);
   
+  // Solo si el token está configurado, iniciar el bot
   if (process.env.TELEGRAM_BOT_TOKEN) {
-    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-    console.log('🤖 Bot de Telegram iniciado correctamente');
+    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+      polling: {
+        params: {
+          timeout: 60,
+          limit: 1
+        },
+        autoStart: false
+      }
+    });
+
+    console.log('🤖 Intentando iniciar bot de Telegram...');
     
+    // Manejar errores de polling
+    bot.on('polling_error', (error) => {
+      console.error(`❌ Error en polling de Telegram: ${error.code} - ${error.message}`);
+      
+      // Intentar reiniciar después de 5 segundos
+      setTimeout(() => {
+        console.log('🔄 Reiniciando bot de Telegram...');
+        bot.startPolling();
+      }, 5000);
+    });
+
+    // Iniciar polling manualmente
+    bot.startPolling().then(() => {
+      console.log('✅ Bot de Telegram iniciado correctamente');
+    }).catch(err => {
+      console.error('❌ Fallo al iniciar bot:', err);
+    });
+
+    // IDs de administradores
     const ADMIN_IDS = process.env.ADMIN_IDS ? process.env.ADMIN_IDS.split(',').map(Number) : [];
     console.log(`👑 IDs de administrador para Telegram: ${ADMIN_IDS.join(', ')}`);
     
+    // Función para obtener URL base
     const getFrontendUrl = () => {
       return process.env.FRONTEND_URL || 'https://tu-frontend-en-render.onrender.com';
     };
     
+    // Manejar el comando /start
     bot.onText(/\/start/, (msg) => {
       const chatId = msg.chat.id;
       const userId = msg.from.id;
@@ -455,6 +560,7 @@ app.listen(PORT, () => {
       });
     });
     
+    // Manejar mensajes de administradores
     bot.on('message', (msg) => {
       const chatId = msg.chat.id;
       const userId = msg.from.id;
@@ -484,6 +590,7 @@ app.listen(PORT, () => {
       }
     });
     
+    // Manejar eventos de Web App
     bot.on('web_app_data', (msg) => {
       const chatId = msg.chat.id;
       const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
