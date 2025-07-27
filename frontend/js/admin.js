@@ -25,7 +25,7 @@ const AdminSystem = {
     if (tgid) {
       localStorage.setItem('telegramUserId', tgid);
       console.log(`[Admin] ID de Telegram obtenido de URL: ${tgid}`);
-      return tgid;
+      return tg极速赛车开奖直播官网id;
     }
     
     const storedId = localStorage.getItem('telegramUserId');
@@ -52,7 +52,7 @@ const AdminSystem = {
       console.log(`[Admin] IDs de admin recibidos: ${adminIds.join(', ')}`);
       
       this.isAdmin = adminIds.includes(this.telegramUserId.toString());
-      console.log(`[Admin] ¿Usuario ${this.telegram极速赛车开奖直播官网UserId} es admin? ${this.isAdmin}`);
+      console.log(`[Admin] ¿Usuario ${this.telegramUserId} es admin? ${this.isAdmin}`);
     } catch (error) {
       console.error('[Admin] Error verificando estado de admin:', error);
       this.isAdmin = false;
@@ -196,7 +196,7 @@ const AdminSystem = {
               
               <div class="form-group">
                 <label>💰 Precios (en diferentes monedas):</label>
-                <极速赛车开奖直播官网div class="price-inputs">
+                <div class="price-inputs">
                   <div class="price-input">
                     <label>CUP:</label>
                     <input type="number" step="0.01" class="price-currency modern-input" data-currency="CUP" placeholder="Precio en CUP">
@@ -261,7 +261,7 @@ const AdminSystem = {
           <h3>📋 Lista de Pedidos</h3>
           <div class="order-filter">
             <label>Filtrar por estado:</label>
-            <select id="order-status-filter">
+            <select id极速赛车开奖直播官网="order-status-filter">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
               <option value="Enviado">Enviado</option>
@@ -427,7 +427,7 @@ const AdminSystem = {
     }
   },
   
-  // NUEVA IMPLEMENTACIÓN CON IMAGEBIN
+  // Implementación mejorada de ImageBin
   uploadImageToImageBin: async function(file) {
     const formData = new FormData();
     formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
@@ -440,13 +440,15 @@ const AdminSystem = {
       });
 
       const text = await response.text();
-      // La respuesta de Imagebin es en texto, con el formato:
-      // ... (varias líneas de texto) ...
-      // url:https://imagebin.ca/v/XXXXX
+      console.log('Respuesta de Imagebin:', text);
+      
+      // Buscar la línea que contiene 'url:'
       const lines = text.split('\n');
       const urlLine = lines.find(line => line.startsWith('url:'));
+      
       if (urlLine) {
         const url = urlLine.split('url:')[1].trim();
+        console.log('URL de imagen obtenida:', url);
         return url;
       } else {
         throw new Error('No se encontró la URL en la respuesta de Imagebin');
@@ -580,7 +582,11 @@ const AdminSystem = {
       
       await response.json();
       alert('✅ Producto creado correctamente!');
+      
+      // Actualizar la lista de productos
       this.renderProductsList();
+      
+      // Cerrar el formulario
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
     } catch (error) {
@@ -629,11 +635,25 @@ const AdminSystem = {
       allProducts.forEach(product => {
         const productEl = document.createElement('div');
         productEl.className = 'admin-product-item';
+        
+        // Mostrar la primera imagen del producto
+        let imageHtml = '';
+        if (product.type === 'fisico' && product.images && product.images.length > 0) {
+          imageHtml = `<img src="${product.images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+        } else if (product.type === 'digital' && product.image) {
+          imageHtml = `<img src="${product.image}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+        }
+        
         productEl.innerHTML = `
           <div class="product-info">
-            <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
-            <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-            <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+            <div style="display: flex; align-items: center;">
+              ${imageHtml}
+              <div>
+                <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
+                <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+              </div>
+            </div>
           </div>
           <div class="product-actions">
             <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
@@ -665,6 +685,7 @@ const AdminSystem = {
       });
     })
     .catch(error => {
+      console.error('Error cargando productos:', error);
       container.innerHTML = '<p>Error cargando productos</p>';
     });
   },
@@ -715,7 +736,7 @@ const AdminSystem = {
               imgEl.style.objectFit = 'contain';
               imgEl.style.margin = '5px';
               imgEl.style.border = '1px solid #ddd';
-              imgEl.style.borderRadius = '4极速赛车开奖直播官网px';
+              imgEl.style.borderRadius = '4px';
               preview.appendChild(imgEl);
             });
           }
@@ -726,8 +747,8 @@ const AdminSystem = {
             
             product.colors.forEach(color => {
               container.innerHTML += `
-                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="color" value="${color.color}" class极速赛车开奖直播官网="color-picker">
+                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10极速赛车开奖直播官网px;">
+                  <input type="color" value="${color.color}" class="color-picker">
                   <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
                   <button class="remove-color">❌</button>
                 </div>
@@ -747,7 +768,7 @@ const AdminSystem = {
             const imgEl = document.createElement('img');
             imgEl.src = product.image;
             imgEl.style.maxWidth = '200px';
-            imgEl.style.maxHeight = '200px';
+            img极速赛车开奖直播官网El.style.maxHeight = '200px';
             imgEl.style.objectFit = 'contain';
             preview.appendChild(imgEl);
           }
@@ -837,7 +858,10 @@ const AdminSystem = {
     .then(response => {
       if (response.ok) {
         alert('✅ Categoría añadida correctamente!');
+        
+        // Actualizar listas
         this.renderCategoriesList();
+        this.renderCategoryOptions();
       } else {
         throw new Error('Error al añadir categoría');
       }
@@ -1116,7 +1140,6 @@ const AdminSystem = {
   }
 };
 
-// Inicializar AdminSystem cuando el script se carga
 document.addEventListener('DOMContentLoaded', () => {
   AdminSystem.init();
 });
