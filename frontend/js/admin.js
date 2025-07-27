@@ -412,27 +412,11 @@ const AdminSystem = {
       return;
     }
     
-    for (let i = 0; i < input.files.length; i++) {
-      const file = input.files[i];
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        const img = document.createElement('img');
-        img.src = e.target.result;
-        img.style.maxWidth = '100px';
-        img.style.maxHeight = '100px';
-        img.style.objectFit = 'contain';
-        img.style.margin = '5px';
-        img.style.border = '1px solid #ddd';
-        img.style.borderRadius = '4px';
-        img.classList.add('image-loading');
-        preview.appendChild(img);
-      };
-      
-      reader.readAsDataURL(file);
-      
-      if (!isMultiple) break;
-    }
+    // Mostrar un mensaje en lugar de las imágenes locales
+    const message = document.createElement('div');
+    message.className = 'image-upload-message';
+    message.textContent = 'Las imágenes se mostrarán aquí después de subirlas a Imagebin.ca';
+    preview.appendChild(message);
   },
   
   // Implementación corregida de ImageBin
@@ -450,14 +434,15 @@ const AdminSystem = {
       const text = await response.text();
       console.log('Respuesta de Imagebin:', text);
       
-      // Buscar la línea que contiene 'url:'
-      const lines = text.split('\n');
-      const urlLine = lines.find(line => line.startsWith('url:'));
+      // Buscar la línea que contiene 'url:' con expresiones regulares mejoradas
+      const urlRegex = /https?:\/\/[^\s]+/g;
+      const urls = text.match(urlRegex);
       
-      if (urlLine) {
-        const url = urlLine.split('url:')[1].trim();
-        console.log('URL de imagen obtenida:', url);
-        return url;
+      if (urls && urls.length > 0) {
+        // Tomamos la última URL que generalmente es la del archivo
+        const imageUrl = urls[urls.length - 1];
+        console.log('URL de imagen obtenida:', imageUrl);
+        return imageUrl;
       } else {
         throw new Error('No se encontró la URL en la respuesta de Imagebin');
       }
@@ -477,7 +462,7 @@ const AdminSystem = {
     }
     
     const urls = [];
-    const previewImages = preview.querySelectorAll('img');
+    preview.innerHTML = '<div class="image-upload-message">Subiendo imágenes a Imagebin.ca...</div>';
     
     for (let i = 0; i < input.files.length; i++) {
       const file = input.files[i];
@@ -488,18 +473,25 @@ const AdminSystem = {
           urls.push(imageUrl);
           console.log('Imagen subida:', imageUrl);
           
-          // Actualizar la imagen con la URL final
-          if (previewImages[i]) {
-            previewImages[i].src = imageUrl;
-            previewImages[i].classList.remove('image-loading');
+          // Actualizar la vista previa con la imagen de Imagebin
+          if (i === 0) {
+            preview.innerHTML = '';
           }
+          
+          const img = document.createElement('img');
+          img.src = imageUrl;
+          img.alt = 'Imagen subida a Imagebin.ca';
+          img.style.maxWidth = '100px';
+          img.style.maxHeight = '100px';
+          img.style.objectFit = 'contain';
+          img.style.margin = '5px';
+          img.style.border = '1px solid #ddd';
+          img.style.borderRadius = '4px';
+          preview.appendChild(img);
         }
       } catch (error) {
         console.error('Error subiendo imagen:', error);
-        if (previewImages[i]) {
-          previewImages[i].classList.add('image-error');
-          previewImages[i].title = 'Error al subir';
-        }
+        preview.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
       }
       
       if (!isMultiple) break;
@@ -840,10 +832,13 @@ const AdminSystem = {
         this.renderProductsList();
         alert('✅ Producto eliminado correctamente');
       } else {
-        throw new Error('Error al eliminar el producto');
+        return response.text().then(errorText => {
+          throw new Error(`Error del servidor: ${errorText}`);
+        });
       }
     })
     .catch(error => {
+      console.error('Error eliminando producto:', error);
       alert('Error al eliminar el producto: ' + error.message);
     });
   },
