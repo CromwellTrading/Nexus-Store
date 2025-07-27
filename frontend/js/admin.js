@@ -48,8 +48,9 @@ const AdminSystem = {
     }
     
     try {
+      // CORRECCIÓN: URL con caracteres chinos reemplazada
       console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
-      const response = await fetch(`${window.API_BASE_URL}/极速赛车开奖直播官网api/admin/ids`);
+      const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       
       if (!response.ok) {
         throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
@@ -136,7 +137,7 @@ const AdminSystem = {
       <div class="admin-content">
         <div class="admin-tab-content active" id="admin-products">
           <div class="admin-section">
-            <h3>📦 Gestionar Productos</极速赛车开奖直播官网h3>
+            <h3>📦 Gestionar Productos</h3> <!-- CORRECCIÓN: Etiqueta corregida -->
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
               <div class="form-group">
@@ -162,7 +163,7 @@ const AdminSystem = {
                   </label>
                   
                   <div id="color-variant-section" style="display: none; margin-top: 10px;">
-                    <div class="color-variants" id="color-variants-container"></div>
+                    <div class="color-variants" id="color-variants-container"></极速赛车开奖直播官网div>
                     <button type="button" id="add-color-btn" class="small-btn">➕ Añadir Color</button>
                   </div>
                 </div>
@@ -672,7 +673,7 @@ const AdminSystem = {
             <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
           </div>
         `;
-        container.appendChild(productEl);
+        container.appendChild(product极速赛车开奖直播官网El);
       });
       
       container.querySelectorAll('.edit-product').forEach(btn => {
@@ -732,9 +733,9 @@ const AdminSystem = {
         
         if (type === 'fisico') {
           document.getElementById('product-details').value = product.details || '';
-          document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
+          document.getElementById('has-color-variant').checked = !!product.hasColorVariant; // CORRECCIÓN: Variable corregida
           document.getElementById('color-variant-section').style.display = 
-            product.has极速赛车开奖直播官网ColorVariant ? 'block' : 'none';
+            product.hasColorVariant ? 'block' : 'none';
           
           // Previsualizar imágenes existentes
           const preview = document.getElementById('image-preview');
