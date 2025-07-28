@@ -1,48 +1,31 @@
-// Imagenup.js - Módulo mejorado para subir imágenes a Imagebin.ca
+// Imagenup.js - Módulo para subir imágenes a ImgBB
 const ImageUploader = {
   uploadImageToImageBin: async function(file) {
     const formData = new FormData();
-    formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
-    formData.append('file', file);
+    formData.append('key', 'f0f757f1c4af7bdb6aea6fa59bd1d718');
+    formData.append('image', file);  // ImgBB usa 'image' en lugar de 'file'
 
     try {
-      // Usar proxy para evitar problemas de CORS
-      const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-      const targetUrl = 'https://imagebin.ca/upload.php';
-      
-      const response = await fetch(proxyUrl + targetUrl, {
+      // Cambiamos el endpoint a ImgBB
+      const response = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
-        body: formData,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        }
+        body: formData
       });
 
       if (!response.ok) {
         throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       }
 
-      const text = await response.text();
-      console.log('Respuesta de Imagebin:', text);
+      const data = await response.json();  // ImgBB devuelve JSON
+      console.log('Respuesta de ImgBB:', data);
       
-      // Extraer la URL usando expresión regular mejorada
-      const urlMatch = text.match(/url:\s*(https?:\/\/[^\s]+)/i);
-      if (urlMatch && urlMatch[1]) {
-        const imageUrl = urlMatch[1].trim();
+      // Extraemos la URL directa de la respuesta JSON
+      if (data && data.data && data.data.url) {
+        const imageUrl = data.data.url;
         console.log('URL de imagen obtenida:', imageUrl);
         return imageUrl;
       } else {
-        // Intentar encontrar cualquier URL en la respuesta
-        const urlRegex = /https?:\/\/[^\s]+/g;
-        const urls = text.match(urlRegex);
-        if (urls && urls.length > 0) {
-          // Tomar la última URL (generalmente es la del archivo)
-          const imageUrl = urls[urls.length - 1];
-          console.log('URL de imagen obtenida (fallback):', imageUrl);
-          return imageUrl;
-        } else {
-          throw new Error('No se encontró la URL en la respuesta de Imagebin');
-        }
+        throw new Error('No se encontró la URL en la respuesta de ImgBB');
       }
     } catch (error) {
       console.error('Error subiendo imagen:', error);
@@ -50,6 +33,7 @@ const ImageUploader = {
     }
   },
 
+  // Las siguientes funciones se mantienen igual
   previewUploadedImage: function(imageUrl, previewId) {
     const preview = document.getElementById(previewId);
     if (!preview) return;
