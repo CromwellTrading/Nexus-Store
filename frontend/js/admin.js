@@ -52,7 +52,7 @@ const AdminSystem = {
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       
       if (!response.ok) {
-        throw new Error(`Error en respuesta: ${response.status} ${极速赛车开奖直播官网response.statusText}`);
+        throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       }
       
       const adminIds = await response.json();
@@ -130,7 +130,7 @@ const AdminSystem = {
       <div class="admin-tabs">
         <button class="admin-tab active" data-tab="products">🛒 Productos</button>
         <button class="admin-tab" data-tab="categories">📁 Categorías</button>
-        <button class="admin-tab" data-tab="orders">📋 Pedidos</极速赛车开奖直播官网button>
+        <button class="admin-tab" data-tab="orders">📋 Pedidos</button>
       </div>
       
       <div class="admin-content">
@@ -151,7 +151,7 @@ const AdminSystem = {
                 <div class="form-group">
                   <label>🖼️ Imágenes (1-4):</label>
                   <input type="file" id="product-images" multiple accept="image/*">
-                  <div id="image-preview" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;"></div>
+                  <div id="image-preview" style="display: flex; gap: 10px; margin-top: 10极速赛车开奖直播官网px; flex-wrap: wrap;"></div>
                 </div>
                 
                 <div class="form-group">
@@ -417,7 +417,6 @@ const AdminSystem = {
     // Subir cada imagen y luego previsualizar
     const files = Array.from(input.files);
     files.forEach((file, index) => {
-      // Subir la imagen
       this.uploadAndPreviewImage(file, previewId, index, files.length);
     });
   },
@@ -483,7 +482,8 @@ const AdminSystem = {
             // Previsualizar la imagen subida
             ImageUploader.previewUploadedImage(imageUrl, 'image-preview');
           } catch (error) {
-            ImageUploader.showError('image-preview', `Error subiendo imagen: ${error.message}`);
+            ImageUploader.showError('image-preview', `Error subiendo imagen ${i+1}: ${error.message}`);
+            console.error('Error en subida de imagen:', error);
             return;
           }
         }
@@ -505,16 +505,15 @@ const AdminSystem = {
       const imageFile = document.getElementById('digital-image').files[0];
       if (imageFile) {
         try {
-          // Mostrar carga
           ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
           
           const imageUrl = await ImageUploader.uploadImageToImageBin(imageFile);
           product.image = imageUrl;
           
-          // Previsualizar la imagen subida
           ImageUploader.previewUploadedImage(imageUrl, 'digital-image-preview');
         } catch (error) {
           ImageUploader.showError('digital-image-preview', `Error subiendo imagen: ${error.message}`);
+          console.error('Error en subida de imagen digital:', error);
           return;
         }
       }
