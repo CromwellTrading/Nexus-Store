@@ -6,29 +6,27 @@ const ImageUploader = {
     formData.append('file', file);
 
     try {
-      console.log('Iniciando subida de imagen a Imagebin.ca...');
+      // Usar proxy para evitar problemas de CORS
+      const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+      const targetUrl = 'https://imagebin.ca/upload.php';
       
-      const response = await fetch('https://imagebin.ca/upload.php', {
+      const response = await fetch(proxyUrl + targetUrl, {
         method: 'POST',
         body: formData,
-        // Añadir headers para mejorar compatibilidad
         headers: {
-          'Accept': 'text/plain'
+          'X-Requested-With': 'XMLHttpRequest'
         }
       });
 
-      console.log('Respuesta recibida de Imagebin.ca');
-      
       if (!response.ok) {
         throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       }
-      
+
       const text = await response.text();
       console.log('Respuesta de Imagebin:', text);
       
-      // Búsqueda mejorada de URL
+      // Extraer la URL usando expresión regular mejorada
       const urlMatch = text.match(/url:\s*(https?:\/\/[^\s]+)/i);
-      
       if (urlMatch && urlMatch[1]) {
         const imageUrl = urlMatch[1].trim();
         console.log('URL de imagen obtenida:', imageUrl);
@@ -37,31 +35,66 @@ const ImageUploader = {
         // Intentar encontrar cualquier URL en la respuesta
         const urlRegex = /https?:\/\/[^\s]+/g;
         const urls = text.match(urlRegex);
-        
         if (urls && urls.length > 0) {
+          // Tomar la última URL (generalmente es la del archivo)
           const imageUrl = urls[urls.length - 1];
           console.log('URL de imagen obtenida (fallback):', imageUrl);
           return imageUrl;
         } else {
-          throw new Error('No se encontró URL en la respuesta de Imagebin');
+          throw new Error('No se encontró la URL en la respuesta de Imagebin');
         }
       }
     } catch (error) {
       console.error('Error subiendo imagen:', error);
-      
-      // Mensaje de error más descriptivo
-      let errorMessage = 'Error de conexión';
-      if (error.message.includes('Failed to fetch')) {
-        errorMessage = 'Error de red: No se pudo conectar con el servidor de imágenes';
-      } else if (error.message.includes('NetworkError')) {
-        errorMessage = 'Error de red: Verifica tu conexión a internet';
-      }
-      
-      throw new Error(`${errorMessage}: ${error.message}`);
+      throw new Error(`Error al subir la imagen: ${error.message}`);
     }
   },
 
-  // Resto de funciones permanecen igual...
+  previewUploadedImage: function(imageUrl, previewId) {
+    const preview = document.getElementById(previewId);
+    if (!preview) return;
+
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.alt = 'Imagen subida';
+    img.style.maxWidth = '100px';
+    img.style.maxHeight = '100px';
+    img.style.objectFit = 'contain';
+    img.style.margin = '5px';
+    img.style.border = '1px solid #ddd';
+    img.style.borderRadius = '4px';
+    preview.appendChild(img);
+  },
+
+  showLoading: function(previewId, message = 'Subiendo imagen...') {
+    const preview = document.getElementById(previewId);
+    if (!preview) return;
+
+    preview.innerHTML = `
+      <div class="image-upload-status">
+        <div class="spinner"></div>
+        <p>${message}</p>
+      </div>
+    `;
+  },
+
+  showError: function(previewId, message) {
+    const preview = document.getElementById(previewId);
+    if (!preview) return;
+
+    preview.innerHTML = `
+      <div class="image-upload-error">
+        <p>❌ ${message}</p>
+      </div>
+    `;
+  },
+
+  resetPreview: function(previewId) {
+    const preview = document.getElementById(previewId);
+    if (preview) {
+      preview.innerHTML = '';
+    }
+  }
 };
 
 window.ImageUploader = ImageUploader;
