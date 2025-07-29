@@ -9,7 +9,6 @@ const AdminSystem = {
     this.telegramUserId = this.getTelegramUserId();
     console.log(`[Admin] ID de Telegram: ${this.telegramUserId}`);
     
-    // Verificar si ya existe el botón en el DOM
     const adminButton = document.getElementById('admin-button');
     if (!adminButton) {
       console.error('[Admin] Botón de admin no encontrado en el DOM');
@@ -151,7 +150,7 @@ const AdminSystem = {
                 <div class="form-group">
                   <label>🖼️ Imágenes (1-4):</label>
                   <input type="file" id="product-images" multiple accept="image/*">
-                  <div id="image-preview" style="display: flex; gap: 10px; margin-top: 10极速赛车开奖直播官网px; flex-wrap: wrap;"></div>
+                  <div id="image-preview" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;"></div>
                 </div>
                 
                 <div class="form-group">
@@ -271,6 +270,7 @@ const AdminSystem = {
             <select id="order-status-filter">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
+              <option value="En proceso">En proceso</option>
               <option value="Enviado">Enviado</option>
               <option value="Completado">Completado</option>
             </select>
@@ -457,12 +457,12 @@ const AdminSystem = {
     }
     
     const product = {
-      id: Date.now(),
       name,
-      prices,
-      category,
       description,
+      prices: JSON.stringify(prices), // Convertir a JSON string para SQLite
+      category,
       type,
+      details: details || '',
       dateCreated: new Date().toISOString()
     };
     
@@ -487,10 +487,10 @@ const AdminSystem = {
             return;
           }
         }
+        product.images = JSON.stringify(product.images); // Convertir a JSON string
       }
       
-      product.details = details;
-      product.hasColorVariant = document.getElementById('has-color-variant').checked;
+      product.hasColorVariant = document.getElementById('has-color-variant').checked ? 1 : 0;
       
       if (product.hasColorVariant) {
         product.colors = [];
@@ -499,6 +499,7 @@ const AdminSystem = {
           const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
           product.colors.push({ color, name });
         });
+        product.colors = JSON.stringify(product.colors);
       }
     } else {
       // Subir imagen para producto digital
@@ -530,6 +531,7 @@ const AdminSystem = {
           });
         }
       });
+      product.requiredFields = JSON.stringify(product.requiredFields);
     }
     
     try {
@@ -551,7 +553,7 @@ const AdminSystem = {
         throw new Error(`Error al guardar: ${errorText}`);
       }
       
-      await response.json();
+      const newProduct = await response.json();
       alert('✅ Producto creado correctamente!');
       
       // Actualizar la lista de productos
@@ -614,11 +616,17 @@ const AdminSystem = {
         
         // Mostrar la primera imagen del producto
         let imageHtml = '';
-        if (product.type === 'fisico' && product.images && product.images.length > 0) {
-          imageHtml = `<img src="${product.images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+        if (product.type === 'fisico' && product.images) {
+          const images = JSON.parse(product.images);
+          if (images && images.length > 0) {
+            imageHtml = `<img src="${images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+          }
         } else if (product.type === 'digital' && product.image) {
           imageHtml = `<img src="${product.image}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
         }
+        
+        // Parsear precios
+        const prices = product.prices ? JSON.parse(product.prices) : {};
         
         productEl.innerHTML = `
           <div class="product-info">
@@ -627,7 +635,7 @@ const AdminSystem = {
               <div>
                 <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
                 <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                <div>${Object.entries(product.prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+                <div>${Object.entries(prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
               </div>
             </div>
           </div>
@@ -687,10 +695,12 @@ const AdminSystem = {
         document.getElementById('product-description').value = product.description;
         document.getElementById('product-category').value = product.category;
         
+        // Parsear precios y llenar los campos
+        const prices = JSON.parse(product.prices);
         document.querySelectorAll('.price-currency').forEach(input => {
           const currency = input.dataset.currency;
-          if (product.prices[currency]) {
-            input.value = product.prices[currency];
+          if (prices[currency]) {
+            input.value = prices[currency];
           }
         });
         
@@ -703,25 +713,29 @@ const AdminSystem = {
           // Previsualizar imágenes existentes
           const preview = document.getElementById('image-preview');
           preview.innerHTML = '';
-          if (product.images && product.images.length > 0) {
-            product.images.forEach(img => {
-              const imgEl = document.createElement('img');
-              imgEl.src = img;
-              imgEl.style.maxWidth = '100px';
-              imgEl.style.maxHeight = '100px';
-              imgEl.style.objectFit = 'contain';
-              imgEl.style.margin = '5px';
-              imgEl.style.border = '1px solid #ddd';
-              imgEl.style.borderRadius = '4px';
-              preview.appendChild(imgEl);
-            });
+          if (product.images) {
+            const images = JSON.parse(product.images);
+            if (images && images.length > 0) {
+              images.forEach(img => {
+                const imgEl = document.createElement('img');
+                imgEl.src = img;
+                imgEl.style.maxWidth = '100px';
+                imgEl.style.maxHeight = '100px';
+                imgEl.style.objectFit = 'contain';
+                imgEl.style.margin = '5px';
+                imgEl.style.border = '1px solid #ddd';
+                imgEl.style.borderRadius = '4px';
+                preview.appendChild(imgEl);
+              });
+            }
           }
           
           if (product.hasColorVariant && product.colors) {
+            const colors = JSON.parse(product.colors);
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
             
-            product.colors.forEach(color => {
+            colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                   <input type="color" value="${color.color}" class="color-picker">
@@ -751,17 +765,20 @@ const AdminSystem = {
           
           const container = document.getElementById('required-fields-container');
           container.innerHTML = '';
-          if (product.requiredFields && product.requiredFields.length > 0) {
-            product.requiredFields.forEach(field => {
-              container.innerHTML += `
-                <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
-                  <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
-                  <label>Requerido</label>
-                  <button class="remove-field">❌</button>
-                </div>
-              `;
-            });
+          if (product.requiredFields) {
+            const requiredFields = JSON.parse(product.requiredFields);
+            if (requiredFields && requiredFields.length > 0) {
+              requiredFields.forEach(field => {
+                container.innerHTML += `
+                  <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
+                    <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
+                    <label>Requerido</label>
+                    <button class="remove-field">❌</button>
+                  </div>
+                `;
+              });
+            }
           } else {
             container.innerHTML = `
               <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -792,7 +809,7 @@ const AdminSystem = {
   deleteProduct: function(id, type, category) {
     if (!confirm('¿Estás seguro de eliminar este producto?')) return;
     
-    fetch(`${window.API_BASE_URL}/api/admin/products/${type}/${category}/${id}`, {
+    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
       method: 'DELETE',
       headers: {
         'Telegram-ID': this.telegramUserId.toString()
@@ -831,7 +848,7 @@ const AdminSystem = {
       },
       body: JSON.stringify({
         type: type,
-        category: name
+        name: name
       })
     })
     .then(response => {
@@ -889,7 +906,7 @@ const AdminSystem = {
             const category = e.target.getAttribute('data-category');
             
             if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-              fetch(`${window.API_BASE_URL}/api/admin/categories/${type}/${category}`, {
+              fetch(`${window.API_BASE_URL}/api/admin/categories/${category}?type=${type}`, {
                 method: 'DELETE',
                 headers: {
                   'Telegram-ID': this.telegramUserId.toString()
@@ -949,6 +966,12 @@ const AdminSystem = {
         }
         
         filteredOrders.forEach(order => {
+          // Parsear los campos JSON
+          const items = JSON.parse(order.items);
+          const payment = JSON.parse(order.payment);
+          const recipient = JSON.parse(order.recipient);
+          const requiredFields = JSON.parse(order.requiredFields);
+          
           const orderElement = document.createElement('div');
           orderElement.className = 'admin-order';
           orderElement.innerHTML = `
@@ -965,7 +988,7 @@ const AdminSystem = {
               </div>
             </div>
             <div class="order-details">
-              <div><strong>👤 Cliente:</strong> ${order.recipient?.fullName || 'No especificado'}</div>
+              <div><strong>👤 Cliente:</strong> ${recipient.fullName || 'No especificado'}</div>
               <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
             </div>
             <div class="order-actions">
@@ -1025,6 +1048,12 @@ const AdminSystem = {
           return;
         }
         
+        // Parsear campos JSON
+        const items = JSON.parse(order.items);
+        const payment = JSON.parse(order.payment);
+        const recipient = JSON.parse(order.recipient);
+        const requiredFields = JSON.parse(order.requiredFields);
+        
         const modal = document.getElementById('product-modal');
         modal.innerHTML = `
           <div class="modal-content">
@@ -1041,22 +1070,22 @@ const AdminSystem = {
               
               <h3>👤 Datos del Cliente</h3>
               <div class="customer-info">
-                <div><strong>Nombre:</strong> ${order.recipient.fullName}</div>
-                <div><strong>🆔 CI:</strong> ${order.recipient.ci}</div>
-                <div><strong>📱 Teléfono:</strong> ${order.recipient.phone}</div>
-                <div><strong>📍 Provincia:</strong> ${order.recipient.province}</div>
+                <div><strong>Nombre:</strong> ${recipient.fullName}</div>
+                <div><strong>🆔 CI:</strong> ${recipient.ci}</div>
+                <div><strong>📱 Teléfono:</strong> ${recipient.phone}</div>
+                <div><strong>📍 Provincia:</strong> ${recipient.province}</div>
               </div>
               
               <h3>💳 Información de Pago</h3>
               <div class="payment-info">
-                <div><strong>Método:</strong> ${order.payment.method}</div>
-                <div><strong>🔑 ID Transferencia:</strong> ${order.payment.transferId}</div>
-                <div><strong>📸 Comprobante:</strong> <a href="${order.payment.transferProof}" target="_blank">Ver imagen</a></div>
+                <div><strong>Método:</strong> ${payment.method}</div>
+                <div><strong>🔑 ID Transferencia:</strong> ${payment.transferId}</div>
+                <div><strong>📸 Comprobante:</strong> <a href="${payment.transferProof}" target="_blank">Ver imagen</a></div>
               </div>
               
               <h3>🛒 Productos</h3>
               <div class="order-products">
-                ${order.items.map(item => `
+                ${items.map(item => `
                   <div class="order-product-item">
                     <div class="product-details">
                       <div>${item.name}</div>
