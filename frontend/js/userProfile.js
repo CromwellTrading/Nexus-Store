@@ -11,17 +11,44 @@ const UserProfile = {
     this.loadUserData();
   },
   
-  loadUserData: function() {
-    const savedData = localStorage.getItem('userProfile');
-    if (savedData) {
-      this.userData = JSON.parse(savedData);
-      console.log("Datos de usuario cargados desde localStorage:", this.userData);
+  async loadUserData() {
+    const userId = this.getTelegramUserId();
+    if (!userId) return;
+    
+    try {
+      const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`);
+      if (response.ok) {
+        const user = await response.json();
+        this.userData = user.data ? JSON.parse(user.data) : user;
+      } else {
+        this.loadFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('Error cargando perfil:', error);
+      this.loadFromLocalStorage();
     }
   },
   
-  saveUserData: function() {
+  loadFromLocalStorage: function() {
+    const savedData = localStorage.getItem('userProfile');
+    if (savedData) this.userData = JSON.parse(savedData);
+  },
+  
+  async saveUserData() {
     localStorage.setItem('userProfile', JSON.stringify(this.userData));
-    console.log("Datos de usuario guardados en localStorage");
+    
+    const userId = this.getTelegramUserId();
+    if (userId) {
+      try {
+        await fetch(`${window.API_BASE_URL}/api/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.userData)
+        });
+      } catch (error) {
+        console.error('Error guardando perfil:', error);
+      }
+    }
   },
   
   openProfileModal: function() {
@@ -36,40 +63,34 @@ const UserProfile = {
         <div class="profile-form">
           <div class="form-group">
             <label>👤 Nombre y Apellidos:</label>
-            <input type="text" id="full-name" value="${this.userData.fullName}" class="modern-input">
+            <input type="text" id="full-name" value="${this.userData.fullName || ''}" class="modern-input">
           </div>
           <div class="form-group">
             <label>🆔 Carnet de Identidad:</label>
-            <input type="text" id="ci" value="${this.userData.ci}" class="modern-input">
+            <input type="text" id="ci" value="${this.userData.ci || ''}" class="modern-input">
           </div>
           <div class="form-group">
             <label>📱 Teléfono:</label>
-            <input type="text" id="phone" value="${this.userData.phone}" class="modern-input">
+            <input type="text" id="phone" value="${this.userData.phone || ''}" class="modern-input">
           </div>
           <div class="form-group">
             <label>🏠 Dirección:</label>
-            <input type="text" id="address" value="${this.userData.address}" class="modern-input">
+            <input type="text" id="address" value="${this.userData.address || ''}" class="modern-input">
           </div>
           <div class="form-group">
             <label>📍 Provincia:</label>
             <select id="province" class="modern-select">
               <option value="">Seleccionar provincia</option>
-              <option value="Pinar del Río" ${this.userData.province === 'Pinar del Río' ? 'selected' : ''}>Pinar del Río</option>
-              <option value="Artemisa" ${this.userData.province === 'Artemisa' ? 'selected' : ''}>Artemisa</option>
-              <option value="La Habana" ${this.userData.province === 'La Habana' ? 'selected' : ''}>La Habana</option>
-              <option value="Mayabeque" ${this.userData.province === 'Mayabeque' ? 'selected' : ''}>Mayabeque</option>
-              <option value="Matanzas" ${this.userData.province === 'Matanzas' ? 'selected' : ''}>Matanzas</option>
-              <option value="Cienfuegos" ${this.userData.province === 'Cienfuegos' ? 'selected' : ''}>Cienfuegos</option>
-              <option value="Villa Clara" ${this.userData.province === 'Villa Clara' ? 'selected' : ''}>Villa Clara</option>
-              <option value="Sancti Spíritus" ${this.userData.province === 'Sancti Spíritus' ? 'selected' : ''}>Sancti Spíritus</option>
-              <option value="Ciego de Ávila" ${this.userData.province === 'Ciego de Ávila' ? 'selected' : ''}>Ciego de Ávila</option>
-              <option value="Camagüey" ${this.userData.province === 'Camagüey' ? 'selected' : ''}>Camagüey</option>
-              <option value="Las Tunas" ${this.userData.province === 'Las Tunas' ? 'selected' : ''}>Las Tunas</option>
-              <option value="Granma" ${this.userData.province === 'Granma' ? 'selected' : ''}>Granma</option>
-              <option value="Holguín" ${this.userData.province === 'Holguín' ? 'selected' : ''}>Holguín</option>
-              <option value="Santiago de Cuba" ${this.userData.province === 'Santiago de Cuba' ? 'selected' : ''}>Santiago de Cuba</option>
-              <option value="Guantánamo" ${this.userData.province === 'Guantánamo' ? 'selected' : ''}>Guantánamo</option>
-              <option value="Isla de la Juventud" ${this.userData.province === 'Isla de la Juventud' ? 'selected' : ''}>Isla de la Juventud</option>
+              ${[
+                'Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas',
+                'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila',
+                'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba',
+                'Guantánamo', 'Isla de la Juventud'
+              ].map(prov => `
+                <option value="${prov}" ${this.userData.province === prov ? 'selected' : ''}>
+                  ${prov}
+                </option>
+              `).join('')}
             </select>
           </div>
           <button id="save-profile" class="save-btn">💾 Guardar Perfil</button>
@@ -79,9 +100,8 @@ const UserProfile = {
     
     modal.style.display = 'flex';
     
-    document.getElementById('save-profile')?.addEventListener('click', () => this.saveProfile());
-    
-    modal.querySelector('.close-modal')?.addEventListener('click', () => {
+    document.getElementById('save-profile').addEventListener('click', () => this.saveProfile());
+    modal.querySelector('.close-modal').addEventListener('click', () => {
       modal.style.display = 'none';
     });
   },
