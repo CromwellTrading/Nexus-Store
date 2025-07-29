@@ -6,7 +6,6 @@ const CartSystem = {
     this.loadCart();
     this.updateCartIcon();
     
-    // Configurar evento para el botón del carrito
     document.getElementById('cart-button').addEventListener('click', () => {
       this.openCartModal();
     });
@@ -18,10 +17,10 @@ const CartSystem = {
     
     try {
       const response = await fetch(`${window.API_BASE_URL}/api/cart/${userId}`);
-      if (!response.ok) {
-        throw new Error('Error al cargar el carrito');
-      }
-      this.cart = await response.json();
+      if (!response.ok) throw new Error('Error al cargar el carrito');
+      
+      const cartData = await response.json();
+      this.cart = cartData;
       this.updateCartIcon();
     } catch (error) {
       console.error('Error cargando carrito:', error);
@@ -42,9 +41,7 @@ const CartSystem = {
         body: JSON.stringify({ userId, productId, tabType })
       });
       
-      if (!response.ok) {
-        throw new Error('Error al añadir al carrito');
-      }
+      if (!response.ok) throw new Error('Error al añadir al carrito');
       
       this.cart = await response.json();
       this.updateCartIcon();
@@ -68,15 +65,11 @@ const CartSystem = {
         body: JSON.stringify({ userId, productId, tabType })
       });
       
-      if (!response.ok) {
-        throw new Error('Error al eliminar del carrito');
-      }
+      if (!response.ok) throw new Error('Error al eliminar del carrito');
       
       this.cart = await response.json();
       this.updateCartIcon();
-      if (this.isCartModalOpen) {
-        this.openCartModal();
-      }
+      if (this.isCartModalOpen) this.openCartModal();
     } catch (error) {
       console.error('Error eliminando del carrito:', error);
     }
@@ -96,38 +89,33 @@ const CartSystem = {
         })
       });
       
-      if (!response.ok) {
-        throw new Error('Error actualizando cantidad');
-      }
+      if (!response.ok) throw new Error('Error actualizando cantidad');
       
       this.cart = await response.json();
       this.updateCartIcon();
-      if (this.isCartModalOpen) {
-        this.openCartModal();
-      }
+      if (this.isCartModalOpen) this.openCartModal();
     } catch (error) {
       console.error('Error actualizando cantidad:', error);
     }
   },
   
   async openCartModal() {
-    await this.loadCart(); // Asegurarse de tener los datos actualizados
+    await this.loadCart();
     this.isCartModalOpen = true;
     
     const modal = document.getElementById('product-modal');
     let cartContent = '<p>Tu carrito está vacío</p>';
+    let total = 0;
     
     if (this.cart.items && this.cart.items.length > 0) {
       cartContent = await Promise.all(this.cart.items.map(async item => {
-        // Obtener detalles del producto
         const product = await ProductView.getProductById(item.productId, item.tabType);
-        
         if (!product) return '';
         
-        // Obtener precio actual
-        const price = product.prices ? 
-          (product.prices.CUP || product.prices.MLC || product.prices['Saldo Móvil'] || 0) : 
-          0;
+        // Manejar precios desde SQLite
+        const price = product.prices?.CUP || product.prices?.MLC || 0;
+        const itemTotal = price * item.quantity;
+        total += itemTotal;
         
         return `
           <div class="cart-item">
@@ -137,7 +125,7 @@ const CartSystem = {
             <div>
                 <h3>${product.name}</h3>
                 <div>${price} CUP x ${item.quantity}</div>
-                <div>Total: ${(price * item.quantity).toFixed(2)} CUP</div>
+                <div>Total: ${itemTotal.toFixed(2)} CUP</div>
             </div>
             <div class="cart-buttons">
                 <button class="decrease-quantity" data-id="${item.productId}" data-tab="${item.tabType}">-</button>
@@ -160,7 +148,7 @@ const CartSystem = {
           ${cartContent}
         </div>
         <div style="font-weight: bold; text-align: right; margin-bottom: 20px;">
-          Total: $${this.getCartTotal().toFixed(2)} CUP
+          Total: $${total.toFixed(2)} CUP
         </div>
         <button id="checkout-button" style="background: var(--success-color); color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem;" ${this.cart.items.length === 0 ? 'disabled' : ''}>
           Finalizar Compra
@@ -189,9 +177,7 @@ const CartSystem = {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
           const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
-          if (item) {
-            this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
-          }
+          if (item) this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
         });
       });
       
@@ -200,7 +186,7 @@ const CartSystem = {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
           const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
-          if (item) {
+          if (item && item.quantity > 1) {
             this.updateCartItemQuantity(productId, tabType, item.quantity - 1);
           }
         });
@@ -208,15 +194,9 @@ const CartSystem = {
       
       const checkoutButton = modal.querySelector('#checkout-button');
       checkoutButton.addEventListener('click', () => {
-        CheckoutSystem.openCheckout(this.cart, this.getCartTotal());
+        CheckoutSystem.openCheckout(this.cart, total);
       });
     }
-  },
-  
-  getCartTotal: function() {
-    return this.cart.items.reduce((total, item) => {
-      return total + (item.quantity * 10); // Precio temporal
-    }, 0);
   },
   
   updateCartIcon: function() {
@@ -230,12 +210,8 @@ const CartSystem = {
       cartButton.appendChild(counter);
     }
     
-    if (itemCount > 0) {
-      counter.textContent = itemCount;
-      counter.style.display = 'flex';
-    } else {
-      counter.style.display = 'none';
-    }
+    counter.textContent = itemCount;
+    counter.style.display = itemCount > 0 ? 'flex' : 'none';
   },
   
   clearCart: function() {
@@ -251,8 +227,6 @@ const CartSystem = {
         this.updateCartIcon();
       }
     })
-    .catch(error => {
-      console.error('Error vaciando carrito:', error);
-    });
+    .catch(error => console.error('Error vaciando carrito:', error));
   }
 };
