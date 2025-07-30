@@ -112,14 +112,21 @@ const CartSystem = {
         const product = await ProductView.getProductById(item.productId, item.tabType);
         if (!product) return '';
         
-        // Manejar precios desde SQLite
-        const price = product.prices?.CUP || product.prices?.MLC || 0;
+        // Precio: ahora es un objeto, tomamos CUP o el primero
+        const prices = product.prices;
+        const price = prices?.CUP || Object.values(prices)[0] || 0;
         const itemTotal = price * item.quantity;
         total += itemTotal;
         
+        // Imagen: ahora es un array, tomamos la primera
+        let imageUrl = 'placeholder.jpg';
+        if (product.images && product.images.length > 0) {
+          imageUrl = product.images[0];
+        }
+        
         return `
           <div class="cart-item">
-            <img src="${product.image || (product.images && product.images[0]) || 'placeholder.jpg'}" 
+            <img src="${imageUrl}" 
                   alt="${product.name}" 
                   style="width: 60px; height: 60px; object-fit: cover;">
             <div>
@@ -141,17 +148,17 @@ const CartSystem = {
     modal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Carrito de Compras</h2>
+          <h2>🛒 Carrito de Compras</h2>
           <button class="close-modal">&times;</button>
         </div>
         <div class="cart-items" style="max-height: 50vh; overflow-y: auto; margin-bottom: 20px;">
           ${cartContent}
         </div>
-        <div style="font-weight: bold; text-align: right; margin-bottom: 20px;">
-          Total: $${total.toFixed(2)} CUP
+        <div style="font-weight: bold; text-align: right; margin-bottom: 20px; font-size: 1.2rem;">
+          💰 Total: $${total.toFixed(2)} CUP
         </div>
-        <button id="checkout-button" style="background: var(--success-color); color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem;" ${this.cart.items.length === 0 ? 'disabled' : ''}>
-          Finalizar Compra
+        <button id="checkout-button" class="checkout-btn" ${this.cart.items.length === 0 ? 'disabled' : ''}>
+          ✅ Finalizar Compra
         </button>
       </div>
     `;
