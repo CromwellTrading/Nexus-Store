@@ -19,7 +19,8 @@ const UserProfile = {
       const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`);
       if (response.ok) {
         const user = await response.json();
-        this.userData = user.data ? JSON.parse(user.data) : user;
+        // Ahora profile_data es un objeto JSONB directamente
+        this.userData = user.profile_data || {};
       } else {
         this.loadFromLocalStorage();
       }
@@ -114,7 +115,7 @@ const UserProfile = {
     this.userData.province = document.getElementById('province').value;
     
     this.saveUserData();
-    alert('Perfil guardado correctamente');
+    alert('✅ Perfil guardado correctamente');
   },
   
   getUserData: function() {
