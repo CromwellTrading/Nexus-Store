@@ -26,23 +26,23 @@ const CheckoutSystem = {
             <h3>👤 Tus Datos Personales</h3>
             <div class="form-group">
               <label>Nombre y Apellidos:</label>
-              <input type="text" id="checkout-fullname" value="${userData.fullName || ''}" required>
+              <input type="text" id="checkout-fullname" value="${userData.fullName || ''}" required class="modern-input">
             </div>
             <div class="form-group">
               <label>Carnet de Identidad:</label>
-              <input type="text" id="checkout-ci" value="${userData.ci || ''}" required>
+              <input type="text" id="checkout-ci" value="${userData.ci || ''}" required class="modern-input">
             </div>
             <div class="form-group">
               <label>Teléfono:</label>
-              <input type="text" id="checkout-phone" value="${userData.phone || ''}" required>
+              <input type="text" id="checkout-phone" value="${userData.phone || ''}" required class="modern-input">
             </div>
             <div class="form-group">
               <label>Dirección:</label>
-              <input type="text" id="checkout-address" value="${userData.address || ''}" required>
+              <input type="text" id="checkout-address" value="${userData.address || ''}" required class="modern-input">
             </div>
             <div class="form-group">
               <label>Provincia:</label>
-              <select id="checkout-province" required>
+              <select id="checkout-province" required class="modern-select">
                 <option value="">Seleccionar provincia</option>
                 <option value="Pinar del Río" ${userData.province === 'Pinar del Río' ? 'selected' : ''}>Pinar del Río</option>
                 <option value="Artemisa" ${userData.province === 'Artemisa' ? 'selected' : ''}>Artemisa</option>
@@ -64,23 +64,24 @@ const CheckoutSystem = {
             </div>
             
             <div class="optional-recipient">
-              <label>
+              <label class="checkbox-label">
                 <input type="checkbox" id="add-recipient"> 
+                <span class="checkmark"></span>
                 📦 ¿Entregar a otra persona?
               </label>
               
               <div id="recipient-fields" style="display: none; margin-top: 15px;">
                 <div class="form-group">
                   <label>Nombre y Apellidos del Receptor:</label>
-                  <input type="text" id="recipient-name">
+                  <input type="text" id="recipient-name" class="modern-input">
                 </div>
                 <div class="form-group">
                   <label>CI del Receptor:</label>
-                  <input type="text" id="recipient-ci">
+                  <input type="text" id="recipient-ci" class="modern-input">
                 </div>
                 <div class="form-group">
                   <label>Teléfono del Receptor:</label>
-                  <input type="text" id="recipient-phone">
+                  <input type="text" id="recipient-phone" class="modern-input">
                 </div>
               </div>
             </div>
@@ -300,7 +301,7 @@ const CheckoutSystem = {
           userId: userId,
           paymentMethod: method,
           transferData: transferData,
-          recipientData: recipientData,
+          recipient: recipientData,  // Cambiamos a recipient (singular)
           requiredFields: requiredFieldsData
         })
       })
@@ -323,8 +324,8 @@ const CheckoutSystem = {
     cartItems.forEach(item => {
       if (item.tabType === 'digital') {
         const product = ProductView.getProductById(item.productId, 'digital');
-        if (product && product.requiredFields) {
-          product.requiredFields.forEach(field => {
+        if (product && product.required_fields) {
+          product.required_fields.forEach(field => {
             if (field.required) {
               fields.add(field.name);
             }
@@ -343,7 +344,7 @@ const CheckoutSystem = {
         container.innerHTML += `
           <div class="form-group">
             <label>${field}:</label>
-            <input type="text" id="field-${field.replace(/\s+/g, '-')}" required>
+            <input type="text" id="field-${field.replace(/\s+/g, '-')}" required class="modern-input">
           </div>
         `;
       });
