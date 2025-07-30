@@ -440,7 +440,7 @@ const AdminSystem = {
     const type = this.productType;
     const name = document.getElementById('product-name').value;
     const description = document.getElementById('product-description').value;
-    const category = document.getElementById('product-category').value;
+    const categoryId = document.getElementById('product-category').value;
     const details = document.getElementById('product-details').value;
     
     const priceInputs = document.querySelectorAll('.price-currency');
@@ -451,7 +451,7 @@ const AdminSystem = {
       }
     });
     
-    if (!name || !description || !category) {
+    if (!name || !description || !categoryId) {
       alert('Por favor complete todos los campos requeridos');
       return;
     }
@@ -459,11 +459,9 @@ const AdminSystem = {
     const product = {
       name,
       description,
-      prices: JSON.stringify(prices), // Convertir a JSON string para SQLite
-      category,
-      type,
+      prices, // Ahora es un objeto (JSONB)
       details: details || '',
-      dateCreated: new Date().toISOString()
+      date_created: new Date().toISOString()
     };
     
     if (type === 'fisico') {
@@ -487,19 +485,17 @@ const AdminSystem = {
             return;
           }
         }
-        product.images = JSON.stringify(product.images); // Convertir a JSON string
       }
       
-      product.hasColorVariant = document.getElementById('has-color-variant').checked ? 1 : 0;
+      product.has_color_variant = document.getElementById('has-color-variant').checked;
       
-      if (product.hasColorVariant) {
+      if (product.has_color_variant) {
         product.colors = [];
         document.querySelectorAll('.color-variant').forEach(variant => {
           const color = variant.querySelector('.color-picker').value;
           const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
           product.colors.push({ color, name });
         });
-        product.colors = JSON.stringify(product.colors);
       }
     } else {
       // Subir imagen para producto digital
@@ -509,7 +505,7 @@ const AdminSystem = {
           ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
           
           const imageUrl = await ImageUploader.uploadImageToImageBin(imageFile);
-          product.image = imageUrl;
+          product.images = [imageUrl]; // Ahora es un array
           
           ImageUploader.previewUploadedImage(imageUrl, 'digital-image-preview');
         } catch (error) {
@@ -519,19 +515,18 @@ const AdminSystem = {
         }
       }
       
-      product.requiredFields = [];
+      product.required_fields = [];
       document.querySelectorAll('.required-field').forEach(field => {
         const fieldName = field.querySelector('.field-name').value.trim();
         const isRequired = field.querySelector('.field-required').checked;
         
         if (fieldName) {
-          product.requiredFields.push({
+          product.required_fields.push({
             name: fieldName,
             required: isRequired
           });
         }
       });
-      product.requiredFields = JSON.stringify(product.requiredFields);
     }
     
     try {
@@ -543,7 +538,7 @@ const AdminSystem = {
         },
         body: JSON.stringify({
           type: type,
-          category: category,
+          categoryId: categoryId, // Ahora enviamos el ID de categoría
           product: product
         })
       });
@@ -576,106 +571,71 @@ const AdminSystem = {
     
     container.innerHTML = '<h4>📦 Productos Existentes</h4>';
     
-    Promise.all([
-      fetch(`${window.API_BASE_URL}/api/products/fisico`).then(res => res.json()),
-      fetch(`${window.API_BASE_URL}/api/products/digital`).then(res => res.json())
-    ])
-    .then(([physicalProducts, digitalProducts]) => {
-      const allProducts = [];
-      
-      Object.keys(physicalProducts).forEach(category => {
-        physicalProducts[category].forEach(product => {
-          allProducts.push({
-            ...product,
-            type: 'fisico',
-            category
-          });
-        });
-      });
-      
-      Object.keys(digitalProducts).forEach(category => {
-        digitalProducts[category].forEach(product => {
-          allProducts.push({
-            ...product,
-            type: 'digital',
-            category
-          });
-        });
-      });
-      
-      allProducts.sort((a, b) => new Date(b.dateCreated) - new Date(a.dateCreated));
-      
-      if (allProducts.length === 0) {
-        container.innerHTML += '<p>No hay productos disponibles</p>';
-        return;
-      }
-      
-      allProducts.forEach(product => {
-        const productEl = document.createElement('div');
-        productEl.className = 'admin-product-item';
-        
-        // Mostrar la primera imagen del producto
-        let imageHtml = '';
-        if (product.type === 'fisico' && product.images) {
-          const images = JSON.parse(product.images);
-          if (images && images.length > 0) {
-            imageHtml = `<img src="${images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
-          }
-        } else if (product.type === 'digital' && product.image) {
-          imageHtml = `<img src="${product.image}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+    fetch(`${window.API_BASE_URL}/api/admin/products`)
+      .then(response => response.json())
+      .then(products => {
+        if (!products || products.length === 0) {
+          container.innerHTML += '<p>No hay productos disponibles</p>';
+          return;
         }
         
-        // Parsear precios
-        const prices = product.prices ? JSON.parse(product.prices) : {};
-        
-        productEl.innerHTML = `
-          <div class="product-info">
-            <div style="display: flex; align-items: center;">
-              ${imageHtml}
-              <div>
-                <strong>${product.name}</strong> (${this.getCategoryName(product.category)})
-                <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                <div>${Object.entries(prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+        products.forEach(product => {
+          const productEl = document.createElement('div');
+          productEl.className = 'admin-product-item';
+          
+          // Mostrar la primera imagen del producto
+          let imageHtml = '';
+          if (product.images && product.images.length > 0) {
+            imageHtml = `<img src="${product.images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
+          }
+          
+          // Parsear precios
+          const prices = product.prices || {};
+          
+          productEl.innerHTML = `
+            <div class="product-info">
+              <div style="display: flex; align-items: center;">
+                ${imageHtml}
+                <div>
+                  <strong>${product.name}</strong> (${product.categories?.name || 'Sin categoría'})
+                  <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                  <div>${Object.entries(prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+                </div>
               </div>
             </div>
-          </div>
-          <div class="product-actions">
-            <button class="edit-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">✏️ Editar</button>
-            <button class="delete-product" data-id="${product.id}" data-type="${product.type}" data-category="${product.category}">🗑️ Eliminar</button>
-          </div>
-        `;
-        container.appendChild(productEl);
-      });
-      
-      container.querySelectorAll('.edit-product').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
-          const type = e.target.getAttribute('data-type');
-          const category = e.target.getAttribute('data-category');
-          this.editProduct(id, type, category);
+            <div class="product-actions">
+              <button class="edit-product" data-id="${product.id}">✏️ Editar</button>
+              <button class="delete-product" data-id="${product.id}">🗑️ Eliminar</button>
+            </div>
+          `;
+          container.appendChild(productEl);
         });
-      });
-      
-      container.querySelectorAll('.delete-product').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
-          const type = e.target.getAttribute('data-type');
-          const category = e.target.getAttribute('data-category');
-          
-          if (confirm('¿Estás seguro de eliminar este producto?')) {
-            this.deleteProduct(id, type, category);
-          }
+        
+        container.querySelectorAll('.edit-product').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-id');
+            this.editProduct(id);
+          });
         });
+        
+        container.querySelectorAll('.delete-product').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-id');
+            
+            if (confirm('¿Estás seguro de eliminar este producto?')) {
+              this.deleteProduct(id);
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.error('Error cargando productos:', error);
+        container.innerHTML = '<p>Error cargando productos</p>';
       });
-    })
-    .catch(error => {
-      console.error('Error cargando productos:', error);
-      container.innerHTML = '<p>Error cargando productos</p>';
-    });
   },
   
-  editProduct: function(id, type, category) {
-    fetch(`${window.API_BASE_URL}/api/products/${type}/${id}`)
+  editProduct: function(id) {
+    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`)
       .then(response => response.json())
       .then(product => {
         if (!product) {
@@ -686,17 +646,18 @@ const AdminSystem = {
         form.style.display = 'block';
         document.getElementById('add-product-btn').style.display = 'none';
         
-        this.productType = type;
+        this.productType = product.type;
         document.querySelectorAll('.type-tab').forEach(tab => {
-          tab.classList.toggle('active', tab.getAttribute('data-type') === type);
+          tab.classList.toggle('active', tab.getAttribute('data-type') === product.type);
         });
         
         document.getElementById('product-name').value = product.name;
         document.getElementById('product-description').value = product.description;
-        document.getElementById('product-category').value = product.category;
+        document.getElementById('product-category').value = product.category_id;
+        document.getElementById('product-details').value = product.details || '';
         
         // Parsear precios y llenar los campos
-        const prices = JSON.parse(product.prices);
+        const prices = product.prices || {};
         document.querySelectorAll('.price-currency').forEach(input => {
           const currency = input.dataset.currency;
           if (prices[currency]) {
@@ -704,38 +665,33 @@ const AdminSystem = {
           }
         });
         
-        if (type === 'fisico') {
-          document.getElementById('product-details').value = product.details || '';
-          document.getElementById('has-color-variant').checked = !!product.hasColorVariant;
+        if (product.type === 'fisico') {
+          document.getElementById('has-color-variant').checked = !!product.has_color_variant;
           document.getElementById('color-variant-section').style.display = 
-            product.hasColorVariant ? 'block' : 'none';
+            product.has_color_variant ? 'block' : 'none';
           
           // Previsualizar imágenes existentes
           const preview = document.getElementById('image-preview');
           preview.innerHTML = '';
-          if (product.images) {
-            const images = JSON.parse(product.images);
-            if (images && images.length > 0) {
-              images.forEach(img => {
-                const imgEl = document.createElement('img');
-                imgEl.src = img;
-                imgEl.style.maxWidth = '100px';
-                imgEl.style.maxHeight = '100px';
-                imgEl.style.objectFit = 'contain';
-                imgEl.style.margin = '5px';
-                imgEl.style.border = '1px solid #ddd';
-                imgEl.style.borderRadius = '4px';
-                preview.appendChild(imgEl);
-              });
-            }
+          if (product.images && product.images.length > 0) {
+            product.images.forEach(img => {
+              const imgEl = document.createElement('img');
+              imgEl.src = img;
+              imgEl.style.maxWidth = '100px';
+              imgEl.style.maxHeight = '100px';
+              imgEl.style.objectFit = 'contain';
+              imgEl.style.margin = '5px';
+              imgEl.style.border = '1px solid #ddd';
+              imgEl.style.borderRadius = '4px';
+              preview.appendChild(imgEl);
+            });
           }
           
-          if (product.hasColorVariant && product.colors) {
-            const colors = JSON.parse(product.colors);
+          if (product.has_color_variant && product.colors) {
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
             
-            colors.forEach(color => {
+            product.colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                   <input type="color" value="${color.color}" class="color-picker">
@@ -754,9 +710,9 @@ const AdminSystem = {
         } else {
           const preview = document.getElementById('digital-image-preview');
           preview.innerHTML = '';
-          if (product.image) {
+          if (product.images && product.images.length > 0) {
             const imgEl = document.createElement('img');
-            imgEl.src = product.image;
+            imgEl.src = product.images[0];
             imgEl.style.maxWidth = '200px';
             imgEl.style.maxHeight = '200px';
             imgEl.style.objectFit = 'contain';
@@ -765,10 +721,9 @@ const AdminSystem = {
           
           const container = document.getElementById('required-fields-container');
           container.innerHTML = '';
-          if (product.requiredFields) {
-            const requiredFields = JSON.parse(product.requiredFields);
-            if (requiredFields && requiredFields.length > 0) {
-              requiredFields.forEach(field => {
+          if (product.required_fields) {
+            if (product.required_fields.length > 0) {
+              product.required_fields.forEach(field => {
                 container.innerHTML += `
                   <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                     <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
@@ -806,7 +761,7 @@ const AdminSystem = {
       });
   },
   
-  deleteProduct: function(id, type, category) {
+  deleteProduct: function(id) {
     if (!confirm('¿Estás seguro de eliminar este producto?')) return;
     
     fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
@@ -877,24 +832,26 @@ const AdminSystem = {
     
     container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
     
-    fetch(`${window.API_BASE_URL}/api/categories/${type}`)
+    fetch(`${window.API_BASE_URL}/api/admin/categories`)
       .then(response => response.json())
       .then(categories => {
-        if (!categories || categories.length === 0) {
+        // Filtrar por tipo
+        const filtered = categories.filter(cat => cat.type === type);
+        
+        if (!filtered || filtered.length === 0) {
           container.innerHTML += '<p>No hay categorías definidas</p>';
           return;
         }
         
-        categories.forEach(category => {
+        filtered.forEach(category => {
           const categoryEl = document.createElement('div');
           categoryEl.className = 'admin-category-item';
           categoryEl.innerHTML = `
             <div class="category-info">
-              ${this.getCategoryName(category)}
-              <span>(${category})</span>
+              ${category.name}
             </div>
             <div class="category-actions">
-              <button class="delete-category" data-type="${type}" data-category="${category}">🗑️ Eliminar</button>
+              <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
             </div>
           `;
           container.appendChild(categoryEl);
@@ -902,11 +859,10 @@ const AdminSystem = {
         
         container.querySelectorAll('.delete-category').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const type = e.target.getAttribute('data-type');
-            const category = e.target.getAttribute('data-category');
+            const id = e.target.getAttribute('data-id');
             
             if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-              fetch(`${window.API_BASE_URL}/api/admin/categories/${category}?type=${type}`, {
+              fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
                 method: 'DELETE',
                 headers: {
                   'Telegram-ID': this.telegramUserId.toString()
@@ -966,18 +922,12 @@ const AdminSystem = {
         }
         
         filteredOrders.forEach(order => {
-          // Parsear los campos JSON
-          const items = JSON.parse(order.items);
-          const payment = JSON.parse(order.payment);
-          const recipient = JSON.parse(order.recipient);
-          const requiredFields = JSON.parse(order.requiredFields);
-          
           const orderElement = document.createElement('div');
           orderElement.className = 'admin-order';
           orderElement.innerHTML = `
             <div class="order-header">
               <div class="order-id">📋 Pedido #${order.id}</div>
-              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+              <div class="order-date">📅 ${new Date(order.created_at).toLocaleDateString()}</div>
               <div class="order-status">
                 <select class="status-select" data-id="${order.id}">
                   <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
@@ -988,7 +938,7 @@ const AdminSystem = {
               </div>
             </div>
             <div class="order-details">
-              <div><strong>👤 Cliente:</strong> ${recipient.fullName || 'No especificado'}</div>
+              <div><strong>👤 Cliente:</strong> ${order.user_id}</div>
               <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
             </div>
             <div class="order-actions">
@@ -1041,18 +991,12 @@ const AdminSystem = {
   },
   
   viewOrderDetails: function(orderId) {
-    fetch(`${window.API_BASE_URL}/api/orders/${orderId}`)
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}/details`)
       .then(response => response.json())
       .then(order => {
         if (!order) {
           return;
         }
-        
-        // Parsear campos JSON
-        const items = JSON.parse(order.items);
-        const payment = JSON.parse(order.payment);
-        const recipient = JSON.parse(order.recipient);
-        const requiredFields = JSON.parse(order.requiredFields);
         
         const modal = document.getElementById('product-modal');
         modal.innerHTML = `
@@ -1063,38 +1007,36 @@ const AdminSystem = {
             </div>
             <div class="order-details-full">
               <div class="order-info">
-                <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
+                <div><strong>📅 Fecha:</strong> ${new Date(order.created_at).toLocaleString()}</div>
                 <div><strong>🔄 Estado:</strong> ${order.status}</div>
                 <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
               </div>
               
               <h3>👤 Datos del Cliente</h3>
               <div class="customer-info">
-                <div><strong>Nombre:</strong> ${recipient.fullName}</div>
-                <div><strong>🆔 CI:</strong> ${recipient.ci}</div>
-                <div><strong>📱 Teléfono:</strong> ${recipient.phone}</div>
-                <div><strong>📍 Provincia:</strong> ${recipient.province}</div>
-              </div>
-              
-              <h3>💳 Información de Pago</h3>
-              <div class="payment-info">
-                <div><strong>Método:</strong> ${payment.method}</div>
-                <div><strong>🔑 ID Transferencia:</strong> ${payment.transferId}</div>
-                <div><strong>📸 Comprobante:</strong> <a href="${payment.transferProof}" target="_blank">Ver imagen</a></div>
+                <div><strong>Usuario:</strong> ${order.user_id}</div>
+                <div><strong>Método de Pago:</strong> ${order.payment.method}</div>
               </div>
               
               <h3>🛒 Productos</h3>
               <div class="order-products">
-                ${items.map(item => `
+                ${order.items.map(item => `
                   <div class="order-product-item">
+                    <div class="product-image">
+                      ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : ''}
+                    </div>
                     <div class="product-details">
-                      <div>${item.name}</div>
+                      <div><strong>${item.product_name}</strong></div>
+                      <div>${item.tab_type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
                       <div>${item.quantity} x $${item.price.toFixed(2)}</div>
-                      <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                      <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
                     </div>
                   </div>
                 `).join('')}
               </div>
+              
+              <h3>📝 Información Adicional</h3>
+              <pre>${JSON.stringify(order.recipient, null, 2)}</pre>
             </div>
           </div>
         `;
@@ -1117,26 +1059,19 @@ const AdminSystem = {
     
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
-    fetch(`${window.API_BASE_URL}/api/categories/${type}`)
+    fetch(`${window.API_BASE_URL}/api/admin/categories?type=${type}`)
       .then(response => response.json())
       .then(categories => {
         categories.forEach(category => {
           const option = document.createElement('option');
-          option.value = category;
-          option.textContent = this.getCategoryName(category);
+          option.value = category.id;
+          option.textContent = category.name;
           categorySelect.appendChild(option);
         });
+      })
+      .catch(error => {
+        console.error('Error cargando categorías:', error);
       });
-  },
-  
-  getCategoryName: function(categoryKey) {
-    const names = {
-      electronics: 'Electrónicos',
-      clothing: 'Ropa',
-      software: 'Software',
-      ebooks: 'Libros Digitales'
-    };
-    return names[categoryKey] || categoryKey;
   },
   
   resetProductForm: function() {
