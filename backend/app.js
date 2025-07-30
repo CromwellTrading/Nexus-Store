@@ -637,7 +637,7 @@ app.post('/api/checkout', async (req, res) => {
 });
 
 // =====================================================================
-// Rutas de administración
+// Rutas de administración - CORREGIDAS
 // =====================================================================
 console.log('\n🔧 Configurando rutas de administración...');
 
@@ -664,7 +664,7 @@ app.get('/api/admin/categories', isAdmin, async (req, res) => {
   }
 });
 
-// Crear nueva categoría
+// Crear nueva categoría - VERSIÓN CORREGIDA
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
   console.log('\n📁 POST /api/admin/categories');
   console.log('   Telegram ID:', req.telegramId);
@@ -691,7 +691,7 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
       throw existError;
     }
     
-    if (existingCategory.length > 0) {
+    if (existingCategory && existingCategory.length > 0) {
       console.log('   ❌ La categoría ya existe');
       return res.status(400).json({ 
         error: 'La categoría ya existe',
@@ -700,18 +700,24 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
     }
     
     console.log(`   Creando categoría: ${name} (${type})`);
-    // Crear si no existe
+    // Crear con retorno de datos usando .select() y .single()
     const { data, error } = await supabase
       .from('categories')
-      .insert([{ type, name }]);
+      .insert([{ type, name }])
+      .select()
+      .single();
     
     if (error) {
       console.error(`   ❌ Error Supabase: ${error.message}`);
       throw error;
     }
     
-    console.log('   ✅ Categoría creada exitosamente:', data[0]);
-    res.status(201).json(data[0]);
+    if (!data) {
+      throw new Error('La categoría se creó pero no se pudo recuperar');
+    }
+    
+    console.log('   ✅ Categoría creada exitosamente:', data);
+    res.status(201).json(data);
   } catch (error) {
     console.error('   ❌ Error interno al crear categoría:', error);
     res.status(500).json({ 
@@ -793,16 +799,18 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
         colors: product.colors,
         required_fields: product.requiredFields,
         date_created: new Date().toISOString()
-      }]);
+      }])
+      .select()
+      .single();
     
     if (error) {
       console.error(`   ❌ Error Supabase: ${error.message}`);
       throw error;
     }
     
-    console.log(`   ✅ Producto creado ID: ${data[0].id}`);
+    console.log(`   ✅ Producto creado ID: ${data.id}`);
     res.json({
-      id: data[0].id,
+      id: data.id,
       ...product
     });
   } catch (error) {
