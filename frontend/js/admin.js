@@ -639,4 +639,502 @@ const AdminSystem = {
         
         container.querySelectorAll('.delete-product').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const id = e
+            const id = e.target.getAttribute('data-id');
+            
+            if (confirm('¿Estás seguro de eliminar este producto?')) {
+              this.deleteProduct(id);
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.error('Error cargando productos:', error);
+        container.innerHTML = '<p>Error cargando productos</p>';
+      });
+  },
+  
+  editProduct: function(id) {
+    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`)
+      .then(response => response.json())
+      .then(product => {
+        if (!product) {
+          return;
+        }
+        
+        const form = document.getElementById('product-form');
+        form.style.display = 'block';
+        document.getElementById('add-product-btn').style.display = 'none';
+        
+        this.productType = product.type;
+        document.querySelectorAll('.type-tab').forEach(tab => {
+          tab.classList.toggle('active', tab.getAttribute('data-type') === product.type);
+        });
+        
+        document.getElementById('product-name').value = product.name;
+        document.getElementById('product-description').value = product.description;
+        document.getElementById('product-category').value = product.category_id;
+        document.getElementById('product-details').value = product.details || '';
+        
+        // Parsear precios y llenar los campos
+        const prices = product.prices || {};
+        document.querySelectorAll('.price-currency').forEach(input => {
+          const currency = input.dataset.currency;
+          if (prices[currency]) {
+            input.value = prices[currency];
+          }
+        });
+        
+        if (product.type === 'fisico') {
+          document.getElementById('has-color-variant').checked = !!product.has_color_variant;
+          document.getElementById('color-variant-section').style.display = 
+            product.has_color_variant ? 'block' : 'none';
+          
+          // Previsualizar imágenes existentes
+          const preview = document.getElementById('image-preview');
+          preview.innerHTML = '';
+          if (product.images && product.images.length > 0) {
+            product.images.forEach(img => {
+              const imgEl = document.createElement('img');
+              imgEl.src = img;
+              imgEl.style.maxWidth = '100px';
+              imgEl.style.maxHeight = '100px';
+              imgEl.style.objectFit = 'contain';
+              imgEl.style.margin = '5px';
+              imgEl.style.border = '1px solid #ddd';
+              imgEl.style.borderRadius = '4px';
+              preview.appendChild(imgEl);
+            });
+          }
+          
+          if (product.has_color_variant && product.colors) {
+            const container = document.getElementById('color-variants-container');
+            container.innerHTML = '';
+            
+            product.colors.forEach(color => {
+              container.innerHTML += `
+                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                  <input type="color" value="${color.color}" class="color-picker">
+                  <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
+                  <button class="remove-color">❌</button>
+                </div>
+              `;
+            });
+            
+            container.querySelectorAll('.remove-color').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.target.closest('.color-variant').remove();
+              });
+            });
+          }
+        } else {
+          const preview = document.getElementById('digital-image-preview');
+          preview.innerHTML = '';
+          if (product.images && product.images.length > 0) {
+            const imgEl = document.createElement('img');
+            imgEl.src = product.images[0];
+            imgEl.style.maxWidth = '200px';
+            imgEl.style.maxHeight = '200px';
+            imgEl.style.objectFit = 'contain';
+            preview.appendChild(imgEl);
+          }
+          
+          const container = document.getElementById('required-fields-container');
+          container.innerHTML = '';
+          if (product.required_fields) {
+            if (product.required_fields.length > 0) {
+              product.required_fields.forEach(field => {
+                container.innerHTML += `
+                  <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
+                    <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
+                    <label>Requerido</label>
+                    <button class="remove-field">❌</button>
+                  </div>
+                `;
+              });
+            }
+          } else {
+            container.innerHTML = `
+              <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+                <input type="checkbox" class="field-required" checked>
+                <label>Requerido</label>
+                <button class="remove-field">❌</button>
+              </div>
+            `;
+          }
+          
+          container.querySelectorAll('.remove-field').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              e.target.closest('.required-field').remove();
+            });
+          });
+        }
+        
+        document.getElementById('save-product').onclick = () => {
+          this.saveProduct();
+        };
+      })
+      .catch(error => {
+        alert('Error al cargar el producto para edición');
+      });
+  },
+  
+  deleteProduct: function(id) {
+    if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+    
+    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
+    .then(response => {
+      if (response.ok) {
+        this.renderProductsList();
+        alert('✅ Producto eliminado correctamente');
+      } else {
+        return response.text().then(errorText => {
+          throw new Error(`Error del servidor: ${errorText}`);
+        });
+      }
+    })
+    .catch(error => {
+      console.error('Error eliminando producto:', error);
+      alert('Error al eliminar el producto: ' + error.message);
+    });
+  },
+  
+  addCategory: function() {
+    const type = this.categoryType;
+    const name = document.getElementById('new-category-name').value.trim();
+    
+    if (!name) {
+      alert('Por favor ingrese un nombre para la categoría');
+      return;
+    }
+    
+    // Verificar primero si la categoría ya existe en la lista actual
+    const existingCategories = Array.from(
+      document.querySelectorAll('#categories-list .category-info')
+    ).map(el => el.textContent.trim());
+    
+    if (existingCategories.includes(name)) {
+      alert(`❌ La categoría "${name}" ya existe para productos ${type}`);
+      return;
+    }
+    
+    fetch(`${window.API_BASE_URL}/api/admin/categories`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Telegram-ID': this.telegramUserId.toString()
+      },
+      body: JSON.stringify({
+        type: type,
+        name: name
+      })
+    })
+    .then(response => {
+      if (response.status === 201) {
+        return response.json();
+      } else if (response.status === 400) {
+        return response.json().then(data => {
+          throw new Error(data.error);
+        });
+      } else {
+        throw new Error('Error en el servidor');
+      }
+    })
+    .then(data => {
+      alert(`✅ Categoría "${name}" creada correctamente!`);
+      document.getElementById('new-category-name').value = '';
+      this.renderCategoriesList();
+      this.renderCategoryOptions();
+    })
+    .catch(error => {
+      console.error('Error añadiendo categoría:', error);
+      alert(`❌ Error: ${error.message}`);
+    });
+  },
+  
+  renderCategoriesList: function() {
+    const type = this.categoryType;
+    const container = document.getElementById('categories-list');
+    if (!container) {
+      console.error('[Admin] No se encontró el contenedor de categorías');
+      return;
+    }
+    
+    container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
+    
+    fetch(`${window.API_BASE_URL}/api/admin/categories`)
+      .then(response => response.json())
+      .then(categories => {
+        // Filtrar por tipo
+        const filtered = categories.filter(cat => cat.type === type);
+        
+        if (!filtered || filtered.length === 0) {
+          container.innerHTML += '<p>No hay categorías definidas</p>';
+          return;
+        }
+        
+        filtered.forEach(category => {
+          const categoryEl = document.createElement('div');
+          categoryEl.className = 'admin-category-item';
+          categoryEl.innerHTML = `
+            <div class="category-info">
+              ${category.name}
+            </div>
+            <div class="category-actions">
+              <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
+            </div>
+          `;
+          container.appendChild(categoryEl);
+        });
+        
+        container.querySelectorAll('.delete-category').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-id');
+            
+            if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
+              fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Telegram-ID': this.telegramUserId.toString()
+                }
+              })
+              .then(response => {
+                if (response.ok) {
+                  this.renderCategoriesList();
+                  this.renderProductsList();
+                  alert('✅ Categoría eliminada correctamente');
+                } else {
+                  throw new Error('Error al eliminar categoría');
+                }
+              })
+              .catch(error => {
+                alert('Error al eliminar categoría: ' + error.message);
+              });
+            }
+          });
+        });
+      })
+      .catch(error => {
+        container.innerHTML = '<p>Error cargando categorías</p>';
+      });
+  },
+  
+  loadOrders: function(filter = 'all') {
+    const ordersList = document.getElementById('admin-orders-list');
+    if (!ordersList) {
+      console.error('[Admin] No se encontró el contenedor de pedidos');
+      return;
+    }
+    
+    ordersList.innerHTML = '';
+    
+    fetch(`${window.API_BASE_URL}/api/admin/orders`)
+      .then(response => response.json())
+      .then(orders => {
+        let filteredOrders = orders;
+        
+        if (filter !== 'all') {
+          filteredOrders = orders.filter(order => order.status === filter);
+        }
+        
+        const statusOrder = {
+          'Pendiente': 1,
+          'En proceso': 2,
+          'Enviado': 3,
+          'Completado': 4
+        };
+        
+        filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+        
+        if (filteredOrders.length === 0) {
+          ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+          return;
+        }
+        
+        filteredOrders.forEach(order => {
+          const orderElement = document.createElement('div');
+          orderElement.className = 'admin-order';
+          orderElement.innerHTML = `
+            <div class="order-header">
+              <div class="order-id">📋 Pedido #${order.id}</div>
+              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+              <div class="order-status">
+                <select class="status-select" data-id="${order.id}">
+                  <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                  <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                  <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                  <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+                </select>
+              </div>
+            </div>
+            <div class="order-details">
+              <div><strong>👤 Cliente:</strong> ${order.userId}</div>
+              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+            </div>
+            <div class="order-actions">
+              <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+            </div>
+          `;
+          ordersList.appendChild(orderElement);
+        });
+        
+        document.querySelectorAll('.btn-view').forEach(button => {
+          button.addEventListener('click', (e) => {
+            const orderId = e.target.getAttribute('data-id');
+            this.viewOrderDetails(orderId);
+          });
+        });
+        
+        document.querySelectorAll('.status-select').forEach(select => {
+          select.addEventListener('change', (e) => {
+            const orderId = e.target.getAttribute('data-id');
+            const newStatus = e.target.value;
+            this.updateOrderStatus(orderId, newStatus);
+          });
+        });
+      })
+      .catch(error => {
+        ordersList.innerHTML = '<p>Error cargando pedidos</p>';
+      });
+  },
+  
+  updateOrderStatus: function(orderId, newStatus) {
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Telegram-ID': this.telegramUserId.toString()
+      },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(response => {
+      if (response.ok) {
+        this.loadOrders(document.getElementById('order-status-filter').value);
+        alert('✅ Estado actualizado correctamente');
+      } else {
+        throw new Error('Error actualizando estado');
+      }
+    })
+    .catch(error => {
+      alert('Error actualizando estado: ' + error.message);
+    });
+  },
+  
+  viewOrderDetails: function(orderId) {
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`)
+      .then(response => response.json())
+      .then(order => {
+        if (!order) {
+          return;
+        }
+        
+        const modal = document.getElementById('product-modal');
+        modal.innerHTML = `
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>📋 Detalles del Pedido #${order.id}</h2>
+              <button class="close-modal">&times;</button>
+            </div>
+            <div class="order-details-full">
+              <div class="order-info">
+                <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
+                <div><strong>🔄 Estado:</strong> ${order.status}</div>
+                <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+              </div>
+              
+              <h3>👤 Datos del Cliente</h3>
+              <div class="customer-info">
+                <div><strong>Usuario:</strong> ${order.userId}</div>
+                <div><strong>Método de Pago:</strong> ${order.payment.method}</div>
+              </div>
+              
+              <h3>🛒 Productos</h3>
+              <div class="order-products">
+                ${order.items.map(item => `
+                  <div class="order-product-item">
+                    <div class="product-image">
+                      ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : ''}
+                    </div>
+                    <div class="product-details">
+                      <div><strong>${item.product_name}</strong></div>
+                      <div>${item.tab_type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                      <div>${item.quantity} x $${item.price.toFixed(2)}</div>
+                      <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+              
+              <h3>📝 Información Adicional</h3>
+              <pre>${JSON.stringify(order.recipient, null, 2)}</pre>
+            </div>
+          </div>
+        `;
+        
+        modal.querySelector('.close-modal').addEventListener('click', () => {
+          this.openAdminPanel();
+        });
+      })
+      .catch(error => {
+        alert('Error al cargar detalles del pedido');
+      });
+  },
+  
+  renderCategoryOptions: function(type = this.productType) {
+    const categorySelect = document.getElementById('product-category');
+    if (!categorySelect) {
+      console.error('[Admin] No se encontró el selector de categorías');
+      return;
+    }
+    
+    categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
+    
+    fetch(`${window.API_BASE_URL}/api/categories/${type}`)
+      .then(response => response.json())
+      .then(categories => {
+        categories.forEach(category => {
+          const option = document.createElement('option');
+          option.value = category.id;
+          option.textContent = category.name;
+          categorySelect.appendChild(option);
+        });
+      })
+      .catch(error => {
+        console.error('Error cargando categorías:', error);
+      });
+  },
+  
+  resetProductForm: function() {
+    document.getElementById('product-name').value = '';
+    document.getElementById('product-description').value = '';
+    document.getElementById('product-details').value = '';
+    document.getElementById('has-color-variant').checked = false;
+    document.getElementById('color-variant-section').style.display = 'none';
+    document.getElementById('color-variants-container').innerHTML = '';
+    document.getElementById('image-preview').innerHTML = '';
+    document.getElementById('digital-image-preview').innerHTML = '';
+    document.getElementById('required-fields-container').innerHTML = `
+      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+        <input type="checkbox" class="field-required" checked>
+        <label>Requerido</label>
+        <button class="remove-field">❌</button>
+      </div>
+    `;
+    
+    document.querySelectorAll('.price-currency').forEach(input => {
+      input.value = '';
+    });
+  }
+};
+
+// Inicialización
+window.addEventListener('DOMContentLoaded', () => {
+  AdminSystem.init();
+});
