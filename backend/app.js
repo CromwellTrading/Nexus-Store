@@ -2,14 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 import TelegramBot from 'node-telegram-bot-api';
-import Database from 'better-sqlite3';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -19,73 +14,32 @@ console.log(`👑 Admin IDs: ${process.env.ADMIN_IDS}`);
 console.log(`🤖 Token de bot: ${process.env.TELEGRAM_BOT_TOKEN ? 'Configurado' : 'FALTANTE'}`);
 console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL}`);
 
-// Configuración de la base de datos
-const DB_PATH = path.join(__dirname, 'data', 'store.db');
-console.log(`📂 Ruta de la base de datos: ${DB_PATH}`);
+// Configuración de Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
-// Asegurar que exista la carpeta data
-try {
-  const dataDir = path.join(__dirname, 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir);
-    console.log("✅ Carpeta 'data' creada exitosamente");
+// Configuración de PostgreSQL directa
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Verificar conexión a Supabase
+(async () => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .limit(1);
+    
+    if (error) throw error;
+    console.log('✅ Conexión a Supabase verificada correctamente');
+  } catch (error) {
+    console.error('❌ Error verificando conexión a Supabase:', error.message);
   }
-} catch (err) {
-  console.error(`❌ Error creando carpeta 'data': ${err.message}`);
-}
-
-// Inicializar base de datos
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL'); // Mejorar rendimiento
-
-// Crear tablas si no existen
-db.exec(`
-  CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL,
-    name TEXT NOT NULL,
-    UNIQUE(type, name)
-  );
-  
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL,
-    category TEXT NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
-    details TEXT,
-    prices TEXT, -- JSON string
-    images TEXT, -- JSON string
-    hasColorVariant BOOLEAN DEFAULT 0,
-    colors TEXT, -- JSON string
-    requiredFields TEXT, -- JSON string
-    dateCreated TEXT DEFAULT (datetime('now'))
-  );
-  
-  CREATE TABLE IF NOT EXISTS carts (
-    userId TEXT PRIMARY KEY,
-    items TEXT -- JSON string
-  );
-  
-  CREATE TABLE IF NOT EXISTS orders (
-    id TEXT PRIMARY KEY,
-    userId TEXT NOT NULL,
-    items TEXT, -- JSON string
-    payment TEXT, -- JSON string
-    recipient TEXT, -- JSON string
-    requiredFields TEXT, -- JSON string
-    total REAL,
-    status TEXT,
-    createdAt TEXT DEFAULT (datetime('now')),
-    updatedAt TEXT
-  );
-  
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    data TEXT -- JSON string
-  );
-`);
-console.log('✅ Base de datos inicializada');
+})();
 
 app.use(cors({
   origin: '*',
@@ -131,31 +85,42 @@ app.get('/api/admin/ids', (req, res) => {
 });
 
 // Productos
-app.get('/api/products/:type', (req, res) => {
+app.get('/api/products/:type', async (req, res) => {
   const { type } = req.params;
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM products WHERE type = ?
-    `);
-    const products = stmt.all(type);
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        id, 
+        type, 
+        name, 
+        description, 
+        details, 
+        prices, 
+        images, 
+        has_color_variant, 
+        colors, 
+        required_fields,
+        date_created,
+        categories!inner(name)
+      `)
+      .eq('type', type);
+    
+    if (error) throw error;
     
     // Organizar por categoría
     const result = {};
     products.forEach(product => {
-      if (!result[product.category]) {
-        result[product.category] = [];
+      const categoryName = product.categories.name;
+      
+      if (!result[categoryName]) {
+        result[categoryName] = [];
       }
       
-      // Parsear campos JSON
-      const parsedProduct = {
+      result[categoryName].push({
         ...product,
-        prices: JSON.parse(product.prices),
-        images: product.images ? JSON.parse(product.images) : [],
-        colors: product.colors ? JSON.parse(product.colors) : [],
-        requiredFields: product.requiredFields ? JSON.parse(product.requiredFields) : []
-      };
-      
-      result[product.category].push(parsedProduct);
+        category: categoryName
+      });
     });
     
     res.json(result);
@@ -165,23 +130,25 @@ app.get('/api/products/:type', (req, res) => {
   }
 });
 
-app.get('/api/products/:type/:id', (req, res) => {
+app.get('/api/products/:type/:id', async (req, res) => {
   const { type, id } = req.params;
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM products 
-      WHERE type = ? AND id = ?
-    `);
-    const product = stmt.get(type, id);
+    const { data: product, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        categories!inner(name)
+      `)
+      .eq('type', type)
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
     
     if (product) {
-      // Parsear campos JSON
       const parsedProduct = {
         ...product,
-        prices: JSON.parse(product.prices),
-        images: product.images ? JSON.parse(product.images) : [],
-        colors: product.colors ? JSON.parse(product.colors) : [],
-        requiredFields: product.requiredFields ? JSON.parse(product.requiredFields) : []
+        category: product.categories.name
       };
       res.json(parsedProduct);
     } else {
@@ -194,41 +161,42 @@ app.get('/api/products/:type/:id', (req, res) => {
 });
 
 // Carrito
-app.get('/api/cart/:userId', (req, res) => {
+app.get('/api/cart/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM carts WHERE userId = ?
-    `);
-    const cart = stmt.get(userId);
+    const { data: cart, error } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
     
-    if (cart) {
-      res.json({
-        userId: cart.userId,
-        items: JSON.parse(cart.items)
-      });
-    } else {
-      // Crear carrito vacío si no existe
-      res.json({ userId, items: [] });
-    }
+    if (error && error.code !== 'PGRST116') throw error;
+    
+    res.json({
+      userId,
+      items: cart?.items || []
+    });
   } catch (error) {
     console.error('Error obteniendo carrito:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-app.post('/api/cart/add', (req, res) => {
+app.post('/api/cart/add', async (req, res) => {
   const { userId, productId, tabType } = req.body;
   try {
     // Obtener carrito existente
-    let stmt = db.prepare(`
-      SELECT * FROM carts WHERE userId = ?
-    `);
-    let cart = stmt.get(userId);
+    let { data: cart, error } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
     
     let items = [];
     if (cart) {
-      items = JSON.parse(cart.items);
+      items = cart.items;
     }
     
     // Buscar si el producto ya está en el carrito
@@ -249,39 +217,46 @@ app.post('/api/cart/add', (req, res) => {
     
     if (cart) {
       // Actualizar carrito existente
-      stmt = db.prepare(`
-        UPDATE carts SET items = ? WHERE userId = ?
-      `);
-      stmt.run(JSON.stringify(items), userId);
+      const { error } = await supabase
+        .from('carts')
+        .update({ items })
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      res.json({ userId, items });
     } else {
       // Crear nuevo carrito
-      stmt = db.prepare(`
-        INSERT INTO carts (userId, items) VALUES (?, ?)
-      `);
-      stmt.run(userId, JSON.stringify(items));
+      const { error } = await supabase
+        .from('carts')
+        .insert([{ user_id: userId, items }]);
+      
+      if (error) throw error;
+      res.json({ userId, items });
     }
-    
-    res.json({ userId, items });
   } catch (error) {
     console.error('Error añadiendo al carrito:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-app.post('/api/cart/remove', (req, res) => {
+app.post('/api/cart/remove', async (req, res) => {
   const { userId, productId, tabType } = req.body;
   try {
     // Obtener carrito
-    let stmt = db.prepare(`
-      SELECT * FROM carts WHERE userId = ?
-    `);
-    const cart = stmt.get(userId);
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
     
-    if (!cart) {
-      return res.status(404).json({ error: 'Carrito no encontrado' });
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      throw cartError;
     }
     
-    let items = JSON.parse(cart.items);
+    let items = cart.items;
     const initialLength = items.length;
     
     items = items.filter(item => 
@@ -293,11 +268,12 @@ app.post('/api/cart/remove', (req, res) => {
     }
     
     // Actualizar carrito
-    stmt = db.prepare(`
-      UPDATE carts SET items = ? WHERE userId = ?
-    `);
-    stmt.run(JSON.stringify(items), userId);
+    const { error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId);
     
+    if (error) throw error;
     res.json({ userId, items });
   } catch (error) {
     console.error('Error removiendo del carrito:', error);
@@ -305,7 +281,7 @@ app.post('/api/cart/remove', (req, res) => {
   }
 });
 
-app.post('/api/cart/update', (req, res) => {
+app.post('/api/cart/update', async (req, res) => {
   const { userId, productId, tabType, quantity } = req.body;
   
   if (quantity < 1) {
@@ -314,16 +290,20 @@ app.post('/api/cart/update', (req, res) => {
   
   try {
     // Obtener carrito
-    let stmt = db.prepare(`
-      SELECT * FROM carts WHERE userId = ?
-    `);
-    const cart = stmt.get(userId);
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
     
-    if (!cart) {
-      return res.status(404).json({ error: 'Carrito no encontrado' });
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      throw cartError;
     }
     
-    let items = JSON.parse(cart.items);
+    let items = cart.items;
     const itemIndex = items.findIndex(item => 
       item.productId == productId && item.tabType === tabType
     );
@@ -335,11 +315,12 @@ app.post('/api/cart/update', (req, res) => {
     items[itemIndex].quantity = quantity;
     
     // Actualizar carrito
-    stmt = db.prepare(`
-      UPDATE carts SET items = ? WHERE userId = ?
-    `);
-    stmt.run(JSON.stringify(items), userId);
+    const { error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId);
     
+    if (error) throw error;
     res.json({ userId, items });
   } catch (error) {
     console.error('Error actualizando carrito:', error);
@@ -347,16 +328,18 @@ app.post('/api/cart/update', (req, res) => {
   }
 });
 
-app.post('/api/cart/clear/:userId', (req, res) => {
+app.post('/api/cart/clear/:userId', async (req, res) => {
   const { userId } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      DELETE FROM carts WHERE userId = ?
-    `);
-    const result = stmt.run(userId);
+    const { error, count } = await supabase
+      .from('carts')
+      .delete()
+      .eq('user_id', userId);
     
-    if (result.changes > 0) {
+    if (error) throw error;
+    
+    if (count > 0) {
       res.json({ success: true });
     } else {
       res.status(404).json({ error: 'Carrito no encontrado' });
@@ -368,112 +351,149 @@ app.post('/api/cart/clear/:userId', (req, res) => {
 });
 
 // Checkout
-app.post('/api/checkout', (req, res) => {
+app.post('/api/checkout', async (req, res) => {
   const { userId, paymentMethod, transferData, recipientData, requiredFields } = req.body;
   
+  const client = await pool.connect();
+  
   try {
-    // Obtener carrito
-    let stmt = db.prepare(`
-      SELECT * FROM carts WHERE userId = ?
-    `);
-    const cart = stmt.get(userId);
+    await client.query('BEGIN');
     
-    if (!cart || !cart.items) {
+    // 1. Obtener carrito
+    const cartRes = await client.query(
+      'SELECT items FROM carts WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    
+    if (!cartRes.rows.length || !cartRes.rows[0].items) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
     
-    const items = JSON.parse(cart.items);
+    const items = cartRes.rows[0].items;
     let total = 0;
-    const itemsWithDetails = [];
+    const orderItems = [];
     
-    // Obtener detalles de los productos
+    // 2. Procesar cada item
     for (const item of items) {
-      stmt = db.prepare(`
-        SELECT * FROM products 
-        WHERE type = ? AND id = ?
-      `);
-      const product = stmt.get(item.tabType, item.productId);
+      const productRes = await client.query(
+        `SELECT id, name, prices->>$1 AS price, images->0 AS image
+         FROM products WHERE id = $2`,
+        [paymentMethod, item.productId]
+      );
       
-      if (product) {
-        const prices = JSON.parse(product.prices);
-        const price = prices[paymentMethod] || Object.values(prices)[0] || 0;
-        total += price * item.quantity;
+      if (productRes.rows.length) {
+        const product = productRes.rows[0];
+        const price = parseFloat(product.price) || 0;
+        const itemTotal = price * item.quantity;
+        total += itemTotal;
         
-        itemsWithDetails.push({
-          ...item,
-          name: product.name,
+        orderItems.push({
+          product_id: product.id,
+          product_name: product.name,
+          quantity: item.quantity,
           price: price,
-          imageUrl: product.images ? JSON.parse(product.images)[0] : null
+          image_url: product.image,
+          tab_type: item.tabType
         });
       }
     }
     
-    // Crear orden
+    // 3. Crear orden
     const orderId = `ORD-${Date.now()}`;
-    const order = {
-      id: orderId,
-      userId,
-      items: itemsWithDetails,
-      payment: {
-        method: paymentMethod,
-        ...transferData
-      },
-      recipient: recipientData,
-      requiredFields,
-      total,
-      status: 'Pendiente',
-      createdAt: new Date().toISOString()
-    };
-    
-    // Guardar orden
-    stmt = db.prepare(`
-      INSERT INTO orders (id, userId, items, payment, recipient, requiredFields, total, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
-      order.id,
-      order.userId,
-      JSON.stringify(order.items),
-      JSON.stringify(order.payment),
-      JSON.stringify(order.recipient),
-      JSON.stringify(order.requiredFields),
-      order.total,
-      order.status,
-      order.createdAt
+    await client.query(
+      `INSERT INTO orders (id, user_id, total, status)
+       VALUES ($1, $2, $3, 'Pendiente')`,
+      [orderId, userId, total]
     );
     
-    // Vaciar carrito
-    stmt = db.prepare(`
-      DELETE FROM carts WHERE userId = ?
-    `);
-    stmt.run(userId);
+    // 4. Añadir items a la orden
+    for (const item of orderItems) {
+      await client.query(
+        `INSERT INTO order_items 
+         (order_id, product_id, product_name, quantity, price, image_url, tab_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          orderId,
+          item.product_id,
+          item.product_name,
+          item.quantity,
+          item.price,
+          item.image_url,
+          item.tab_type
+        ]
+      );
+    }
+    
+    // 5. Guardar detalles adicionales
+    await client.query(
+      `INSERT INTO order_details 
+       (order_id, payment_method, transfer_data, recipient_data, required_fields)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        orderId,
+        paymentMethod,
+        JSON.stringify(transferData),
+        JSON.stringify(recipientData),
+        JSON.stringify(requiredFields)
+      ]
+    );
+    
+    // 6. Vaciar carrito
+    await client.query(
+      'DELETE FROM carts WHERE user_id = $1',
+      [userId]
+    );
+    
+    await client.query('COMMIT');
     
     res.json({ 
       success: true, 
-      orderId: order.id,
+      orderId,
+      total,
       message: 'Compra realizada con éxito' 
     });
+    
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error en checkout:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  } finally {
+    client.release();
   }
 });
 
 // Administración
-app.get('/api/admin/orders', isAdmin, (req, res) => {
+app.get('/api/admin/orders', isAdmin, async (req, res) => {
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM orders
-    `);
-    const orders = stmt.all();
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details!inner(payment_method, transfer_data, recipient_data, required_fields),
+        order_items!inner(product_name, quantity, price, image_url, tab_type)
+      `);
     
-    // Parsear campos JSON
+    if (error) throw error;
+    
     const parsedOrders = orders.map(order => ({
-      ...order,
-      items: JSON.parse(order.items),
-      payment: JSON.parse(order.payment),
-      recipient: JSON.parse(order.recipient),
-      requiredFields: JSON.parse(order.requiredFields)
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details.payment_method,
+        ...order.order_details.transfer_data
+      },
+      recipient: order.order_details.recipient_data,
+      requiredFields: order.order_details.required_fields,
+      items: order.order_items
     }));
     
     res.json(parsedOrders);
@@ -483,22 +503,20 @@ app.get('/api/admin/orders', isAdmin, (req, res) => {
   }
 });
 
-app.put('/api/admin/orders/:orderId', isAdmin, (req, res) => {
+app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   const { orderId } = req.params;
   const { status } = req.body;
   
   try {
-    const stmt = db.prepare(`
-      UPDATE orders SET 
-        status = ?, 
-        updatedAt = ?
-      WHERE id = ?
-    `);
-    const result = stmt.run(status, new Date().toISOString(), orderId);
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', orderId);
     
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Orden no encontrada' });
-    }
+    if (error) throw error;
     
     res.json({ success: true });
   } catch (error) {
@@ -507,69 +525,62 @@ app.put('/api/admin/orders/:orderId', isAdmin, (req, res) => {
   }
 });
 
-app.post('/api/admin/products', isAdmin, (req, res) => {
-  const { type, category, product } = req.body;
+app.post('/api/admin/products', isAdmin, async (req, res) => {
+  const { type, categoryId, product } = req.body;
   
   try {
-    // Preparar el producto para la base de datos
-    const productData = {
-      type,
-      category,
-      name: product.name,
-      description: product.description,
-      details: product.details || null,
-      prices: JSON.stringify(product.prices),
-      images: product.images ? JSON.stringify(product.images) : null,
-      hasColorVariant: product.hasColorVariant ? 1 : 0,
-      colors: product.colors ? JSON.stringify(product.colors) : null,
-      requiredFields: product.requiredFields ? JSON.stringify(product.requiredFields) : null,
-      dateCreated: product.dateCreated || new Date().toISOString()
-    };
+    // Verificar que la categoría existe
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', categoryId)
+      .single();
     
-    const stmt = db.prepare(`
-      INSERT INTO products (
-        type, category, name, description, details, prices, 
-        images, hasColorVariant, colors, requiredFields, dateCreated
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    if (categoryError || !category) {
+      return res.status(400).json({ error: 'Categoría inválida' });
+    }
     
-    const result = stmt.run(
-      productData.type,
-      productData.category,
-      productData.name,
-      productData.description,
-      productData.details,
-      productData.prices,
-      productData.images,
-      productData.hasColorVariant,
-      productData.colors,
-      productData.requiredFields,
-      productData.dateCreated
-    );
+    // Crear producto
+    const { data, error } = await supabase
+      .from('products')
+      .insert([{
+        type,
+        category_id: categoryId,
+        name: product.name,
+        description: product.description,
+        details: product.details,
+        prices: product.prices,
+        images: product.images,
+        has_color_variant: product.hasColorVariant,
+        colors: product.colors,
+        required_fields: product.requiredFields,
+        date_created: new Date().toISOString()
+      }]);
     
-    // Obtener el producto recién creado
-    const newProduct = {
-      id: result.lastInsertRowid,
+    if (error) throw error;
+    
+    res.json({
+      id: data[0].id,
       ...product
-    };
-    
-    res.json(newProduct);
+    });
   } catch (error) {
     console.error('Error creando producto:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-app.delete('/api/admin/products/:id', isAdmin, (req, res) => {
+app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      DELETE FROM products WHERE id = ?
-    `);
-    const result = stmt.run(id);
+    const { error, count } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
     
-    if (result.changes === 0) {
+    if (error) throw error;
+    
+    if (count === 0) {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
     
@@ -580,7 +591,7 @@ app.delete('/api/admin/products/:id', isAdmin, (req, res) => {
   }
 });
 
-app.post('/api/admin/categories', isAdmin, (req, res) => {
+app.post('/api/admin/categories', isAdmin, async (req, res) => {
   const { type, name } = req.body;
   
   if (!type || !name) {
@@ -588,31 +599,36 @@ app.post('/api/admin/categories', isAdmin, (req, res) => {
   }
   
   try {
-    const stmt = db.prepare(`
-      INSERT INTO categories (type, name) VALUES (?, ?)
-    `);
-    stmt.run(type, name);
+    const { error } = await supabase
+      .from('categories')
+      .insert([{ type, name }]);
+    
+    if (error) {
+      if (error.code === '23505') { // Violación de unique constraint
+        return res.status(400).json({ error: 'La categoría ya existe' });
+      }
+      throw error;
+    }
     
     res.json({ success: true });
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT') {
-      return res.status(400).json({ error: 'La categoría ya existe' });
-    }
     console.error('Error creando categoría:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-app.delete('/api/admin/categories/:id', isAdmin, (req, res) => {
+app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      DELETE FROM categories WHERE id = ?
-    `);
-    const result = stmt.run(id);
+    const { error, count } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
     
-    if (result.changes === 0) {
+    if (error) throw error;
+    
+    if (count === 0) {
       return res.status(404).json({ error: 'Categoría no encontrada' });
     }
     
@@ -623,14 +639,16 @@ app.delete('/api/admin/categories/:id', isAdmin, (req, res) => {
   }
 });
 
-app.get('/api/categories/:type', (req, res) => {
+app.get('/api/categories/:type', async (req, res) => {
   const { type } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      SELECT name FROM categories WHERE type = ?
-    `);
-    const categories = stmt.all(type);
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('type', type);
+    
+    if (error) throw error;
     
     res.json(categories.map(c => c.name));
   } catch (error) {
@@ -640,22 +658,23 @@ app.get('/api/categories/:type', (req, res) => {
 });
 
 // Usuarios
-app.get('/api/users/:userId', (req, res) => {
+app.get('/api/users/:userId', async (req, res) => {
   const { userId } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM users WHERE id = ?
-    `);
-    const user = stmt.get(userId);
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
     
     if (user) {
-      // Parsear los datos del usuario
-      const userData = {
+      res.json({
         ...user,
-        data: JSON.parse(user.data)
-      };
-      res.json(userData);
+        data: user.profile_data
+      });
     } else {
       res.status(404).json({ error: 'Usuario no encontrado' });
     }
@@ -665,16 +684,19 @@ app.get('/api/users/:userId', (req, res) => {
   }
 });
 
-app.put('/api/users/:userId', (req, res) => {
+app.put('/api/users/:userId', async (req, res) => {
   const { userId } = req.params;
   const userData = req.body;
   
   try {
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO users (id, data) 
-      VALUES (?, ?)
-    `);
-    stmt.run(userId, JSON.stringify(userData));
+    const { error } = await supabase
+      .from('users')
+      .upsert({ 
+        id: userId, 
+        profile_data: userData 
+      });
+    
+    if (error) throw error;
     res.json({ success: true });
   } catch (error) {
     console.error('Error actualizando usuario:', error);
@@ -683,22 +705,39 @@ app.put('/api/users/:userId', (req, res) => {
 });
 
 // Órdenes de usuario
-app.get('/api/orders/user/:userId', (req, res) => {
+app.get('/api/orders/user/:userId', async (req, res) => {
   const { userId } = req.params;
   
   try {
-    const stmt = db.prepare(`
-      SELECT * FROM orders WHERE userId = ?
-    `);
-    const orders = stmt.all(userId);
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details!inner(payment_method, transfer_data, recipient_data, required_fields),
+        order_items!inner(product_name, quantity, price, image_url, tab_type)
+      `)
+      .eq('user_id', userId);
     
-    // Parsear campos JSON
+    if (error) throw error;
+    
     const parsedOrders = orders.map(order => ({
-      ...order,
-      items: JSON.parse(order.items),
-      payment: JSON.parse(order.payment),
-      recipient: JSON.parse(order.recipient),
-      requiredFields: JSON.parse(order.requiredFields)
+      id: order.id,
+      userId,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details.payment_method,
+        ...order.order_details.transfer_data
+      },
+      recipient: order.order_details.recipient_data,
+      requiredFields: order.order_details.required_fields,
+      items: order.order_items
     }));
     
     res.json(parsedOrders);
