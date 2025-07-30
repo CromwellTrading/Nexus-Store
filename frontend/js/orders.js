@@ -9,10 +9,19 @@ const OrdersSystem = {
     const userId = UserProfile.getTelegramUserId();
     if (!userId) return;
     
-    fetch(`${window.API_URL}/api/orders/${userId}`)
+    fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`)
       .then(response => response.json())
       .then(orders => {
-        this.orders = orders;
+        this.orders = orders.map(order => ({
+          ...order,
+          date: new Date(order.created_at).toLocaleDateString(),
+          data: {
+            items: order.items, // Ya es un array (JSONB)
+            payment: order.payment, // Objeto directo
+            recipient: order.recipient, // Objeto directo
+            total: order.total
+          }
+        }));
       })
       .catch(error => {
         console.error('Error cargando pedidos:', error);
@@ -26,7 +35,7 @@ const OrdersSystem = {
       <div class="order-controls">
         <div class="order-filter">
           <label>Filtrar por estado:</label>
-          <select id="client-status-filter">
+          <select id="client-status-filter" class="modern-select">
             <option value="all">Todos</option>
             <option value="Pendiente">Pendiente</option>
             <option value="En proceso">En proceso</option>
@@ -36,7 +45,7 @@ const OrdersSystem = {
         </div>
         <div class="order-sort">
           <label>Ordenar por:</label>
-          <select id="client-sort-by">
+          <select id="client-sort-by" class="modern-select">
             <option value="newest">Más recientes primero</option>
             <option value="oldest">Más antiguos primero</option>
             <option value="status">Estado</option>
@@ -82,27 +91,27 @@ const OrdersSystem = {
     }
     
     return orders.map(order => {
-      const isUpdated = order.updatedAt && (new Date() - new Date(order.updatedAt)) < (24 * 60 * 60 * 1000);
+      const isUpdated = order.updated_at && (new Date() - new Date(order.updated_at)) < (24 * 60 * 60 * 1000);
       return `
         <div class="order-item ${order.isNew ? 'new-order' : ''}">
-          <h3>Pedido #${order.id} 
+          <h3>📦 Pedido #${order.id} 
             ${order.isNew ? '<span class="new-badge">NUEVO</span>' : ''}
             ${isUpdated ? '<span class="updated-badge">ACTUALIZADO</span>' : ''}
           </h3>
-          <p>Fecha: ${order.date}</p>
-          <p>Total: $${order.data.total.toFixed(2)}</p>
-          <p class="order-status">Estado: <span class="status-${order.status.toLowerCase().replace(/\s+/g, '-')}">${order.status}</span></p>
+          <p>📅 Fecha: ${order.date}</p>
+          <p>💰 Total: $${order.data.total.toFixed(2)}</p>
+          <p class="order-status">🔄 Estado: <span class="status-${order.status.toLowerCase().replace(/\s+/g, '-')}">${order.status}</span></p>
           
           <div class="order-thumbnails">
             ${order.data.items.map(item => `
-              <img src="${item.imageUrl || 'placeholder.jpg'}" 
-                   alt="${item.name}" 
+              <img src="${item.image_url || 'placeholder.jpg'}" 
+                   alt="${item.product_name}" 
                    class="order-thumb"
-                   data-src="${item.imageUrl || 'placeholder.jpg'}">
+                   data-src="${item.image_url || 'placeholder.jpg'}">
             `).join('')}
           </div>
           
-          <button class="view-order-details" data-id="${order.id}">Ver detalles</button>
+          <button class="view-order-details" data-id="${order.id}">👁️ Ver detalles</button>
         </div>
       `;
     }).join('');
@@ -117,9 +126,9 @@ const OrdersSystem = {
     }
     
     if (sortBy === 'newest') {
-      orders.sort((a, b) => new Date(b.date) - new Date(a.date));
+      orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (sortBy === 'oldest') {
-      orders.sort((a, b) => new Date(a.date) - new Date(b.date));
+      orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     } else if (sortBy === 'status') {
       const statusOrder = {
         'Pendiente': 1,
@@ -165,9 +174,62 @@ const OrdersSystem = {
         const order = this.orders.find(o => o.id === orderId);
         if (order) {
           order.isNew = false;
-          AdminSystem.viewOrderDetails(orderId);
+          this.viewOrderDetails(order);
         }
       });
+    });
+  },
+  
+  viewOrderDetails: function(order) {
+    const modal = document.getElementById('product-modal');
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📋 Detalles del Pedido #${order.id}</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <div class="order-details-full">
+          <div class="order-info">
+            <div><strong>📅 Fecha:</strong> ${order.date}</div>
+            <div><strong>🔄 Estado:</strong> ${order.status}</div>
+            <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
+          </div>
+          
+          <h3>👤 Datos del Cliente</h3>
+          <div class="customer-info">
+            <div><strong>Nombre:</strong> ${order.data.recipient.fullName || 'No especificado'}</div>
+            <div><strong>🆔 CI:</strong> ${order.data.recipient.ci || 'No especificado'}</div>
+            <div><strong>📱 Teléfono:</strong> ${order.data.recipient.phone || 'No especificado'}</div>
+            <div><strong>📍 Provincia:</strong> ${order.data.recipient.province || 'No especificado'}</div>
+          </div>
+          
+          <h3>💳 Información de Pago</h3>
+          <div class="payment-info">
+            <div><strong>Método:</strong> ${order.data.payment.method}</div>
+            <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId || 'N/A'}</div>
+            ${order.data.payment.transferProof ? `
+              <div><strong>📸 Comprobante:</strong> <a href="${order.data.payment.transferProof}" target="_blank">Ver imagen</a></div>
+            ` : ''}
+          </div>
+          
+          <h3>🛒 Productos</h3>
+          <div class="order-products">
+            ${order.data.items.map(item => `
+              <div class="order-product-item">
+                <div class="product-details">
+                  <div>${item.product_name}</div>
+                  <div>${item.quantity} x $${item.price.toFixed(2)}</div>
+                  <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+      this.openOrdersModal();
     });
   }
 };
