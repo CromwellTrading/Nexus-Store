@@ -487,9 +487,9 @@ const AdminSystem = {
         }
       }
       
-      product.has_color_variant = document.getElementById('has-color-variant').checked;
+      product.hasColorVariant = document.getElementById('has-color-variant').checked;
       
-      if (product.has_color_variant) {
+      if (product.hasColorVariant) {
         product.colors = [];
         document.querySelectorAll('.color-variant').forEach(variant => {
           const color = variant.querySelector('.color-picker').value;
@@ -515,13 +515,13 @@ const AdminSystem = {
         }
       }
       
-      product.required_fields = [];
+      product.requiredFields = [];
       document.querySelectorAll('.required-field').forEach(field => {
         const fieldName = field.querySelector('.field-name').value.trim();
         const isRequired = field.querySelector('.field-required').checked;
         
         if (fieldName) {
-          product.required_fields.push({
+          product.requiredFields.push({
             name: fieldName,
             required: isRequired
           });
@@ -538,7 +538,7 @@ const AdminSystem = {
         },
         body: JSON.stringify({
           type: type,
-          categoryId: categoryId, // Ahora enviamos el ID de categoría
+          categoryId: categoryId,
           product: product
         })
       });
@@ -809,6 +809,7 @@ const AdminSystem = {
     .then(response => {
       if (response.ok) {
         alert('✅ Categoría añadida correctamente!');
+        document.getElementById('new-category-name').value = '';
         
         // Actualizar listas
         this.renderCategoriesList();
@@ -927,7 +928,7 @@ const AdminSystem = {
           orderElement.innerHTML = `
             <div class="order-header">
               <div class="order-id">📋 Pedido #${order.id}</div>
-              <div class="order-date">📅 ${new Date(order.created_at).toLocaleDateString()}</div>
+              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
               <div class="order-status">
                 <select class="status-select" data-id="${order.id}">
                   <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
@@ -938,7 +939,7 @@ const AdminSystem = {
               </div>
             </div>
             <div class="order-details">
-              <div><strong>👤 Cliente:</strong> ${order.user_id}</div>
+              <div><strong>👤 Cliente:</strong> ${order.userId}</div>
               <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
             </div>
             <div class="order-actions">
@@ -991,7 +992,7 @@ const AdminSystem = {
   },
   
   viewOrderDetails: function(orderId) {
-    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}/details`)
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`)
       .then(response => response.json())
       .then(order => {
         if (!order) {
@@ -1007,14 +1008,14 @@ const AdminSystem = {
             </div>
             <div class="order-details-full">
               <div class="order-info">
-                <div><strong>📅 Fecha:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+                <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
                 <div><strong>🔄 Estado:</strong> ${order.status}</div>
                 <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
               </div>
               
               <h3>👤 Datos del Cliente</h3>
               <div class="customer-info">
-                <div><strong>Usuario:</strong> ${order.user_id}</div>
+                <div><strong>Usuario:</strong> ${order.userId}</div>
                 <div><strong>Método de Pago:</strong> ${order.payment.method}</div>
               </div>
               
@@ -1050,7 +1051,7 @@ const AdminSystem = {
       });
   },
   
-  renderCategoryOptions: function(type = 'fisico') {
+  renderCategoryOptions: function(type = this.productType) {
     const categorySelect = document.getElementById('product-category');
     if (!categorySelect) {
       console.error('[Admin] No se encontró el selector de categorías');
@@ -1059,7 +1060,7 @@ const AdminSystem = {
     
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
-    fetch(`${window.API_BASE_URL}/api/admin/categories?type=${type}`)
+    fetch(`${window.API_BASE_URL}/api/categories/${type}`)
       .then(response => response.json())
       .then(categories => {
         categories.forEach(category => {
