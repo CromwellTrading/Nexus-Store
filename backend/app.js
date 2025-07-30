@@ -90,9 +90,23 @@ app.use(express.json());
 
 // Middleware de administrador con logs detallados
 const isAdmin = (req, res, next) => {
-  console.log('\n🔐 MIDDLEWARE ADMIN - Verificando acceso de administrador...');
-  const telegramId = req.headers['telegram-id'];
-  console.log(`   📱 Telegram ID recibido: ${telegramId}`);
+  console.log("\n🔐 MIDDLEWARE ADMIN - Verificando acceso de administrador...");
+  
+  // 1. Intentar obtener de headers
+  let telegramId = req.headers['telegram-id'];
+  console.log(`   📱 Telegram ID de headers: ${telegramId}`);
+  
+  // 2. Si no está en headers, intentar de query params
+  if (!telegramId && req.query.tgid) {
+    telegramId = req.query.tgid;
+    console.log(`   🔍 Telegram ID de query params: ${telegramId}`);
+  }
+  
+  // 3. Si aún no, intentar de body (para solicitudes POST)
+  if (!telegramId && req.body.telegramId) {
+    telegramId = req.body.telegramId;
+    console.log(`   📦 Telegram ID de body: ${telegramId}`);
+  }
   
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
@@ -101,16 +115,25 @@ const isAdmin = (req, res, next) => {
   console.log(`   👑 IDs de administrador: ${adminIds.join(', ')}`);
   
   if (!telegramId) {
-    console.log('   ❌ Acceso denegado: No se recibió Telegram-ID en headers');
-    return res.status(401).json({ error: 'Se requiere Telegram-ID' });
+    console.log('   ❌ Acceso denegado: No se encontró Telegram-ID');
+    return res.status(401).json({ 
+      error: 'Se requiere Telegram-ID',
+      instructions: 'Agregue el parámetro ?tgid=SU_ID en la URL o envíe en headers'
+    });
   }
   
   if (!adminIds.includes(telegramId.toString())) {
-    console.log('   ❌ Acceso denegado: ID no está en lista de administradores');
-    return res.status(403).json({ error: 'Acceso no autorizado. Solo administradores pueden acceder.' });
+    console.log('   ❌ Acceso denegado: ID no autorizado');
+    return res.status(403).json({ 
+      error: 'Acceso no autorizado',
+      yourId: telegramId,
+      adminIds: adminIds
+    });
   }
   
   console.log('   ✅ Acceso de administrador autorizado');
+  // Adjuntar el ID a la solicitud para uso posterior
+  req.telegramId = telegramId;
   next();
 };
 
@@ -267,7 +290,351 @@ app.get('/api/cart/:userId', async (req, res) => {
   }
 });
 
-// ... (las demás rutas de carrito con logs similares)
+app.post('/api/cart/add', async (req, res) => {
+  const { userId, productId, tabType } = req.body;
+  console.log(`🛒 POST /api/cart/add para usuario: ${userId}`);
+  console.log(`   Producto: ${productId}, Tipo de pestaña: ${tabType}`);
+  
+  try {
+    // Obtener carrito existente
+    console.log('   Buscando carrito existente...');
+    let { data: cart, error } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error(`   ❌ Error Supabase: ${error.message}`);
+      throw error;
+    }
+    
+    let items = [];
+    if (cart) {
+      items = cart.items;
+    }
+    
+    // Buscar si el producto ya está en el carrito
+    const existingItemIndex = items.findIndex(item => 
+      item.productId == productId && item.tabType === tabType
+    );
+    
+    if (existingItemIndex !== -1) {
+      console.log('   Producto ya en carrito, incrementando cantidad');
+      items[existingItemIndex].quantity += 1;
+    } else {
+      console.log('   Añadiendo nuevo producto al carrito');
+      items.push({ 
+        productId, 
+        tabType, 
+        quantity: 1,
+        addedAt: new Date().toISOString()
+      });
+    }
+    
+    if (cart) {
+      // Actualizar carrito existente
+      console.log('   Actualizando carrito existente');
+      const { error } = await supabase
+        .from('carts')
+        .update({ items })
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error(`   ❌ Error actualizando carrito: ${error.message}`);
+        throw error;
+      }
+    } else {
+      // Crear nuevo carrito
+      console.log('   Creando nuevo carrito');
+      const { error } = await supabase
+        .from('carts')
+        .insert([{ user_id: userId, items }]);
+      
+      if (error) {
+        console.error(`   ❌ Error creando carrito: ${error.message}`);
+        throw error;
+      }
+    }
+    
+    console.log('   ✅ Carrito actualizado correctamente');
+    res.json({ userId, items });
+  } catch (error) {
+    console.error(`   ❌ Error añadiendo al carrito: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/cart/remove', async (req, res) => {
+  const { userId, productId, tabType } = req.body;
+  console.log(`🛒 POST /api/cart/remove para usuario: ${userId}`);
+  console.log(`   Producto: ${productId}, Tipo de pestaña: ${tabType}`);
+  
+  try {
+    // Obtener carrito
+    console.log('   Buscando carrito...');
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        console.log('   ❌ Carrito no encontrado');
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      console.error(`   ❌ Error Supabase: ${cartError.message}`);
+      throw cartError;
+    }
+    
+    let items = cart.items;
+    const initialLength = items.length;
+    
+    items = items.filter(item => 
+      !(item.productId == productId && item.tabType === tabType)
+    );
+    
+    if (items.length === initialLength) {
+      console.log('   ❌ Producto no encontrado en el carrito');
+      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
+    }
+    
+    // Actualizar carrito
+    console.log('   Actualizando carrito');
+    const { error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error(`   ❌ Error actualizando carrito: ${error.message}`);
+      throw error;
+    }
+    
+    console.log('   ✅ Producto removido correctamente');
+    res.json({ userId, items });
+  } catch (error) {
+    console.error(`   ❌ Error removiendo del carrito: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/cart/update', async (req, res) => {
+  const { userId, productId, tabType, quantity } = req.body;
+  console.log(`🛒 POST /api/cart/update para usuario: ${userId}`);
+  console.log(`   Producto: ${productId}, Tipo de pestaña: ${tabType}, Cantidad: ${quantity}`);
+  
+  if (quantity < 1) {
+    console.log('   ❌ Cantidad inválida');
+    return res.status(400).json({ error: 'Cantidad inválida' });
+  }
+  
+  try {
+    // Obtener carrito
+    console.log('   Buscando carrito...');
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        console.log('   ❌ Carrito no encontrado');
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      console.error(`   ❌ Error Supabase: ${cartError.message}`);
+      throw cartError;
+    }
+    
+    let items = cart.items;
+    const itemIndex = items.findIndex(item => 
+      item.productId == productId && item.tabType === tabType
+    );
+    
+    if (itemIndex === -1) {
+      console.log('   ❌ Producto no encontrado en el carrito');
+      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
+    }
+    
+    items[itemIndex].quantity = quantity;
+    
+    // Actualizar carrito
+    console.log('   Actualizando carrito');
+    const { error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error(`   ❌ Error actualizando carrito: ${error.message}`);
+      throw error;
+    }
+    
+    console.log('   ✅ Cantidad actualizada correctamente');
+    res.json({ userId, items });
+  } catch (error) {
+    console.error(`   ❌ Error actualizando carrito: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/cart/clear/:userId', async (req, res) => {
+  const { userId } = req.params;
+  console.log(`🛒 POST /api/cart/clear/${userId}`);
+  
+  try {
+    console.log('   Eliminando carrito...');
+    const { error, count } = await supabase
+      .from('carts')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error(`   ❌ Error Supabase: ${error.message}`);
+      throw error;
+    }
+    
+    if (count > 0) {
+      console.log('   ✅ Carrito eliminado');
+      res.json({ success: true });
+    } else {
+      console.log('   ❌ Carrito no encontrado');
+      res.status(404).json({ error: 'Carrito no encontrado' });
+    }
+  } catch (error) {
+    console.error(`   ❌ Error vaciando carrito: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// =====================================================================
+// Checkout
+// =====================================================================
+console.log('\n🔧 Configurando ruta de checkout...');
+app.post('/api/checkout', async (req, res) => {
+  const { userId, paymentMethod, transferData, recipientData, requiredFields } = req.body;
+  console.log(`💳 POST /api/checkout para usuario: ${userId}`);
+  console.log(`   Método de pago: ${paymentMethod}`);
+  
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    console.log('   Transacción iniciada');
+    
+    // 1. Obtener carrito
+    console.log('   Obteniendo carrito...');
+    const cartRes = await client.query(
+      'SELECT items FROM carts WHERE user_id = $1 FOR UPDATE',
+      [userId]
+    );
+    
+    if (!cartRes.rows.length || !cartRes.rows[0].items) {
+      console.log('   ❌ Carrito vacío');
+      return res.status(400).json({ error: 'Carrito vacío' });
+    }
+    
+    const items = cartRes.rows[0].items;
+    let total = 0;
+    const orderItems = [];
+    
+    console.log(`   Procesando ${items.length} items del carrito`);
+    
+    // 2. Procesar cada item
+    for (const item of items) {
+      console.log(`     Producto: ${item.productId}, Tipo: ${item.tabType}, Cantidad: ${item.quantity}`);
+      const productRes = await client.query(
+        `SELECT id, name, prices->>$1 AS price, images->0 AS image
+         FROM products WHERE id = $2`,
+        [paymentMethod, item.productId]
+      );
+      
+      if (productRes.rows.length) {
+        const product = productRes.rows[0];
+        const price = parseFloat(product.price) || 0;
+        const itemTotal = price * item.quantity;
+        total += itemTotal;
+        
+        orderItems.push({
+          product_id: product.id,
+          product_name: product.name,
+          quantity: item.quantity,
+          price: price,
+          image_url: product.image,
+          tab_type: item.tabType
+        });
+      }
+    }
+    
+    // 3. Crear orden
+    const orderId = `ORD-${Date.now()}`;
+    console.log(`   Creando orden: ${orderId}, Total: ${total}`);
+    await client.query(
+      `INSERT INTO orders (id, user_id, total, status)
+       VALUES ($1, $2, $3, 'Pendiente')`,
+      [orderId, userId, total]
+    );
+    
+    // 4. Añadir items a la orden
+    console.log(`   Añadiendo ${orderItems.length} items a la orden`);
+    for (const item of orderItems) {
+      await client.query(
+        `INSERT INTO order_items 
+         (order_id, product_id, product_name, quantity, price, image_url, tab_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          orderId,
+          item.product_id,
+          item.product_name,
+          item.quantity,
+          item.price,
+          item.image_url,
+          item.tab_type
+        ]
+      );
+    }
+    
+    // 5. Guardar detalles adicionales
+    console.log('   Guardando detalles de la orden');
+    await client.query(
+      `INSERT INTO order_details 
+       (order_id, payment_method, transfer_data, recipient_data, required_fields)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        orderId,
+        paymentMethod,
+        JSON.stringify(transferData),
+        JSON.stringify(recipientData),
+        JSON.stringify(requiredFields)
+      ]
+    );
+    
+    // 6. Vaciar carrito
+    console.log('   Vaciando carrito');
+    await client.query(
+      'DELETE FROM carts WHERE user_id = $1',
+      [userId]
+    );
+    
+    await client.query('COMMIT');
+    console.log('   Transacción completada');
+    
+    res.json({ 
+      success: true, 
+      orderId,
+      total,
+      message: 'Compra realizada con éxito' 
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('   ❌ Error en checkout:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  } finally {
+    client.release();
+  }
+});
 
 // =====================================================================
 // Rutas de administración
@@ -297,11 +664,11 @@ app.get('/api/admin/categories', isAdmin, async (req, res) => {
   }
 });
 
-// Crear nueva categoría (con máxima depuración)
+// Crear nueva categoría
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
   console.log('\n📁 POST /api/admin/categories');
-  console.log('   Headers:', JSON.stringify(req.headers, null, 2));
-  console.log('   Body:', JSON.stringify(req.body, null, 2));
+  console.log('   Telegram ID:', req.telegramId);
+  console.log('   Body:', req.body);
   
   const { type, name } = req.body;
   
@@ -311,23 +678,35 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
   }
   
   try {
-    console.log(`   Creando categoría: ${name} (${type})`);
+    console.log(`   Verificando si la categoría ya existe: ${name} (${type})`);
+    // Verificar primero si ya existe
+    const { data: existingCategory, error: existError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('type', type)
+      .eq('name', name);
     
+    if (existError) {
+      console.error(`   ❌ Error Supabase: ${existError.message}`);
+      throw existError;
+    }
+    
+    if (existingCategory.length > 0) {
+      console.log('   ❌ La categoría ya existe');
+      return res.status(400).json({ 
+        error: 'La categoría ya existe',
+        existingId: existingCategory[0].id
+      });
+    }
+    
+    console.log(`   Creando categoría: ${name} (${type})`);
+    // Crear si no existe
     const { data, error } = await supabase
       .from('categories')
       .insert([{ type, name }]);
     
     if (error) {
-      console.error('   ❌ Error en Supabase:', error);
-      console.error('   Código de error:', error.code);
-      console.error('   Detalles:', error.details);
-      console.error('   Mensaje:', error.message);
-      
-      if (error.code === '23505') {
-        console.error('   ❌ Violación de unicidad: La categoría ya existe');
-        return res.status(400).json({ error: 'La categoría ya existe' });
-      }
-      
+      console.error(`   ❌ Error Supabase: ${error.message}`);
       throw error;
     }
     
@@ -346,6 +725,7 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
 app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
   console.log(`\n🗑️ DELETE /api/admin/categories/${id}`);
+  console.log('   Telegram ID:', req.telegramId);
   
   try {
     console.log(`   Eliminando categoría ID: ${id}`);
@@ -375,6 +755,7 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
 // Crear nuevo producto
 app.post('/api/admin/products', isAdmin, async (req, res) => {
   console.log('\n📦 POST /api/admin/products');
+  console.log('   Telegram ID:', req.telegramId);
   console.log('   Body:', JSON.stringify(req.body, null, 2));
   
   const { type, categoryId, product } = req.body;
@@ -415,7 +796,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       }]);
     
     if (error) {
-      console.error('   ❌ Error Supabase:', error);
+      console.error(`   ❌ Error Supabase: ${error.message}`);
       throw error;
     }
     
@@ -455,7 +836,85 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
-// ... (resto de rutas de administración con logs similares)
+// Obtener pedidos de usuario
+app.get('/api/orders/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  console.log(`\n📋 GET /api/orders/user/${userId}`);
+  
+  try {
+    console.log(`   Obteniendo pedidos para usuario: ${userId}`);
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details!inner(payment_method, transfer_data, recipient_data, required_fields),
+        order_items!inner(product_name, quantity, price, image_url, tab_type)
+      `)
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error(`   ❌ Error Supabase: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`   ✅ Encontrados ${orders.length} pedidos`);
+    
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details.payment_method,
+        ...order.order_details.transfer_data
+      },
+      recipient: order.order_details.recipient_data,
+      requiredFields: order.order_details.required_fields,
+      items: order.order_items
+    }));
+    
+    res.json(parsedOrders);
+  } catch (error) {
+    console.error(`   ❌ Error obteniendo pedidos: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Actualizar estado de pedido
+app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+  console.log(`\n📋 PUT /api/admin/orders/${orderId}`);
+  console.log('   Telegram ID:', req.telegramId);
+  console.log('   Nuevo estado:', status);
+  
+  try {
+    const { error } = await supabase
+      .from('orders')
+      .update({ 
+        status, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', orderId);
+    
+    if (error) {
+      console.error(`   ❌ Error Supabase: ${error.message}`);
+      throw error;
+    }
+    
+    console.log('   ✅ Estado de pedido actualizado');
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`   ❌ Error actualizando orden: ${error.message}`);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
 
 // =====================================================================
 // Bot de Telegram
