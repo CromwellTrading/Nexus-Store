@@ -8,12 +8,12 @@
     "start": "node app.js"
   },
   "dependencies": {
-    "better-sqlite3": "^9.5.0",  
+    "@supabase/supabase-js": "^2.42.0",  // Cliente de Supabase
+    "pg": "^8.11.3",                     // Cliente PostgreSQL para Supabase
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.65.0",
-    "node-fetch": "^3.3.2"
+    "node-telegram-bot-api": "^0.65.0"
   },
   "engines": {
     "node": ">=18.0.0"
