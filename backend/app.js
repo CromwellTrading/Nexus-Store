@@ -525,6 +525,22 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   }
 });
 
+// CORRECCIÓN: Manejo de categorías
+app.get('/api/admin/categories', isAdmin, async (req, res) => {
+  try {
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*');
+    
+    if (error) throw error;
+    
+    res.json(categories);
+  } catch (error) {
+    console.error('Error obteniendo categorías:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 app.post('/api/admin/products', isAdmin, async (req, res) => {
   const { type, categoryId, product } = req.body;
   
@@ -591,15 +607,16 @@ app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
   }
 });
 
+// CORRECCIÓN: Manejo de categorías
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
   const { type, name } = req.body;
   
   if (!type || !name) {
-    return res.status(400).json({ error: 'Faltan datos' });
+    return res.status(400).json({ error: 'Faltan datos requeridos' });
   }
   
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('categories')
       .insert([{ type, name }]);
     
@@ -610,7 +627,7 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
       throw error;
     }
     
-    res.json({ success: true });
+    res.status(201).json(data[0]);
   } catch (error) {
     console.error('Error creando categoría:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -645,12 +662,12 @@ app.get('/api/categories/:type', async (req, res) => {
   try {
     const { data: categories, error } = await supabase
       .from('categories')
-      .select('name')
+      .select('id, name')
       .eq('type', type);
     
     if (error) throw error;
     
-    res.json(categories.map(c => c.name));
+    res.json(categories);
   } catch (error) {
     console.error('Error obteniendo categorías:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
