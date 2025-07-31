@@ -246,27 +246,11 @@ const CheckoutSystem = {
       
       const transferData = {};
       
-      // Subir la imagen de comprobante a Imagebin
+      // Subir la imagen de comprobante a ImgBB usando ImageUploader
       try {
-        const formData = new FormData();
-        formData.append('key', 'oQJs9Glzy1gzHGvYSc1M0N8AzPQ7oKRe');
-        formData.append('file', proofFile);
-        
-        const response = await fetch('https://imagebin.ca/upload.php', {
-          method: 'POST',
-          body: formData
-        });
-
-        const text = await response.text();
-        const lines = text.split('\n');
-        const urlLine = lines.find(line => line.startsWith('url:'));
-        if (urlLine) {
-          const url = urlLine.split('url:')[1].trim();
-          transferData.transferProof = url;
-          transferData.transferId = proofFile.name;
-        } else {
-          throw new Error('No se encontró la URL en la respuesta de Imagebin');
-        }
+        const imageUrl = await ImageUploader.uploadImage(proofFile);
+        transferData.transferProof = imageUrl;
+        transferData.transferId = `TRF-${Date.now()}`;
       } catch (error) {
         console.error('Error subiendo comprobante:', error);
         alert('Error al subir el comprobante: ' + error.message);
