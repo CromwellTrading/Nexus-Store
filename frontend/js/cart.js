@@ -105,7 +105,7 @@ const CartSystem = {
     
     const modal = document.getElementById('product-modal');
     let cartContent = '<p>Tu carrito está vacío</p>';
-    let total = 0;
+    let totalByCurrency = {};
     
     if (this.cart.items && this.cart.items.length > 0) {
       cartContent = await Promise.all(this.cart.items.map(async item => {
@@ -116,7 +116,13 @@ const CartSystem = {
         const prices = product.prices;
         const price = prices?.CUP || Object.values(prices)[0] || 0;
         const itemTotal = price * item.quantity;
-        total += itemTotal;
+        
+        // Acumular totales por moneda
+        Object.entries(prices || {}).forEach(([currency, priceVal]) => {
+          if (priceVal) {
+            totalByCurrency[currency] = (totalByCurrency[currency] || 0) + (priceVal * item.quantity);
+          }
+        });
         
         // Imagen: ahora es un array, tomamos la primera
         let imageUrl = 'placeholder.jpg';
@@ -146,6 +152,16 @@ const CartSystem = {
       })).then(items => items.join(''));
     }
     
+    // Crear HTML de totales por moneda
+    let totalDisplay = '';
+    if (Object.keys(totalByCurrency).length > 0) {
+      totalDisplay = Object.entries(totalByCurrency)
+        .map(([currency, amount]) => 
+          `<div>💰 Total ${currency}: ${amount.toFixed(2)}</div>`
+        )
+        .join('');
+    }
+    
     modal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
@@ -156,7 +172,7 @@ const CartSystem = {
           ${cartContent}
         </div>
         <div style="font-weight: bold; text-align: right; margin-bottom: 20px; font-size: 1.2rem;">
-          💰 Total: $${total.toFixed(2)} CUP
+          ${totalDisplay}
         </div>
         <button id="checkout-button" class="checkout-btn" ${this.cart.items.length === 0 ? 'disabled' : ''}>
           ✅ Finalizar Compra
@@ -202,7 +218,7 @@ const CartSystem = {
       
       const checkoutButton = modal.querySelector('#checkout-button');
       checkoutButton.addEventListener('click', () => {
-        CheckoutSystem.openCheckout(this.cart, total);
+        CheckoutSystem.openCheckout(this.cart, totalByCurrency);
       });
     }
   },
