@@ -129,7 +129,7 @@ const CheckoutSystem = {
             <h3>✅ Confirmar Pedido</h3>
             
             <div class="order-summary">
-              <h4>📦 Resumen del Pedido</极速赛车开奖直播官网h4>
+              <h4>📦 Resumen del Pedido</h4>
               <div id="order-items-list"></div>
               <div class="order-total" id="order-total-display">
                 <!-- Total se actualizará dinámicamente -->
@@ -202,7 +202,7 @@ const CheckoutSystem = {
     document.getElementById('next-to-confirm')?.addEventListener('click', () => {
       this.goToStep(3);
     });
-    document.getElementById('back-to-payment')?.addEventListener('click', () => this.goTo极速赛车开奖直播官网Step(2));
+    document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
     
     document.getElementById('cancel-checkout')?.addEventListener('click', () => {
       document.getElementById('product-modal').style.display = 'none';
