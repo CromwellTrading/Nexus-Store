@@ -17,12 +17,12 @@ const SearchFilter = {
         
         categories.forEach(cat => {
           const option = document.createElement('option');
-          option.value = cat;
-          option.textContent = ProductView.getCategoryName(cat);
+          option.value = cat.id;
+          option.textContent = cat.name; // Usar propiedad 'name'
           categoryFilter.appendChild(option);
         });
         
-        if (selectedCategory && categories.includes(selectedCategory)) {
+        if (selectedCategory && categories.some(cat => cat.id === selectedCategory)) {
           categoryFilter.value = selectedCategory;
         }
       })
