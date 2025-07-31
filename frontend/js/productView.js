@@ -74,7 +74,7 @@ const ProductView = {
       
       const categorySection = document.createElement('div');
       categorySection.className = 'category-section';
-      categorySection.innerHTML = `<h2 class="category-title">${this.getCategoryName(category)}</h2>`;
+      categorySection.innerHTML = `<h2 class="category-title">${category}</h2>`; // Usamos el nombre de la categoría directamente
       
       productsInCategory.forEach(product => {
         const productItem = document.createElement('div');
@@ -127,7 +127,7 @@ const ProductView = {
       
       const categoryColumn = document.createElement('div');
       categoryColumn.className = 'category-column';
-      categoryColumn.innerHTML = `<h2 class="category-title">${this.getCategoryName(category)}</h2>`;
+      categoryColumn.innerHTML = `<h2 class="category-title">${category}</h2>`; // Nombre de categoría directo
       
       productsInCategory.forEach(product => {
         const productItem = document.createElement('div');
@@ -222,10 +222,11 @@ const ProductView = {
   setupProductEvents: function(tabType) {
     document.querySelectorAll('.product-item, .grid-product').forEach(item => {
       item.addEventListener('click', function(e) {
-        if (e.target.classList.contains('add-to-cart')) {
-          e.stopPropagation();
+        // Evitar abrir modal si se hizo clic en un botón dentro del item
+        if (e.target.closest('.add-to-cart')) {
           return;
         }
+        
         const productId = this.dataset.id;
         ProductModal.openModal(productId, tabType);
       });
@@ -241,13 +242,7 @@ const ProductView = {
   },
   
   getCategoryName: function(categoryKey) {
-    const names = {
-      electronics: 'Electrónicos',
-      clothing: 'Ropa',
-      software: 'Software',
-      ebooks: 'Libros Digitales'
-    };
-    return names[categoryKey] || categoryKey;
+    return categoryKey; // Usamos directamente el nombre de la categoría
   },
   
   getProductById: async function(id, tabType) {
