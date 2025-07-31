@@ -53,19 +53,21 @@ const ProductModal = {
         thumbnailsContainer.innerHTML = '';
         
         if (product.images && product.images.length > 0) {
-          product.images.forEach((img, index) => {
-            if (index === 0) {
-              mainImage.innerHTML = `<img src="${img}" alt="${product.name}" class="main-image">`;
-            }
-            
-            const thumb = document.createElement('div');
-            thumb.className = 'thumbnail';
-            thumb.innerHTML = `<img src="${img}" alt="Thumbnail ${index + 1}">`;
-            thumb.addEventListener('click', () => {
-              mainImage.innerHTML = `<img src="${img}" alt="${product.name}" class="main-image">`;
+          // Mostrar la primera imagen como principal
+          mainImage.innerHTML = `<img src="${product.images[0]}" alt="${product.name}" class="main-image">`;
+          
+          // Mostrar miniaturas para el resto de imágenes
+          if (product.images.length > 1) {
+            product.images.forEach((img, index) => {
+              const thumb = document.createElement('div');
+              thumb.className = 'thumbnail';
+              thumb.innerHTML = `<img src="${img}" alt="Thumbnail ${index + 1}">`;
+              thumb.addEventListener('click', () => {
+                mainImage.innerHTML = `<img src="${img}" alt="${product.name}" class="main-image">`;
+              });
+              thumbnailsContainer.appendChild(thumb);
             });
-            thumbnailsContainer.appendChild(thumb);
-          });
+          }
         } else if (product.image) {
           mainImage.innerHTML = `<img src="${product.image}" alt="${product.name}" class="main-image">`;
         } else {
