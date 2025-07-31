@@ -121,7 +121,8 @@ const CartSystem = {
         // Imagen: ahora es un array, tomamos la primera
         let imageUrl = 'placeholder.jpg';
         if (product.images && product.images.length > 0) {
-          imageUrl = product.images[0];
+          // Asegurarse de que es un array y tomar la primera URL
+          imageUrl = Array.isArray(product.images) ? product.images[0] : product.images;
         }
         
         return `
