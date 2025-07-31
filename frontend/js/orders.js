@@ -197,10 +197,10 @@ const OrdersSystem = {
           
           <h3>👤 Datos del Cliente</h3>
           <div class="customer-info">
-            <div><strong>Nombre:</strong> ${order.data.recipient.fullName || 'No especificado'}</div>
-            <div><strong>🆔 CI:</strong> ${order.data.recipient.ci || 'No especificado'}</div>
-            <div><strong>📱 Teléfono:</strong> ${order.data.recipient.phone || 'No especificado'}</div>
-            <div><strong>📍 Provincia:</strong> ${order.data.recipient.province || 'No especificado'}</div>
+            <div><strong>Nombre:</strong> ${order.data.recipient?.fullName || 'No especificado'}</div>
+            <div><strong>🆔 CI:</strong> ${order.data.recipient?.ci || 'No especificado'}</div>
+            <div><strong>📱 Teléfono:</strong> ${order.data.recipient?.phone || 'No especificado'}</div>
+            <div><strong>📍 Provincia:</strong> ${order.data.recipient?.province || 'No especificado'}</div>
           </div>
           
           <h3>💳 Información de Pago</h3>
