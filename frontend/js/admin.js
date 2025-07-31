@@ -430,11 +430,26 @@ const AdminSystem = {
       return;
     }
     
-    // Mostrar un mensaje de carga
-    ImageUploader.showLoading(previewId, 'Preparando para subir...');
-    
-    // Subir cada imagen y luego previsualizar
     const files = Array.from(input.files);
+    
+    // Previsualización local inmediata
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.maxWidth = '100px';
+        img.style.maxHeight = '100px';
+        img.style.objectFit = 'contain';
+        img.style.margin = '5px';
+        img.style.border = '1px solid #ddd';
+        img.style.borderRadius = '4px';
+        preview.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    // Subir cada imagen en segundo plano
     files.forEach((file, index) => {
       this.uploadAndPreviewImage(file, previewId, index, files.length);
     });
@@ -442,16 +457,19 @@ const AdminSystem = {
   
   uploadAndPreviewImage: async function(file, previewId, index, total) {
     try {
-      // Mostrar estado de carga para esta imagen
-      ImageUploader.showLoading(previewId, `Subiendo imagen ${index + 1}/${total}...`);
-      
       // Subir la imagen
-      const imageUrl = await ImageUploader.uploadImageToImageBin(file);
+      const imageUrl = await ImageUploader.uploadImage(file);
       
-      // Previsualizar la imagen subida
-      ImageUploader.previewUploadedImage(imageUrl, previewId);
+      // Previsualizar la imagen subida (si es la única o la primera)
+      // Nota: Ya se mostró una previsualización local, así que solo actualizamos si es necesario
+      console.log(`Imagen ${index+1}/${total} subida: ${imageUrl}`);
     } catch (error) {
-      ImageUploader.showError(previewId, `Error subiendo imagen: ${error.message}`);
+      console.error(`Error subiendo imagen ${index+1}:`, error);
+      // Mostrar error en la previsualización
+      const errorElement = document.createElement('div');
+      errorElement.className = 'image-upload-error';
+      errorElement.textContent = `❌ Error: ${error.message}`;
+      document.getElementById(previewId).appendChild(errorElement);
     }
   },
   
@@ -490,17 +508,11 @@ const AdminSystem = {
         product.images = [];
         for (let i = 0; i < imageFiles.length; i++) {
           try {
-            // Mostrar carga
-            ImageUploader.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}...`);
-            
-            const imageUrl = await ImageUploader.uploadImageToImageBin(imageFiles[i]);
+            const imageUrl = await ImageUploader.uploadImage(imageFiles[i]);
             product.images.push(imageUrl);
-            
-            // Previsualizar la imagen subida
-            ImageUploader.previewUploadedImage(imageUrl, 'image-preview');
           } catch (error) {
-            ImageUploader.showError('image-preview', `Error subiendo imagen ${i+1}: ${error.message}`);
             console.error('Error en subida de imagen:', error);
+            alert(`Error subiendo imagen ${i+1}: ${error.message}`);
             return;
           }
         }
@@ -521,15 +533,11 @@ const AdminSystem = {
       const imageFile = document.getElementById('digital-image').files[0];
       if (imageFile) {
         try {
-          ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
-          
-          const imageUrl = await ImageUploader.uploadImageToImageBin(imageFile);
+          const imageUrl = await ImageUploader.uploadImage(imageFile);
           product.images = [imageUrl]; // Ahora es un array
-          
-          ImageUploader.previewUploadedImage(imageUrl, 'digital-image-preview');
         } catch (error) {
-          ImageUploader.showError('digital-image-preview', `Error subiendo imagen: ${error.message}`);
           console.error('Error en subida de imagen digital:', error);
+          alert('Error subiendo imagen: ' + error.message);
           return;
         }
       }
@@ -983,7 +991,16 @@ const AdminSystem = {
         'Telegram-ID': this.telegramUserId.toString()
       }
     })
-    .then(response => response.json())
+    .then(response => {
+      // Verificar si la respuesta es JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return response.text().then(text => {
+          throw new Error(`Respuesta no JSON: ${text.substring(0, 100)}...`);
+        });
+      }
+      return response.json();
+    })
     .then(orders => {
       let filteredOrders = orders;
       
@@ -1050,10 +1067,12 @@ const AdminSystem = {
       });
     })
     .catch(error => {
+      console.error('Error cargando pedidos:', error);
       ordersList.innerHTML = `
         <div class="error">
           <p>Error cargando pedidos</p>
           <p><small>${error.message}</small></p>
+          <button onclick="AdminSystem.loadOrders()">Reintentar</button>
         </div>
       `;
     });
