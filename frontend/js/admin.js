@@ -588,47 +588,54 @@ const AdminSystem = {
       return;
     }
     
-    container.innerHTML = '<h4>📦 Productos Existentes</h4>';
+    container.innerHTML = '<div class="loading">Cargando productos...</div>';
     
-    fetch(`${window.API_BASE_URL}/api/admin/products`)
-      .then(response => response.json())
+    fetch(`${window.API_BASE_URL}/api/admin/products`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
       .then(products => {
         if (!products || products.length === 0) {
-          container.innerHTML += '<p>No hay productos disponibles</p>';
+          container.innerHTML = '<p>No hay productos disponibles</p>';
           return;
         }
         
-        products.forEach(product => {
-          const productEl = document.createElement('div');
-          productEl.className = 'admin-product-item';
-          
-          // Mostrar la primera imagen del producto
-          let imageHtml = '';
-          if (product.images && product.images.length > 0) {
-            imageHtml = `<img src="${product.images[0]}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px;">`;
-          }
-          
-          // Parsear precios
-          const prices = product.prices || {};
-          
-          productEl.innerHTML = `
-            <div class="product-info">
-              <div style="display: flex; align-items: center;">
-                ${imageHtml}
-                <div>
-                  <strong>${product.name}</strong> (${product.categories?.name || 'Sin categoría'})
-                  <div>${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                  <div>${Object.entries(prices).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
+        container.innerHTML = `
+          <h4>📦 Productos Existentes</h4>
+          <div class="admin-items-list">
+            ${products.map(product => `
+              <div class="admin-product-item">
+                <div class="product-info">
+                  <div class="product-image-preview">
+                    ${product.images && product.images.length > 0 ? 
+                      `<img src="${product.images[0]}" alt="${product.name}" style="width: 60px; height: 60px; object-fit: cover;">` : 
+                      `<div class="no-image">🖼️</div>`
+                    }
+                  </div>
+                  <div class="product-details">
+                    <strong>${product.name}</strong>
+                    <div>Tipo: ${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                    <div>Categoría: ${product.category || 'Sin categoría'}</div>
+                    <div>${Object.entries(product.prices || {}).map(([currency, price]) => 
+                      `${currency}: ${price}`
+                    ).join(', ')}</div>
+                  </div>
+                </div>
+                <div class="product-actions">
+                  <button class="edit-product" data-id="${product.id}">✏️ Editar</button>
+                  <button class="delete-product" data-id="${product.id}">🗑️ Eliminar</button>
                 </div>
               </div>
-            </div>
-            <div class="product-actions">
-              <button class="edit-product" data-id="${product.id}">✏️ Editar</button>
-              <button class="delete-product" data-id="${product.id}">🗑️ Eliminar</button>
-            </div>
-          `;
-          container.appendChild(productEl);
-        });
+            `).join('')}
+          </div>
+        `;
         
         container.querySelectorAll('.edit-product').forEach(btn => {
           btn.addEventListener('click', (e) => {
@@ -649,12 +656,21 @@ const AdminSystem = {
       })
       .catch(error => {
         console.error('Error cargando productos:', error);
-        container.innerHTML = '<p>Error cargando productos</p>';
+        container.innerHTML = `
+          <div class="error">
+            <p>Error cargando productos</p>
+            <p><small>${error.message}</small></p>
+          </div>
+        `;
       });
   },
   
   editProduct: function(id) {
-    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`)
+    fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
       .then(response => response.json())
       .then(product => {
         if (!product) {
@@ -807,22 +823,19 @@ const AdminSystem = {
   
   addCategory: function() {
     const type = this.categoryType;
-    const name = document.getElementById('new-category-name').value.trim();
+    const nameInput = document.getElementById('new-category-name');
+    const name = nameInput.value.trim();
     
     if (!name) {
       alert('Por favor ingrese un nombre para la categoría');
       return;
     }
     
-    // Verificar primero si la categoría ya existe en la lista actual
-    const existingCategories = Array.from(
-      document.querySelectorAll('#categories-list .category-info')
-    ).map(el => el.textContent.trim());
-    
-    if (existingCategories.includes(name)) {
-      alert(`❌ La categoría "${name}" ya existe para productos ${type}`);
-      return;
-    }
+    // Botón de carga
+    const btn = document.getElementById('add-category-btn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<div class="spinner"></div> Creando...';
+    btn.disabled = true;
     
     fetch(`${window.API_BASE_URL}/api/admin/categories`, {
       method: 'POST',
@@ -843,18 +856,24 @@ const AdminSystem = {
           throw new Error(data.error);
         });
       } else {
-        throw new Error('Error en el servidor');
+        throw new Error(`Error ${response.status}`);
       }
     })
     .then(data => {
       alert(`✅ Categoría "${name}" creada correctamente!`);
-      document.getElementById('new-category-name').value = '';
+      nameInput.value = '';
+      
+      // Actualizar las listas
       this.renderCategoriesList();
       this.renderCategoryOptions();
     })
     .catch(error => {
       console.error('Error añadiendo categoría:', error);
       alert(`❌ Error: ${error.message}`);
+    })
+    .finally(() => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
     });
   },
   
@@ -866,63 +885,88 @@ const AdminSystem = {
       return;
     }
     
-    container.innerHTML = `<h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>`;
+    // Mostrar indicador de carga
+    container.innerHTML = '<div class="loading">Cargando categorías...</div>';
     
-    fetch(`${window.API_BASE_URL}/api/admin/categories`)
-      .then(response => response.json())
-      .then(categories => {
-        // Filtrar por tipo
-        const filtered = categories.filter(cat => cat.type === type);
-        
-        if (!filtered || filtered.length === 0) {
-          container.innerHTML += '<p>No hay categorías definidas</p>';
-          return;
-        }
-        
-        filtered.forEach(category => {
-          const categoryEl = document.createElement('div');
-          categoryEl.className = 'admin-category-item';
-          categoryEl.innerHTML = `
-            <div class="category-info">
-              ${category.name}
+    fetch(`${window.API_BASE_URL}/api/admin/categories`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(categories => {
+      // Filtrar por tipo
+      const filtered = categories.filter(cat => cat.type === type);
+      
+      if (!filtered || filtered.length === 0) {
+        container.innerHTML = '<p>No hay categorías definidas</p>';
+        return;
+      }
+      
+      container.innerHTML = `
+        <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
+        <div class="admin-items-list">
+          ${filtered.map(category => `
+            <div class="admin-category-item">
+              <div class="category-info">
+                <strong>${category.name}</strong>
+                <small>Tipo: ${category.type}</small>
+              </div>
+              <div class="category-actions">
+                <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
+              </div>
             </div>
-            <div class="category-actions">
-              <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
-            </div>
-          `;
-          container.appendChild(categoryEl);
+          `).join('')}
+        </div>
+      `;
+      
+      // Agregar event listeners para eliminar
+      container.querySelectorAll('.delete-category').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = e.target.getAttribute('data-id');
+          this.deleteCategory(id);
         });
-        
-        container.querySelectorAll('.delete-category').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const id = e.target.getAttribute('data-id');
-            
-            if (confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-              fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
-                method: 'DELETE',
-                headers: {
-                  'Telegram-ID': this.telegramUserId.toString()
-                }
-              })
-              .then(response => {
-                if (response.ok) {
-                  this.renderCategoriesList();
-                  this.renderProductsList();
-                  alert('✅ Categoría eliminada correctamente');
-                } else {
-                  throw new Error('Error al eliminar categoría');
-                }
-              })
-              .catch(error => {
-                alert('Error al eliminar categoría: ' + error.message);
-              });
-            }
-          });
-        });
-      })
-      .catch(error => {
-        container.innerHTML = '<p>Error cargando categorías</p>';
       });
+    })
+    .catch(error => {
+      console.error('Error cargando categorías:', error);
+      container.innerHTML = `
+        <div class="error">
+          <p>Error cargando categorías</p>
+          <p><small>${error.message}</small></p>
+        </div>
+      `;
+    });
+  },
+  
+  deleteCategory: function(id) {
+    if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
+      return;
+    }
+    
+    fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
+    .then(response => {
+      if (response.ok) {
+        this.renderCategoriesList();
+        this.renderProductsList(); // Actualizar lista de productos también
+        alert('✅ Categoría eliminada correctamente');
+      } else {
+        throw new Error('Error al eliminar categoría');
+      }
+    })
+    .catch(error => {
+      alert('Error al eliminar categoría: ' + error.message);
+    });
   },
   
   loadOrders: function(filter = 'all') {
@@ -932,76 +976,87 @@ const AdminSystem = {
       return;
     }
     
-    ordersList.innerHTML = '';
+    ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
     
-    fetch(`${window.API_BASE_URL}/api/admin/orders`)
-      .then(response => response.json())
-      .then(orders => {
-        let filteredOrders = orders;
-        
-        if (filter !== 'all') {
-          filteredOrders = orders.filter(order => order.status === filter);
-        }
-        
-        const statusOrder = {
-          'Pendiente': 1,
-          'En proceso': 2,
-          'Enviado': 3,
-          'Completado': 4
-        };
-        
-        filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-        
-        if (filteredOrders.length === 0) {
-          ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-          return;
-        }
-        
-        filteredOrders.forEach(order => {
-          const orderElement = document.createElement('div');
-          orderElement.className = 'admin-order';
-          orderElement.innerHTML = `
-            <div class="order-header">
-              <div class="order-id">📋 Pedido #${order.id}</div>
-              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
-              <div class="order-status">
-                <select class="status-select" data-id="${order.id}">
-                  <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                  <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                  <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-                  <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-                </select>
-              </div>
+    fetch(`${window.API_BASE_URL}/api/admin/orders`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
+    .then(response => response.json())
+    .then(orders => {
+      let filteredOrders = orders;
+      
+      if (filter !== 'all') {
+        filteredOrders = orders.filter(order => order.status === filter);
+      }
+      
+      const statusOrder = {
+        'Pendiente': 1,
+        'En proceso': 2,
+        'Enviado': 3,
+        'Completado': 4
+      };
+      
+      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      
+      if (filteredOrders.length === 0) {
+        ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+        return;
+      }
+      
+      ordersList.innerHTML = '';
+      
+      filteredOrders.forEach(order => {
+        const orderElement = document.createElement('div');
+        orderElement.className = 'admin-order';
+        orderElement.innerHTML = `
+          <div class="order-header">
+            <div class="order-id">📋 Pedido #${order.id}</div>
+            <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+            <div class="order-status">
+              <select class="status-select" data-id="${order.id}">
+                <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+              </select>
             </div>
-            <div class="order-details">
-              <div><strong>👤 Cliente:</strong> ${order.userId}</div>
-              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-            </div>
-            <div class="order-actions">
-              <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
-            </div>
-          `;
-          ordersList.appendChild(orderElement);
-        });
-        
-        document.querySelectorAll('.btn-view').forEach(button => {
-          button.addEventListener('click', (e) => {
-            const orderId = e.target.getAttribute('data-id');
-            this.viewOrderDetails(orderId);
-          });
-        });
-        
-        document.querySelectorAll('.status-select').forEach(select => {
-          select.addEventListener('change', (e) => {
-            const orderId = e.target.getAttribute('data-id');
-            const newStatus = e.target.value;
-            this.updateOrderStatus(orderId, newStatus);
-          });
-        });
-      })
-      .catch(error => {
-        ordersList.innerHTML = '<p>Error cargando pedidos</p>';
+          </div>
+          <div class="order-details">
+            <div><strong>👤 Cliente:</strong> ${order.userId}</div>
+            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+          </div>
+          <div class="order-actions">
+            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+          </div>
+        `;
+        ordersList.appendChild(orderElement);
       });
+      
+      document.querySelectorAll('.btn-view').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const orderId = e.target.getAttribute('data-id');
+          this.viewOrderDetails(orderId);
+        });
+      });
+      
+      document.querySelectorAll('.status-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const orderId = e.target.getAttribute('data-id');
+          const newStatus = e.target.value;
+          this.updateOrderStatus(orderId, newStatus);
+        });
+      });
+    })
+    .catch(error => {
+      ordersList.innerHTML = `
+        <div class="error">
+          <p>Error cargando pedidos</p>
+          <p><small>${error.message}</small></p>
+        </div>
+      `;
+    });
   },
   
   updateOrderStatus: function(orderId, newStatus) {
@@ -1027,7 +1082,11 @@ const AdminSystem = {
   },
   
   viewOrderDetails: function(orderId) {
-    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`)
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
       .then(response => response.json())
       .then(order => {
         if (!order) {
@@ -1095,7 +1154,11 @@ const AdminSystem = {
     
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
-    fetch(`${window.API_BASE_URL}/api/categories/${type}`)
+    fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
+      headers: {
+        'Telegram-ID': this.telegramUserId.toString()
+      }
+    })
       .then(response => response.json())
       .then(categories => {
         categories.forEach(category => {
