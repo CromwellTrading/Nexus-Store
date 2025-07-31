@@ -1,7 +1,9 @@
 const CheckoutSystem = {
   init: function() {},
+  selectedMethodPrices: {}, // Almacenará los precios por método de pago
     
-  openCheckout: function(cart, total) {
+  openCheckout: function(cart, totalByCurrency) {
+    this.selectedMethodPrices = totalByCurrency;
     const userData = UserProfile.getUserData();
     const modal = document.getElementById('product-modal');
     
@@ -44,22 +46,16 @@ const CheckoutSystem = {
               <label>Provincia:</label>
               <select id="checkout-province" required class="modern-select">
                 <option value="">Seleccionar provincia</option>
-                <option value="Pinar del Río" ${userData.province === 'Pinar del Río' ? 'selected' : ''}>Pinar del Río</option>
-                <option value="Artemisa" ${userData.province === 'Artemisa' ? 'selected' : ''}>Artemisa</option>
-                <option value="La Habana" ${userData.province === 'La Habana' ? 'selected' : ''}>La Habana</option>
-                <option value="Mayabeque" ${userData.province === 'Mayabeque' ? 'selected' : ''}>Mayabeque</option>
-                <option value="Matanzas" ${userData.province === 'Matanzas' ? 'selected' : ''}>Matanzas</option>
-                <option value="Cienfuegos" ${userData.province === 'Cienfuegos' ? 'selected' : ''}>Cienfuegos</option>
-                <option value="Villa Clara" ${userData.province === 'Villa Clara' ? 'selected' : ''}>Villa Clara</option>
-                <option value="Sancti Spíritus" ${userData.province === 'Sancti Spíritus' ? 'selected' : ''}>Sancti Spíritus</option>
-                <option value="Ciego de Ávila" ${userData.province === 'Ciego de Ávila' ? 'selected' : ''}>Ciego de Ávila</option>
-                <option value="Camagüey" ${userData.province === 'Camagüey' ? 'selected' : ''}>Camagüey</option>
-                <option value="Las Tunas" ${userData.province === 'Las Tunas' ? 'selected' : ''}>Las Tunas</option>
-                <option value="Granma" ${userData.province === 'Granma' ? 'selected' : ''}>Granma</option>
-                <option value="Holguín" ${userData.province === 'Holguín' ? 'selected' : ''}>Holguín</option>
-                <option value="Santiago de Cuba" ${userData.province === 'Santiago de Cuba' ? 'selected' : ''}>Santiago de Cuba</option>
-                <option value="Guantánamo" ${userData.province === 'Guantánamo' ? 'selected' : ''}>Guantánamo</option>
-                <option value="Isla de la Juventud" ${userData.province === 'Isla de la Juventud' ? 'selected' : ''}>Isla de la Juventud</option>
+                ${[
+                  'Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas',
+                  'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila',
+                  'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba',
+                  'Guantánamo', 'Isla de la Juventud'
+                ].map(prov => `
+                  <option value="${prov}" ${userData.province === prov ? 'selected' : ''}>
+                    ${prov}
+                  </option>
+                `).join('')}
               </select>
             </div>
             
@@ -133,10 +129,10 @@ const CheckoutSystem = {
             <h3>✅ Confirmar Pedido</h3>
             
             <div class="order-summary">
-              <h4>📦 Resumen del Pedido</h4>
+              <h4>📦 Resumen del Pedido</极速赛车开奖直播官网h4>
               <div id="order-items-list"></div>
               <div class="order-total" id="order-total-display">
-                Total: $${total.toFixed(2)} CUP
+                <!-- Total se actualizará dinámicamente -->
               </div>
             </div>
             
@@ -168,10 +164,10 @@ const CheckoutSystem = {
     `;
     
     modal.style.display = 'flex';
-    this.setupCheckoutEvents(cart, total);
+    this.setupCheckoutEvents(cart, totalByCurrency);
   },
   
-  setupCheckoutEvents: function(cart, total) {
+  setupCheckoutEvents: function(cart, totalByCurrency) {
     const addRecipient = document.getElementById('add-recipient');
     if (addRecipient) {
       addRecipient.addEventListener('change', function() {
@@ -206,7 +202,7 @@ const CheckoutSystem = {
     document.getElementById('next-to-confirm')?.addEventListener('click', () => {
       this.goToStep(3);
     });
-    document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
+    document.getElementById('back-to-payment')?.addEventListener('click', () => this.goTo极速赛车开奖直播官网Step(2));
     
     document.getElementById('cancel-checkout')?.addEventListener('click', () => {
       document.getElementById('product-modal').style.display = 'none';
@@ -227,8 +223,8 @@ const CheckoutSystem = {
         const itemElement = document.createElement('div');
         itemElement.className = 'order-item';
         itemElement.innerHTML = `
-          <div>${item.name} x ${item.quantity}</div>
-          <div>$${(item.price * item.quantity).toFixed(2)} CUP</div>
+          <div>${item.name || 'Producto'} x ${item.quantity}</div>
+          <div>$${(item.price * item.quantity).toFixed(2)}</div>
         `;
         itemsList.appendChild(itemElement);
       });
@@ -366,26 +362,36 @@ const CheckoutSystem = {
     if (method === 'Saldo Móvil') {
       document.getElementById('admin-card-number').textContent = `📱 Teléfono: ${phoneNumber}`;
       document.getElementById('admin-phone-number').textContent = '';
-      return;
-    }
-
-    if (userData.adminCards) {
-      switch(method) {
-        case 'BPA':
-          cardNumber = userData.adminCards.bpa || 'Tarjeta no configurada';
-          break;
-        case 'BANDEC':
-          cardNumber = userData.adminCards.bandec || 'Tarjeta no configurada';
-          break;
-        case 'MLC':
-          cardNumber = userData.adminCards.mlc || 'Tarjeta no configurada';
-          break;
+    } else {
+      if (userData.adminCards) {
+        switch(method) {
+          case 'BPA':
+            cardNumber = userData.adminCards.bpa || 'Tarjeta no configurada';
+            break;
+          case 'BANDEC':
+            cardNumber = userData.adminCards.bandec || 'Tarjeta no configurada';
+            break;
+          case 'MLC':
+            cardNumber = userData.adminCards.mlc || 'Tarjeta no configurada';
+            break;
+        }
       }
+      
+      const adminCardEl = document.getElementById('admin-card-number');
+      const adminPhoneEl = document.getElementById('admin-phone-number');
+      if (adminCardEl) adminCardEl.textContent = `💳 Tarjeta: ${cardNumber}`;
+      if (adminPhoneEl) adminPhoneEl.textContent = `📱 Teléfono: ${phoneNumber}`;
     }
     
-    const adminCardEl = document.getElementById('admin-card-number');
-    const adminPhoneEl = document.getElementById('admin-phone-number');
-    if (adminCardEl) adminCardEl.textContent = `💳 Tarjeta: ${cardNumber}`;
-    if (adminPhoneEl) adminPhoneEl.textContent = `📱 Teléfono: ${phoneNumber}`;
+    // Actualizar el total mostrado según el método de pago
+    const totalDisplay = document.getElementById('order-total-display');
+    if (totalDisplay) {
+      const total = this.selectedMethodPrices[method];
+      if (total !== undefined) {
+        totalDisplay.textContent = `Total: ${total.toFixed(2)} ${method}`;
+      } else {
+        totalDisplay.textContent = 'Total no disponible';
+      }
+    }
   }
 };
