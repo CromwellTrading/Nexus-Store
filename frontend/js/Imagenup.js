@@ -12,7 +12,8 @@ const ImageUploader = {
       });
 
       if (!response.ok) {
-        throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Error en la subida');
       }
 
       const data = await response.json();
