@@ -56,7 +56,7 @@ const AdminSystem = {
   },
   
   checkAdminStatus: async function() {
-    if (!this.telegram极速赛车开奖直播官网UserId) {
+    if (!this.telegramUserId) {
       console.log('[Admin] No hay ID de Telegram. Usuario no es admin');
       this.isAdmin = false;
       return;
