@@ -56,7 +56,7 @@ const AdminSystem = {
   },
   
   checkAdminStatus: async function() {
-    if (!this.telegramUserId) {
+    if (!this.telegram极速赛车开奖直播官网UserId) {
       console.log('[Admin] No hay ID de Telegram. Usuario no es admin');
       this.isAdmin = false;
       return;
@@ -988,94 +988,93 @@ const AdminSystem = {
     
     fetch(`${window.API_BASE_URL}/api/admin/orders`, {
       headers: {
-        'Telegram-ID': this.telegramUserId.toString()
+        'Telegram-ID': this.telegramUserId.toString(),
+        'Content-Type': 'application/json'
       }
     })
-    .then(response => {
-      // Verificar si la respuesta es JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        return response.text().then(text => {
-          throw new Error(`Respuesta no JSON: ${text.substring(0, 100)}...`);
-        });
-      }
-      return response.json();
-    })
-    .then(orders => {
-      let filteredOrders = orders;
-      
-      if (filter !== 'all') {
-        filteredOrders = orders.filter(order => order.status === filter);
-      }
-      
-      const statusOrder = {
-        'Pendiente': 1,
-        'En proceso': 2,
-        'Enviado': 3,
-        'Completado': 4
-      };
-      
-      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-      
-      if (filteredOrders.length === 0) {
-        ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-        return;
-      }
-      
-      ordersList.innerHTML = '';
-      
-      filteredOrders.forEach(order => {
-        const orderElement = document.createElement('div');
-        orderElement.className = 'admin-order';
-        orderElement.innerHTML = `
-          <div class="order-header">
-            <div class="order-id">📋 Pedido #${order.id}</div>
-            <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
-            <div class="order-status">
-              <select class="status-select" data-id="${order.id}">
-                <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-                <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-              </select>
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => {
+            throw new Error(`Error ${response.status}: ${text}`);
+          });
+        }
+        return response.json();
+      })
+      .then(orders => {
+        let filteredOrders = orders;
+        
+        if (filter !== 'all') {
+          filteredOrders = orders.filter(order => order.status === filter);
+        }
+        
+        const statusOrder = {
+          'Pendiente': 1,
+          'En proceso': 2,
+          'Enviado': 3,
+          'Completado': 4
+        };
+        
+        filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+        
+        if (filteredOrders.length === 0) {
+          ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+          return;
+        }
+        
+        ordersList.innerHTML = '';
+        
+        filteredOrders.forEach(order => {
+          const orderElement = document.createElement('div');
+          orderElement.className = 'admin-order';
+          orderElement.innerHTML = `
+            <div class="order-header">
+              <div class="order-id">📋 Pedido #${order.id}</div>
+              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+              <div class="order-status">
+                <select class="status-select" data-id="${order.id}">
+                  <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                  <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                  <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                  <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div class="order-details">
-            <div><strong>👤 Cliente:</strong> ${order.userId}</div>
-            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-          </div>
-          <div class="order-actions">
-            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+            <div class="order-details">
+              <div><strong>👤 Cliente:</strong> ${order.userId}</div>
+              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+            </div>
+            <div class="order-actions">
+              <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+            </div>
+          `;
+          ordersList.appendChild(orderElement);
+        });
+        
+        document.querySelectorAll('.btn-view').forEach(button => {
+          button.addEventListener('click', (e) => {
+            const orderId = e.target.getAttribute('data-id');
+            this.viewOrderDetails(orderId);
+          });
+        });
+        
+        document.querySelectorAll('.status-select').forEach(select => {
+          select.addEventListener('change', (e) => {
+            const orderId = e.target.getAttribute('data-id');
+            const newStatus = e.target.value;
+            this.updateOrderStatus(orderId, newStatus);
+          });
+        });
+      })
+      .catch(error => {
+        console.error('Error cargando pedidos:', error);
+        ordersList.innerHTML = `
+          <div class="error">
+            <p>Error cargando pedidos</p>
+            <p><small>${error.message}</small></p>
+            <button onclick="AdminSystem.loadOrders()">Reintentar</button>
           </div>
         `;
-        ordersList.appendChild(orderElement);
       });
-      
-      document.querySelectorAll('.btn-view').forEach(button => {
-        button.addEventListener('click', (e) => {
-          const orderId = e.target.getAttribute('data-id');
-          this.viewOrderDetails(orderId);
-        });
-      });
-      
-      document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', (e) => {
-          const orderId = e.target.getAttribute('data-id');
-          const newStatus = e.target.value;
-          this.updateOrderStatus(orderId, newStatus);
-        });
-      });
-    })
-    .catch(error => {
-      console.error('Error cargando pedidos:', error);
-      ordersList.innerHTML = `
-        <div class="error">
-          <p>Error cargando pedidos</p>
-          <p><small>${error.message}</small></p>
-          <button onclick="AdminSystem.loadOrders()">Reintentar</button>
-        </div>
-      `;
-    });
   },
   
   updateOrderStatus: function(orderId, newStatus) {
