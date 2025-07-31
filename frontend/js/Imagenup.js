@@ -1,12 +1,11 @@
 // Imagenup.js - Módulo para subir imágenes a ImgBB
 const ImageUploader = {
-  uploadImageToImageBin: async function(file) {
+  uploadImage: async function(file) {
     const formData = new FormData();
-    formData.append('key', 'f0f757f1c4af7bdb6aea6fa59bd1d718');
-    formData.append('image', file);  // ImgBB usa 'image' en lugar de 'file'
+    formData.append('key', 'f0f757f1c4af7bdb6aea6fa59bd1d718');  // API key de ImgBB
+    formData.append('image', file);
 
     try {
-      // Cambiamos el endpoint a ImgBB
       const response = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
         body: formData
@@ -16,13 +15,17 @@ const ImageUploader = {
         throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();  // ImgBB devuelve JSON
+      const data = await response.json();
       console.log('Respuesta de ImgBB:', data);
       
       // Extraemos la URL directa de la respuesta JSON
       if (data && data.data && data.data.url) {
         const imageUrl = data.data.url;
         console.log('URL de imagen obtenida:', imageUrl);
+        return imageUrl;
+      } else if (data && data.data && data.data.image && data.data.image.url) {
+        const imageUrl = data.data.image.url;
+        console.log('URL de imagen obtenida (alternativa):', imageUrl);
         return imageUrl;
       } else {
         throw new Error('No se encontró la URL en la respuesta de ImgBB');
@@ -33,7 +36,6 @@ const ImageUploader = {
     }
   },
 
-  // Las siguientes funciones se mantienen igual
   previewUploadedImage: function(imageUrl, previewId) {
     const preview = document.getElementById(previewId);
     if (!preview) return;
