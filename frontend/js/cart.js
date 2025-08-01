@@ -200,7 +200,7 @@ const CartSystem = {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
-          const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
+          const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
           if (item) this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
         });
       });
@@ -209,7 +209,7 @@ const CartSystem = {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
-          const item = this.cart.items.find(i => i.productId == productId && i.tabType === tabType);
+          const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
           if (item && item.quantity > 1) {
             this.updateCartItemQuantity(productId, tabType, item.quantity - 1);
           }
