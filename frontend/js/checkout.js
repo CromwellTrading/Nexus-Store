@@ -140,6 +140,7 @@ const CheckoutSystem = {
               <div class="form-group">
                 <label>📸 Captura de pantalla de la transferencia:</label>
                 <input type="file" id="transfer-proof" accept="image/*" required>
+                <div id="transfer-proof-preview" style="margin-top: 10px;"></div>
                 <p class="info-note">Por favor, suba una imagen que muestre claramente:</p>
                 <ul class="info-note">
                   <li>ID de la transferencia</li>
@@ -246,17 +247,28 @@ const CheckoutSystem = {
         return;
       }
       
-      const transferData = {};
+      const proofPreview = document.getElementById('transfer-proof-preview');
+      proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
       
+      let transferProofUrl;
       try {
-        const imageUrl = await ImageUploader.uploadImage(proofFile);
-        transferData.transferProof = imageUrl;
-        transferData.transferId = `TRF-${Date.now()}`;
+        transferProofUrl = await ImageUploader.uploadImage(proofFile);
+        proofPreview.innerHTML = `
+          <img src="${transferProofUrl}" alt="Comprobante de pago" 
+               style="max-width: 200px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px;">
+          <p>✅ Comprobante subido correctamente</p>
+        `;
       } catch (error) {
         console.error('Error subiendo comprobante:', error);
+        proofPreview.innerHTML = `<div class="error">❌ Error subiendo comprobante: ${error.message}</div>`;
         alert('Error al subir el comprobante: ' + error.message);
         return;
       }
+      
+      const transferData = {
+        transferProof: transferProofUrl,
+        transferId: `TRF-${Date.now()}`
+      };
       
       const recipientData = {};
       if (document.getElementById('add-recipient')?.checked) {
@@ -392,11 +404,16 @@ const CheckoutSystem = {
       if (adminPhoneEl) adminPhoneEl.textContent = `📱 Teléfono: ${phoneNumber}`;
     }
     
+    // Determinar moneda según método de pago
+    let currency = 'CUP'; // Por defecto para BPA y BANDEC
+    if (method === 'MLC') currency = 'MLC';
+    else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
+    
     const totalDisplay = document.getElementById('order-total-display');
     if (totalDisplay) {
-      const total = this.selectedMethodPrices[method];
+      const total = this.selectedMethodPrices[currency];
       if (total !== undefined) {
-        totalDisplay.textContent = `Total: ${total.toFixed(2)} ${method}`;
+        totalDisplay.textContent = `Total: ${total.toFixed(2)} ${currency}`;
       } else {
         totalDisplay.textContent = 'Total no disponible';
       }
