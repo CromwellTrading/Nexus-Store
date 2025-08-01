@@ -328,11 +328,25 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 });
 
 // =====================================================================
-// Checkout
+// Checkout (Versión Mejorada)
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
   const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
   
+  // Validación básica
+  if (!userId || !paymentMethod || !transferData || !transferData.transferProof) {
+    return res.status(400).json({ 
+      error: 'Datos de checkout incompletos',
+      received: {
+        userId,
+        paymentMethod,
+        transferData,
+        recipient,
+        requiredFields
+      }
+    });
+  }
+
   const client = await pool.connect();
   
   try {
@@ -344,7 +358,7 @@ app.post('/api/checkout', async (req, res) => {
       [userId]
     );
     
-    if (!cartRes.rows.length || !cartRes.rows[0].items) {
+    if (!cartRes.rows.length || !cartRes.rows[0].items || cartRes.rows[0].items.length === 0) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
     
@@ -377,6 +391,10 @@ app.post('/api/checkout', async (req, res) => {
       }
     }
     
+    if (orderItems.length === 0) {
+      throw new Error('No se pudieron procesar los productos del carrito');
+    }
+    
     // 3. Crear orden
     const orderId = `ORD-${Date.now()}`;
     const orderRes = await client.query(
@@ -385,7 +403,6 @@ app.post('/api/checkout', async (req, res) => {
        RETURNING *`,
       [orderId, userId, total]
     );
-    const order = orderRes.rows[0];
     
     // 4. Añadir items a la orden
     for (const item of orderItems) {
@@ -414,8 +431,8 @@ app.post('/api/checkout', async (req, res) => {
         orderId,
         paymentMethod,
         JSON.stringify(transferData),
-        JSON.stringify(recipient),
-        JSON.stringify(requiredFields)
+        JSON.stringify(recipient || {}),
+        JSON.stringify(requiredFields || {})
       ]
     );
     
@@ -430,13 +447,19 @@ app.post('/api/checkout', async (req, res) => {
     res.json({ 
       success: true, 
       orderId,
-      total,
-      order
+      total
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error en checkout:', error);
-    res.status(500).json({ error: 'Error en checkout: ' + error.message });
+    console.error('Error en checkout:', {
+      error: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    res.status(500).json({ 
+      error: 'Error en checkout',
+      details: error.message
+    });
   } finally {
     client.release();
   }
@@ -670,7 +693,9 @@ app.get('/api/orders/user/:userId', async (req, res) => {
   }
 });
 
-// Obtener todos los pedidos (para admin)
+// =====================================================================
+// Obtener pedidos para admin (Versión Corregida)
+// =====================================================================
 app.get('/api/admin/orders', isAdmin, async (req, res) => {
   try {
     const { data: orders, error } = await supabase
@@ -682,32 +707,60 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         status,
         created_at,
         updated_at,
-        order_details!inner(payment_method, transfer_data, recipient_data, required_fields),
-        order_items!inner(product_name, quantity, price, image_url, tab_type)
+        order_details:order_details_id (
+          payment_method,
+          transfer_data,
+          recipient_data,
+          required_fields
+        ),
+        order_items:order_items_id (
+          product_name,
+          quantity,
+          price,
+          image_url,
+          tab_type
+        )
       `);
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error obteniendo pedidos:', error);
+      return res.status(500).json({ error: 'Error en consulta Supabase' });
+    }
+
+    if (!orders || orders.length === 0) {
+      return res.json([]);
+    }
     
-    const parsedOrders = orders.map(order => ({
-      id: order.id,
-      userId: order.user_id,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      payment: {
-        method: order.order_details[0]?.payment_method,
-        ...(order.order_details[0]?.transfer_data || {})
-      },
-      recipient: order.order_details[0]?.recipient_data,
-      requiredFields: order.order_details[0]?.required_fields,
-      items: order.order_items
-    }));
+    // Formatear respuesta
+    const formattedOrders = orders.map(order => {
+      const orderDetails = order.order_details && order.order_details.length > 0 
+        ? order.order_details[0] 
+        : null;
+      
+      return {
+        id: order.id,
+        userId: order.user_id,
+        total: order.total,
+        status: order.status,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        payment: {
+          method: orderDetails?.payment_method,
+          ...(orderDetails?.transfer_data || {})
+        },
+        recipient: orderDetails?.recipient_data,
+        requiredFields: orderDetails?.required_fields,
+        items: order.order_items || []
+      };
+    });
     
-    res.json(parsedOrders);
+    res.json(formattedOrders);
   } catch (error) {
-    console.error('Error getting orders for admin:', error);
-    res.status(500).json({ error: 'Error obteniendo pedidos' });
+    console.error('Error crítico obteniendo pedidos:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message
+    });
   }
 });
 
