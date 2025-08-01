@@ -25,23 +25,19 @@ const AdminSystem = {
   },
   
   getTelegramUserId: function() {
-    // 1. Buscar en URL
     const urlParams = new URLSearchParams(window.location.search);
     let tgid = urlParams.get('tgid');
     
-    // 2. Buscar en localStorage
     if (!tgid) {
       tgid = localStorage.getItem('telegramUserId');
     }
     
-    // 3. Buscar en sessionStorage
     if (!tgid) {
       tgid = sessionStorage.getItem('telegramUserId');
     }
     
-    // 4. Si aún no se encuentra, usar un valor por defecto para desarrollo
     if (!tgid && window.location.hostname === 'localhost') {
-      tgid = '5376388604'; // ID por defecto para desarrollo
+      tgid = '5376388604';
       console.warn('⚠️ Usando ID de Telegram de desarrollo');
     }
     
@@ -408,7 +404,6 @@ const AdminSystem = {
       this.loadOrders(e.target.value);
     });
     
-    // Eventos para previsualización de imágenes
     document.getElementById('product-images')?.addEventListener('change', (e) => {
       this.previewImages(e.target, 'image-preview');
     });
@@ -432,7 +427,6 @@ const AdminSystem = {
     
     const files = Array.from(input.files);
     
-    // Previsualización local inmediata
     files.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -449,7 +443,6 @@ const AdminSystem = {
       reader.readAsDataURL(file);
     });
     
-    // Subir cada imagen en segundo plano
     files.forEach((file, index) => {
       this.uploadAndPreviewImage(file, previewId, index, files.length);
     });
@@ -457,15 +450,10 @@ const AdminSystem = {
   
   uploadAndPreviewImage: async function(file, previewId, index, total) {
     try {
-      // Subir la imagen
       const imageUrl = await ImageUploader.uploadImage(file);
-      
-      // Previsualizar la imagen subida (si es la única o la primera)
-      // Nota: Ya se mostró una previsualización local, así que solo actualizamos si es necesario
       console.log(`Imagen ${index+1}/${total} subida: ${imageUrl}`);
     } catch (error) {
       console.error(`Error subiendo imagen ${index+1}:`, error);
-      // Mostrar error en la previsualización
       const errorElement = document.createElement('div');
       errorElement.className = 'image-upload-error';
       errorElement.textContent = `❌ Error: ${error.message}`;
@@ -496,13 +484,12 @@ const AdminSystem = {
     const product = {
       name,
       description,
-      prices, // Ahora es un objeto (JSONB)
+      prices,
       details: details || '',
       date_created: new Date().toISOString()
     };
     
     if (type === 'fisico') {
-      // Subir imágenes para producto físico
       const imageFiles = document.getElementById('product-images').files;
       if (imageFiles.length > 0) {
         product.images = [];
@@ -529,12 +516,11 @@ const AdminSystem = {
         });
       }
     } else {
-      // Subir imagen para producto digital
       const imageFile = document.getElementById('digital-image').files[0];
       if (imageFile) {
         try {
           const imageUrl = await ImageUploader.uploadImage(imageFile);
-          product.images = [imageUrl]; // Ahora es un array
+          product.images = [imageUrl];
         } catch (error) {
           console.error('Error en subida de imagen digital:', error);
           alert('Error subiendo imagen: ' + error.message);
@@ -578,10 +564,7 @@ const AdminSystem = {
       const newProduct = await response.json();
       alert('✅ Producto creado correctamente!');
       
-      // Actualizar la lista de productos
       this.renderProductsList();
-      
-      // Cerrar el formulario
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
     } catch (error) {
@@ -699,7 +682,6 @@ const AdminSystem = {
         document.getElementById('product-category').value = product.category_id;
         document.getElementById('product-details').value = product.details || '';
         
-        // Parsear precios y llenar los campos
         const prices = product.prices || {};
         document.querySelectorAll('.price-currency').forEach(input => {
           const currency = input.dataset.currency;
@@ -713,7 +695,6 @@ const AdminSystem = {
           document.getElementById('color-variant-section').style.display = 
             product.has_color_variant ? 'block' : 'none';
           
-          // Previsualizar imágenes existentes
           const preview = document.getElementById('image-preview');
           preview.innerHTML = '';
           if (product.images && product.images.length > 0) {
@@ -839,7 +820,6 @@ const AdminSystem = {
       return;
     }
     
-    // Botón de carga
     const btn = document.getElementById('add-category-btn');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<div class="spinner"></div> Creando...';
@@ -870,8 +850,6 @@ const AdminSystem = {
     .then(data => {
       alert(`✅ Categoría "${name}" creada correctamente!`);
       nameInput.value = '';
-      
-      // Actualizar las listas
       this.renderCategoriesList();
       this.renderCategoryOptions();
     })
@@ -893,7 +871,6 @@ const AdminSystem = {
       return;
     }
     
-    // Mostrar indicador de carga
     container.innerHTML = '<div class="loading">Cargando categorías...</div>';
     
     fetch(`${window.API_BASE_URL}/api/admin/categories`, {
@@ -908,7 +885,6 @@ const AdminSystem = {
       return response.json();
     })
     .then(categories => {
-      // Filtrar por tipo
       const filtered = categories.filter(cat => cat.type === type);
       
       if (!filtered || filtered.length === 0) {
@@ -933,7 +909,6 @@ const AdminSystem = {
         </div>
       `;
       
-      // Agregar event listeners para eliminar
       container.querySelectorAll('.delete-category').forEach(btn => {
         btn.addEventListener('click', (e) => {
           const id = e.target.getAttribute('data-id');
@@ -966,7 +941,7 @@ const AdminSystem = {
     .then(response => {
       if (response.ok) {
         this.renderCategoriesList();
-        this.renderProductsList(); // Actualizar lista de productos también
+        this.renderProductsList();
         alert('✅ Categoría eliminada correctamente');
       } else {
         throw new Error('Error al eliminar categoría');
@@ -1149,7 +1124,7 @@ const AdminSystem = {
               </div>
               
               <h3>📝 Información Adicional</h3>
-              <pre>${JSON.stringify(order.recipient, null, 2)}</pre>
+              <pre>${JSON.stringify(order.recipient || {}, null, 2)}</pre>
             </div>
           </div>
         `;
@@ -1159,6 +1134,7 @@ const AdminSystem = {
         });
       })
       .catch(error => {
+        console.error('Error cargando detalles:', error);
         alert('Error al cargar detalles del pedido');
       });
   },
@@ -1215,7 +1191,6 @@ const AdminSystem = {
   }
 };
 
-// Inicialización
 window.addEventListener('DOMContentLoaded', () => {
   AdminSystem.init();
 });
