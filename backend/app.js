@@ -3,6 +3,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 import TelegramBot from 'node-telegram-bot-api';
 
 // =====================================================================
@@ -20,6 +21,12 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
+
+// Configuración de PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 // =====================================================================
 // Middlewares
@@ -321,11 +328,19 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 });
 
 // =====================================================================
-// Checkout
+// Checkout (Versión Simplificada y Robustecida)
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
   const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
   
+  // Validación básica
+  if (!userId || !paymentMethod || !transferData || !transferData.transferProof) {
+    return res.status(400).json({ 
+      error: 'Datos de checkout incompletos',
+      requiredFields: ['userId', 'paymentMethod', 'transferData.transferProof']
+    });
+  }
+
   const client = await pool.connect();
   
   try {
@@ -337,7 +352,7 @@ app.post('/api/checkout', async (req, res) => {
       [userId]
     );
     
-    if (!cartRes.rows.length || !cartRes.rows[0].items) {
+    if (!cartRes.rows.length || !cartRes.rows[0].items || cartRes.rows[0].items.length === 0) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
     
@@ -370,15 +385,17 @@ app.post('/api/checkout', async (req, res) => {
       }
     }
     
+    if (orderItems.length === 0) {
+      return res.status(400).json({ error: 'No se pudieron procesar los productos del carrito' });
+    }
+    
     // 3. Crear orden
     const orderId = `ORD-${Date.now()}`;
-    const orderRes = await client.query(
+    await client.query(
       `INSERT INTO orders (id, user_id, total, status)
-       VALUES ($1, $2, $3, 'Pendiente')
-       RETURNING *`,
+       VALUES ($1, $2, $3, 'Pendiente')`,
       [orderId, userId, total]
     );
-    const order = orderRes.rows[0];
     
     // 4. Añadir items a la orden
     for (const item of orderItems) {
@@ -407,8 +424,8 @@ app.post('/api/checkout', async (req, res) => {
         orderId,
         paymentMethod,
         JSON.stringify(transferData),
-        JSON.stringify(recipient),
-        JSON.stringify(requiredFields)
+        JSON.stringify(recipient || {}),
+        JSON.stringify(requiredFields || {})
       ]
     );
     
@@ -423,13 +440,18 @@ app.post('/api/checkout', async (req, res) => {
     res.json({ 
       success: true, 
       orderId,
-      total,
-      order
+      total
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Error en checkout:', error);
-    res.status(500).json({ error: 'Error en checkout: ' + error.message });
+    console.error('Error en checkout:', {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Error en el proceso de checkout',
+      details: error.message
+    });
   } finally {
     client.release();
   }
@@ -633,74 +655,104 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         total,
         status,
         created_at,
-        updated_at,
-        order_details:payment_method,transfer_data,recipient_data,required_fields,
-        order_items:product_name,quantity,price,image_url,tab_type
+        updated_at
       `)
       .eq('user_id', userId);
     
     if (error) throw error;
     
-    const parsedOrders = orders.map(order => ({
-      id: order.id,
-      userId,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      payment: {
-        method: order.payment_method,
-        ...order.transfer_data
-      },
-      recipient: order.recipient_data,
-      requiredFields: order.required_fields,
-      items: order.order_items
+    // Obtener detalles adicionales para cada pedido
+    const ordersWithDetails = await Promise.all(orders.map(async (order) => {
+      // Obtener order_details
+      const { data: orderDetails, error: detailsError } = await supabase
+        .from('order_details')
+        .select('*')
+        .eq('order_id', order.id)
+        .single();
+      
+      // Obtener order_items
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+      
+      return {
+        ...order,
+        payment: {
+          method: orderDetails?.payment_method,
+          ...(orderDetails?.transfer_data || {})
+        },
+        recipient: orderDetails?.recipient_data,
+        requiredFields: orderDetails?.required_fields,
+        items: orderItems || []
+      };
     }));
     
-    res.json(parsedOrders);
+    res.json(ordersWithDetails);
   } catch (error) {
     res.status(500).json({ error: 'Error obteniendo pedidos' });
   }
 });
 
-// Obtener todos los pedidos (para admin)
+// =====================================================================
+// Obtener pedidos para admin (Versión Simplificada)
+// =====================================================================
 app.get('/api/admin/orders', isAdmin, async (req, res) => {
   try {
-    const { data: orders, error } = await supabase
+    // Obtener todas las órdenes
+    const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select(`
-        id,
-        user_id,
-        total,
-        status,
-        created_at,
-        updated_at,
-        order_details:payment_method,transfer_data,recipient_data,required_fields,
-        order_items:product_name,quantity,price,image_url,tab_type
-      `);
+      .select('*');
     
-    if (error) throw error;
+    if (ordersError) {
+      console.error('Error obteniendo órdenes:', ordersError);
+      return res.status(500).json({ error: 'Error obteniendo órdenes' });
+    }
+
+    // Si no hay órdenes, retornar array vacío
+    if (!orders || orders.length === 0) {
+      return res.json([]);
+    }
     
-    const parsedOrders = orders.map(order => ({
-      id: order.id,
-      userId: order.user_id,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      payment: {
-        method: order.payment_method,
-        ...order.transfer_data
-      },
-      recipient: order.recipient_data,
-      requiredFields: order.required_fields,
-      items: order.order_items
+    // Enriquecer cada orden con sus detalles e ítems
+    const enrichedOrders = await Promise.all(orders.map(async (order) => {
+      // Obtener detalles de la orden (order_details)
+      const { data: orderDetails, error: detailsError } = await supabase
+        .from('order_details')
+        .select('*')
+        .eq('order_id', order.id)
+        .single();
+      
+      // Obtener ítems de la orden (order_items)
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id);
+      
+      return {
+        id: order.id,
+        userId: order.user_id,
+        total: order.total,
+        status: order.status,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        payment: {
+          method: orderDetails?.payment_method,
+          ...(orderDetails?.transfer_data || {})
+        },
+        recipient: orderDetails?.recipient_data,
+        requiredFields: orderDetails?.required_fields,
+        items: orderItems || []
+      };
     }));
     
-    res.json(parsedOrders);
+    res.json(enrichedOrders);
   } catch (error) {
-    console.error('Error getting orders for admin:', error);
-    res.status(500).json({ error: 'Error obteniendo pedidos' });
+    console.error('Error crítico obteniendo pedidos:', error);
+    res.status(500).json({ 
+      error: 'Error interno del servidor',
+      details: error.message
+    });
   }
 });
 
