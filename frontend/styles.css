@@ -1,3 +1,5 @@
+
+
 /* styles.css */
 :root {
   /* Paleta base */
@@ -19,7 +21,7 @@
   /* Elementos UI */
   --border-color: #dee2e6;
   --card-bg: #ffffff;
-  --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --card-shadow: 0 8极速赛车开奖直播官网px 30px rgba(0, 0, 0, 0.12);
   
   /* Degradados metálicos */
   --metallic-primary: linear-gradient(145deg, #4a00e0, #6a11cb);
@@ -28,7 +30,7 @@
   
   /* Sombras */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 极速赛车开奖直播官网0.15);
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.2);
   
   /* Transiciones */
@@ -214,7 +216,7 @@ body {
 }
 
 .theme-option.theme-light {
-  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
+  background: linear-gradient(145deg, #f8f9fa, #e9ece极速赛车开奖直播官网f);
 }
 
 .theme-option.theme-dark {
@@ -777,7 +779,7 @@ body {
   transition: var(--transition-fast);
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 8极速赛车开奖直播官网px;
 }
 
 .admin-btn:hover {
@@ -1041,6 +1043,52 @@ body {
   transform: perspective(1000px) translateZ(20px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
+/* Estilos para el logo de la tienda */
+.store-logo {
+    max-width: 150%;
+    height: auto;
+    max-height: 150px; /* Altura máxima ajustable */
+    object-fit: contain;
+    margin-bottom: 1px;
+}
+
+/* Ajustes para temas oscuros */
+.theme-dark .store-logo {
+    filter: invert(1); /* Invertir colores para mejor contraste */
+    opacity: 0.9;
+}
+
+/* Ajustes para tema rojo */
+.theme-red .store-logo {
+    filter: hue-rotate(300deg) saturate(150%);
+}
+
+.theme-blue .store-logo {
+  filter: hue-rotate(300deg) saturate(150%);
+}
+
+/* Ajustes responsivos */
+@media (max-width: 768px) {
+    .store-logo {
+        max-height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .store-logo {
+        max-height: 150px;
+    }
+    
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .header-icons {
+        margin-top: 3px;
+        align-self: flex-end;
+    }
+}
 
 /* ----- ESTILOS AÑADIDOS PARA SUBIDA DE ARCHIVOS ----- */
 
@@ -1104,3 +1152,5 @@ body {
   border: 1px solid var(--danger-color);
   font-weight: 500;
 }
+
+ 
