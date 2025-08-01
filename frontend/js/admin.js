@@ -828,367 +828,369 @@ const AdminSystem = {
     fetch(`${window.API_BASE_URL}/api/admin/categories`, {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json',
-        'Telegram-ID': this.telegramUserId.toString()
-      },
-      body: JSON.stringify({
-        type: type,
-        name: name
-      })
+      'Content-Type': 'application/json',
+      'Telegram-ID': this.telegramUserId.toString()
+    },
+    body: JSON.stringify({
+      type: type,
+      name: name
     })
-    .then(response => {
-      if (response.status === 201) {
-        return response.json();
-      } else if (response.status === 400) {
-        return response.json().then(data => {
-          throw new Error(data.error);
-        });
-      } else {
-        throw new Error(`Error ${response.status}`);
-      }
-    })
-    .then(data => {
-      alert(`✅ Categoría "${name}" creada correctamente!`);
-      nameInput.value = '';
-      this.renderCategoriesList();
-      this.renderCategoryOptions();
-    })
-    .catch(error => {
-      console.error('Error añadiendo categoría:', error);
-      alert(`❌ Error: ${error.message}`);
-    })
-    .finally(() => {
-      btn.innerHTML = originalText;
-      btn.disabled = false;
-    });
-  },
+  })
+  .then(response => {
+    if (response.status === 201) {
+      return response.json();
+    } else if (response.status === 400) {
+      return response.json().then(data => {
+        throw new Error(data.error);
+      });
+    } else {
+      throw new Error(`Error ${response.status}`);
+    }
+  })
+  .then(data => {
+    alert(`✅ Categoría "${name}" creada correctamente!`);
+    nameInput.value = '';
+    this.renderCategoriesList();
+    this.renderCategoryOptions();
+  })
+  .catch(error => {
+    console.error('Error añadiendo categoría:', error);
+    alert(`❌ Error: ${error.message}`);
+  })
+  .finally(() => {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  });
+},
+
+renderCategoriesList: function() {
+  const type = this.categoryType;
+  const container = document.getElementById('categories-list');
+  if (!container) {
+    console.error('[Admin] No se encontró el contenedor de categorías');
+    return;
+  }
   
-  renderCategoriesList: function() {
-    const type = this.categoryType;
-    const container = document.getElementById('categories-list');
-    if (!container) {
-      console.error('[Admin] No se encontró el contenedor de categorías');
+  container.innerHTML = '<div class="loading">Cargando categorías...</div>';
+  
+  fetch(`${window.API_BASE_URL}/api/admin/categories`, {
+    headers: {
+      'Telegram-ID': this.telegramUserId.toString()
+    }
+  })
+  .then(response => {
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+    return response.json();
+  })
+  .then(categories => {
+    const filtered = categories.filter(cat => cat.type === type);
+    
+    if (!filtered || filtered.length === 0) {
+      container.innerHTML = '<p>No hay categorías definidas</p>';
       return;
     }
     
-    container.innerHTML = '<div class="loading">Cargando categorías...</div>';
+    container.innerHTML = `
+      <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
+      <div class="admin-items-list">
+        ${filtered.map(category => `
+          <div class="admin-category-item">
+            <div class="category-info">
+              <strong>${category.name}</strong>
+              <small>Tipo: ${category.type}</small>
+            </div>
+            <div class="category-actions">
+              <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
     
-    fetch(`${window.API_BASE_URL}/api/admin/categories`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
-    })
+    container.querySelectorAll('.delete-category').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.getAttribute('data-id');
+        this.deleteCategory(id);
+      });
+    });
+  })
+  .catch(error => {
+    console.error('Error cargando categorías:', error);
+    container.innerHTML = `
+      <div class="error">
+        <p>Error cargando categorías</p>
+        <p><small>${error.message}</small></p>
+      </div>
+    `;
+  });
+},
+
+deleteCategory: function(id) {
+  if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
+    return;
+  }
+  
+  fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Telegram-ID': this.telegramUserId.toString()
+    }
+  })
+  .then(response => {
+    if (response.ok) {
+      this.renderCategoriesList();
+      this.renderProductsList();
+      alert('✅ Categoría eliminada correctamente');
+    } else {
+      throw new Error('Error al eliminar categoría');
+    }
+  })
+  .catch(error => {
+    alert('Error al eliminar categoría: ' + error.message);
+  });
+},
+
+loadOrders: function(filter = 'all') {
+  const ordersList = document.getElementById('admin-orders-list');
+  if (!ordersList) {
+    console.error('[Admin] No se encontró el contenedor de pedidos');
+    return;
+  }
+  
+  ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+  
+  fetch(`${window.API_BASE_URL}/api/admin/orders`, {
+    headers: {
+      'Telegram-ID': this.telegramUserId.toString(),
+      'Content-Type': 'application/json'
+    }
+  })
     .then(response => {
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        return response.text().then(text => {
+          throw new Error(`Error ${response.status}: ${text}`);
+        });
       }
       return response.json();
     })
-    .then(categories => {
-      const filtered = categories.filter(cat => cat.type === type);
+    .then(orders => {
+      let filteredOrders = orders;
       
-      if (!filtered || filtered.length === 0) {
-        container.innerHTML = '<p>No hay categorías definidas</p>';
+      if (filter !== 'all') {
+        filteredOrders = orders.filter(order => order.status === filter);
+      }
+      
+      const statusOrder = {
+        'Pendiente': 1,
+        'En proceso': 2,
+        'Enviado': 3,
+        'Completado': 4
+      };
+      
+      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      
+      if (filteredOrders.length === 0) {
+        ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
         return;
       }
       
-      container.innerHTML = `
-        <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
-        <div class="admin-items-list">
-          ${filtered.map(category => `
-            <div class="admin-category-item">
-              <div class="category-info">
-                <strong>${category.name}</strong>
-                <small>Tipo: ${category.type}</small>
-              </div>
-              <div class="category-actions">
-                <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
-              </div>
+      ordersList.innerHTML = '';
+      
+      filteredOrders.forEach(order => {
+        const orderElement = document.createElement('div');
+        orderElement.className = 'admin-order';
+        orderElement.innerHTML = `
+          <div class="order-header">
+            <div class="order-id">📋 Pedido #${order.id}</div>
+            <div class="order-date">📅 ${new Date(order.created_at).toLocaleDateString()}</div>
+            <div class="order-status">
+              <select class="status-select" data-id="${order.id}">
+                <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+              </select>
             </div>
-          `).join('')}
+          </div>
+          <div class="order-details">
+            <div><strong>👤 Cliente:</strong> ${order.user_id}</div>
+            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+          </div>
+          <div class="order-actions">
+            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+          </div>
+        `;
+        ordersList.appendChild(orderElement);
+      });
+      
+      document.querySelectorAll('.btn-view').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const orderId = e.target.getAttribute('data-id');
+          this.viewOrderDetails(orderId);
+        });
+      });
+      
+      document.querySelectorAll('.status-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          const orderId = e.target.getAttribute('data-id');
+          const newStatus = e.target.value;
+          this.updateOrderStatus(orderId, newStatus);
+        });
+      });
+    })
+    .catch(error => {
+      console.error('Error cargando pedidos:', error);
+      ordersList.innerHTML = `
+        <div class="error">
+          <p>Error cargando pedidos</p>
+          <p><small>${error.message}</small></p>
+          <button onclick="AdminSystem.loadOrders()">Reintentar</button>
+        </div>
+      `;
+    });
+},
+
+updateOrderStatus: function(orderId, newStatus) {
+  fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+    method: 'PUT',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Telegram-ID': this.telegramUserId.toString()
+    },
+    body: JSON.stringify({ status: newStatus })
+  })
+  .then(response => {
+    if (response.ok) {
+      this.loadOrders(document.getElementById('order-status-filter').value);
+      alert('✅ Estado actualizado correctamente');
+    } else {
+      throw new Error('Error actualizando estado');
+    }
+  })
+  .catch(error => {
+    alert('Error actualizando estado: ' + error.message);
+  });
+},
+
+viewOrderDetails: function(orderId) {
+  fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+    headers: {
+      'Telegram-ID': this.telegramUserId.toString()
+    }
+  })
+    .then(response => response.json())
+    .then(order => {
+      if (!order) {
+        return;
+      }
+      
+      const modal = document.getElementById('product-modal');
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>📋 Detalles del Pedido #${order.id}</h2>
+            <button class="close-modal">&times;</button>
+          </div>
+          <div class="order-details-full">
+            <div class="order-info">
+              <div><strong>📅 Fecha:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+              <div><strong>🔄 Estado:</strong> ${order.status}</div>
+              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+            </div>
+            
+            <h3>👤 Datos del Cliente</h3>
+            <div class="customer-info">
+              <div><strong>Usuario:</strong> ${order.user_id}</div>
+              <div><strong>Método de Pago:</strong> ${order.payment?.method || 'No especificado'}</div>
+            </div>
+            
+            <h3>🛒 Productos</h3>
+            <div class="order-products">
+              ${order.items.map(item => `
+                <div class="order-product-item">
+                  <div class="product-image">
+                    ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : ''}
+                  </div>
+                  <div class="product-details">
+                    <div><strong>${item.product_name}</strong></div>
+                    <div>${item.tab_type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                    <div>${item.quantity} x $${item.price.toFixed(2)}</div>
+                    <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <h3>📝 Información Adicional</h3>
+            ${order.recipient && Object.keys(order.recipient).length > 0 ? 
+              `<pre>${JSON.stringify(order.recipient, null, 2)}</pre>` : 
+              '<p>No hay información adicional</p>'}
+          </div>
         </div>
       `;
       
-      container.querySelectorAll('.delete-category').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const id = e.target.getAttribute('data-id');
-          this.deleteCategory(id);
-        });
+      modal.querySelector('.close-modal').addEventListener('click', () => {
+        this.openAdminPanel();
+      });
+    })
+    .catch(error => {
+      console.error('Error cargando detalles:', error);
+      alert('Error al cargar detalles del pedido');
+    });
+},
+
+renderCategoryOptions: function(type = this.productType) {
+  const categorySelect = document.getElementById('product-category');
+  if (!categorySelect) {
+    console.error('[Admin] No se encontró el selector de categorías');
+    return;
+  }
+  
+  categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
+  
+  fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
+    headers: {
+      'Telegram-ID': this.telegramUserId.toString()
+    }
+  })
+    .then(response => response.json())
+    .then(categories => {
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        categorySelect.appendChild(option);
       });
     })
     .catch(error => {
       console.error('Error cargando categorías:', error);
-      container.innerHTML = `
-        <div class="error">
-          <p>Error cargando categorías</p>
-          <p><small>${error.message}</small></p>
-        </div>
-      `;
     });
-  },
+},
+
+resetProductForm: function() {
+  document.getElementById('product-name').value = '';
+  document.getElementById('product-description').value = '';
+  document.getElementById('product-details').value = '';
+  document.getElementById('has-color-variant').checked = false;
+  document.getElementById('color-variant-section').style.display = 'none';
+  document.getElementById('color-variants-container').innerHTML = '';
+  document.getElementById('image-preview').innerHTML = '';
+  document.getElementById('digital-image-preview').innerHTML = '';
+  document.getElementById('required-fields-container').innerHTML = `
+    <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+      <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+      <input type="checkbox" class="field-required" checked>
+      <label>Requerido</label>
+      <button class="remove-field">❌</button>
+    </div>
+  `;
   
-  deleteCategory: function(id) {
-    if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-      return;
-    }
-    
-    fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
-    })
-    .then(response => {
-      if (response.ok) {
-        this.renderCategoriesList();
-        this.renderProductsList();
-        alert('✅ Categoría eliminada correctamente');
-      } else {
-        throw new Error('Error al eliminar categoría');
-      }
-    })
-    .catch(error => {
-      alert('Error al eliminar categoría: ' + error.message);
-    });
-  },
-  
-  loadOrders: function(filter = 'all') {
-    const ordersList = document.getElementById('admin-orders-list');
-    if (!ordersList) {
-      console.error('[Admin] No se encontró el contenedor de pedidos');
-      return;
-    }
-    
-    ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
-    
-    fetch(`${window.API_BASE_URL}/api/admin/orders`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString(),
-        'Content-Type': 'application/json'
-      }
-    })
-      .then(response => {
-        if (!response.ok) {
-          return response.text().then(text => {
-            throw new Error(`Error ${response.status}: ${text}`);
-          });
-        }
-        return response.json();
-      })
-      .then(orders => {
-        let filteredOrders = orders;
-        
-        if (filter !== 'all') {
-          filteredOrders = orders.filter(order => order.status === filter);
-        }
-        
-        const statusOrder = {
-          'Pendiente': 1,
-          'En proceso': 2,
-          'Enviado': 3,
-          'Completado': 4
-        };
-        
-        filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-        
-        if (filteredOrders.length === 0) {
-          ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-          return;
-        }
-        
-        ordersList.innerHTML = '';
-        
-        filteredOrders.forEach(order => {
-          const orderElement = document.createElement('div');
-          orderElement.className = 'admin-order';
-          orderElement.innerHTML = `
-            <div class="order-header">
-              <div class="order-id">📋 Pedido #${order.id}</div>
-              <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
-              <div class="order-status">
-                <select class="status-select" data-id="${order.id}">
-                  <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                  <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                  <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-                  <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-                </select>
-              </div>
-            </div>
-            <div class="order-details">
-              <div><strong>👤 Cliente:</strong> ${order.userId}</div>
-              <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-            </div>
-            <div class="order-actions">
-              <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
-            </div>
-          `;
-          ordersList.appendChild(orderElement);
-        });
-        
-        document.querySelectorAll('.btn-view').forEach(button => {
-          button.addEventListener('click', (e) => {
-            const orderId = e.target.getAttribute('data-id');
-            this.viewOrderDetails(orderId);
-          });
-        });
-        
-        document.querySelectorAll('.status-select').forEach(select => {
-          select.addEventListener('change', (e) => {
-            const orderId = e.target.getAttribute('data-id');
-            const newStatus = e.target.value;
-            this.updateOrderStatus(orderId, newStatus);
-          });
-        });
-      })
-      .catch(error => {
-        console.error('Error cargando pedidos:', error);
-        ordersList.innerHTML = `
-          <div class="error">
-            <p>Error cargando pedidos</p>
-            <p><small>${error.message}</small></p>
-            <button onclick="AdminSystem.loadOrders()">Reintentar</button>
-          </div>
-        `;
-      });
-  },
-  
-  updateOrderStatus: function(orderId, newStatus) {
-    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Telegram-ID': this.telegramUserId.toString()
-      },
-      body: JSON.stringify({ status: newStatus })
-    })
-    .then(response => {
-      if (response.ok) {
-        this.loadOrders(document.getElementById('order-status-filter').value);
-        alert('✅ Estado actualizado correctamente');
-      } else {
-        throw new Error('Error actualizando estado');
-      }
-    })
-    .catch(error => {
-      alert('Error actualizando estado: ' + error.message);
-    });
-  },
-  
-  viewOrderDetails: function(orderId) {
-    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
-    })
-      .then(response => response.json())
-      .then(order => {
-        if (!order) {
-          return;
-        }
-        
-        const modal = document.getElementById('product-modal');
-        modal.innerHTML = `
-          <div class="modal-content">
-            <div class="modal-header">
-              <h2>📋 Detalles del Pedido #${order.id}</h2>
-              <button class="close-modal">&times;</button>
-            </div>
-            <div class="order-details-full">
-              <div class="order-info">
-                <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
-                <div><strong>🔄 Estado:</strong> ${order.status}</div>
-                <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-              </div>
-              
-              <h3>👤 Datos del Cliente</h3>
-              <div class="customer-info">
-                <div><strong>Usuario:</strong> ${order.userId}</div>
-                <div><strong>Método de Pago:</strong> ${order.payment.method}</div>
-              </div>
-              
-              <h3>🛒 Productos</h3>
-              <div class="order-products">
-                ${order.items.map(item => `
-                  <div class="order-product-item">
-                    <div class="product-image">
-                      ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : ''}
-                    </div>
-                    <div class="product-details">
-                      <div><strong>${item.product_name}</strong></div>
-                      <div>${item.tab_type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
-                      <div>${item.quantity} x $${item.price.toFixed(2)}</div>
-                      <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-              
-              <h3>📝 Información Adicional</h3>
-              <pre>${JSON.stringify(order.recipient || {}, null, 2)}</pre>
-            </div>
-          </div>
-        `;
-        
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-          this.openAdminPanel();
-        });
-      })
-      .catch(error => {
-        console.error('Error cargando detalles:', error);
-        alert('Error al cargar detalles del pedido');
-      });
-  },
-  
-  renderCategoryOptions: function(type = this.productType) {
-    const categorySelect = document.getElementById('product-category');
-    if (!categorySelect) {
-      console.error('[Admin] No se encontró el selector de categorías');
-      return;
-    }
-    
-    categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
-    
-    fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
-    })
-      .then(response => response.json())
-      .then(categories => {
-        categories.forEach(category => {
-          const option = document.createElement('option');
-          option.value = category.id;
-          option.textContent = category.name;
-          categorySelect.appendChild(option);
-        });
-      })
-      .catch(error => {
-        console.error('Error cargando categorías:', error);
-      });
-  },
-  
-  resetProductForm: function() {
-    document.getElementById('product-name').value = '';
-    document.getElementById('product-description').value = '';
-    document.getElementById('product-details').value = '';
-    document.getElementById('has-color-variant').checked = false;
-    document.getElementById('color-variant-section').style.display = 'none';
-    document.getElementById('color-variants-container').innerHTML = '';
-    document.getElementById('image-preview').innerHTML = '';
-    document.getElementById('digital-image-preview').innerHTML = '';
-    document.getElementById('required-fields-container').innerHTML = `
-      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-        <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
-        <input type="checkbox" class="field-required" checked>
-        <label>Requerido</label>
-        <button class="remove-field">❌</button>
-      </div>
-    `;
-    
-    document.querySelectorAll('.price-currency').forEach(input => {
-      input.value = '';
-    });
-  }
+  document.querySelectorAll('.price-currency').forEach(input => {
+    input.value = '';
+  });
+}
 };
 
 window.addEventListener('DOMContentLoaded', () => {
