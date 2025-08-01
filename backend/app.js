@@ -7,26 +7,9 @@ import { Pool } from 'pg';
 import TelegramBot from 'node-telegram-bot-api';
 
 // =====================================================================
-// Configuración inicial y verificación de variables de entorno
+// Configuración inicial
 // =====================================================================
 console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
-console.log('🔍 Verificando variables de entorno:');
-
-const envVars = [
-  'PORT', 'ADMIN_IDS', 'TELEGRAM_BOT_TOKEN', 'FRONTEND_URL',
-  'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_DB_URL'
-];
-
-envVars.forEach(varName => {
-  const value = process.env[varName];
-  console.log(`   ${varName}: ${value ? '✅ Configurado' : '❌ FALTANTE'}`);
-  
-  if (!value && varName !== 'TELEGRAM_BOT_TOKEN') {
-    console.error(`   ⚠️ ADVERTENCIA: ${varName} no está definido en .env`);
-  }
-});
-
-console.log('===========================================');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -34,49 +17,24 @@ const PORT = process.env.PORT || 10000;
 // =====================================================================
 // Configuración de Supabase
 // =====================================================================
-console.log('\n🔧 Configurando Supabase...');
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-// Configuración de PostgreSQL directa
-console.log('\n🔧 Configurando conexión directa a PostgreSQL...');
+// Configuración de PostgreSQL
 const pool = new Pool({
   connectionString: process.env.SUPABASE_DB_URL,
   ssl: { rejectUnauthorized: false }
 });
 
 // =====================================================================
-// Verificación de conexión a Supabase
-// =====================================================================
-console.log('\n🔍 Probando conexión a Supabase...');
-(async () => {
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .limit(1);
-    
-    if (error) {
-      console.error('   ❌ Error en consulta Supabase:', error);
-      throw error;
-    }
-    
-    console.log(`   ✅ Conexión a Supabase verificada. Productos encontrados: ${data.length}`);
-  } catch (error) {
-    console.error('   ❌ Error crítico verificando conexión a Supabase:', error.message);
-  }
-})();
-
-// =====================================================================
 // Middlewares
 // =====================================================================
-console.log('\n🔧 Configurando middlewares...');
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID', '*']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 }));
 app.use(express.json());
 
@@ -125,7 +83,7 @@ app.get('/api/admin/ids', (req, res) => {
 });
 
 // =====================================================================
-// Rutas de productos (ACTUALIZADAS)
+// Rutas de productos
 // =====================================================================
 app.get('/api/products/:type', async (req, res) => {
   const { type } = req.params;
@@ -142,7 +100,6 @@ app.get('/api/products/:type', async (req, res) => {
     
     if (error) throw error;
 
-    // Organizar por categoría
     const result = {};
     products.forEach(product => {
       const categoryName = product.categories.name;
@@ -186,7 +143,7 @@ app.get('/api/products/:type/:id', async (req, res) => {
 });
 
 // =====================================================================
-// Rutas de carrito (ACTUALIZADAS)
+// Rutas de carrito
 // =====================================================================
 app.get('/api/cart/:userId', async (req, res) => {
   const { userId } = req.params;
@@ -371,10 +328,10 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 });
 
 // =====================================================================
-// Checkout (ACTUALIZADO)
+// Checkout
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
-  const { userId, paymentMethod, transferData, recipientData, requiredFields } = req.body;
+  const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
   
   const client = await pool.connect();
   
@@ -457,7 +414,7 @@ app.post('/api/checkout', async (req, res) => {
         orderId,
         paymentMethod,
         JSON.stringify(transferData),
-        JSON.stringify(recipientData),
+        JSON.stringify(recipient),
         JSON.stringify(requiredFields)
       ]
     );
@@ -478,14 +435,15 @@ app.post('/api/checkout', async (req, res) => {
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    res.status(500).json({ error: 'Error en checkout' });
+    console.error('Error en checkout:', error);
+    res.status(500).json({ error: 'Error en checkout: ' + error.message });
   } finally {
     client.release();
   }
 });
 
 // =====================================================================
-// Rutas de administración (ACTUALIZADAS)
+// Rutas de administración
 // =====================================================================
 
 // Obtener todas las categorías
@@ -708,6 +666,47 @@ app.get('/api/orders/user/:userId', async (req, res) => {
     
     res.json(parsedOrders);
   } catch (error) {
+    res.status(500).json({ error: 'Error obteniendo pedidos' });
+  }
+});
+
+// Obtener todos los pedidos (para admin)
+app.get('/api/admin/orders', isAdmin, async (req, res) => {
+  try {
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details!inner(payment_method, transfer_data, recipient_data, required_fields),
+        order_items!inner(product_name, quantity, price, image_url, tab_type)
+      `);
+    
+    if (error) throw error;
+    
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details[0]?.payment_method,
+        ...(order.order_details[0]?.transfer_data || {})
+      },
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
+      items: order.order_items
+    }));
+    
+    res.json(parsedOrders);
+  } catch (error) {
+    console.error('Error getting orders for admin:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
   }
 });
