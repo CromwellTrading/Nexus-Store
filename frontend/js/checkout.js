@@ -1,6 +1,6 @@
 const CheckoutSystem = {
   init: function() {},
-  selectedMethodPrices: {}, // Almacenará los precios por método de pago
+  selectedMethodPrices: {},
     
   openCheckout: function(cart, totalByCurrency) {
     this.selectedMethodPrices = totalByCurrency;
@@ -201,6 +201,12 @@ const CheckoutSystem = {
     document.getElementById('back-to-info')?.addEventListener('click', () => this.goToStep(1));
     document.getElementById('next-to-confirm')?.addEventListener('click', () => {
       this.goToStep(3);
+      
+      // Mostrar campos requeridos para productos digitales
+      const requiredFields = this.getRequiredFields(cart.items);
+      if (requiredFields.length > 0) {
+        this.showRequiredFields(requiredFields);
+      }
     });
     document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
     
@@ -242,7 +248,6 @@ const CheckoutSystem = {
       
       const transferData = {};
       
-      // Subir la imagen de comprobante a ImgBB usando ImageUploader
       try {
         const imageUrl = await ImageUploader.uploadImage(proofFile);
         transferData.transferProof = imageUrl;
@@ -253,7 +258,6 @@ const CheckoutSystem = {
         return;
       }
       
-      // Continuar con la orden
       const recipientData = {};
       if (document.getElementById('add-recipient')?.checked) {
         recipientData.fullName = document.getElementById('recipient-name').value;
@@ -270,32 +274,36 @@ const CheckoutSystem = {
         });
       }
       
-      // Crear la orden en el backend
-      fetch(`${window.API_BASE_URL}/api/checkout`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Telegram-ID': userId.toString()
-        },
-        body: JSON.stringify({
-          userId: userId,
-          paymentMethod: method,
-          transferData: transferData,
-          recipient: recipientData,  // Cambiamos a recipient (singular)
-          requiredFields: requiredFieldsData
-        })
-      })
-      .then(response => response.json())
-      .then(orderResult => {
+      try {
+        const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Telegram-ID': userId.toString()
+          },
+          body: JSON.stringify({
+            userId: userId,
+            paymentMethod: method,
+            transferData: transferData,
+            recipient: recipientData,
+            requiredFields: requiredFieldsData
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText);
+        }
+        
+        const orderResult = await response.json();
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
         
         Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
-      })
-      .catch(error => {
+      } catch (error) {
         console.error('Error confirmando compra:', error);
         alert('Error al confirmar la compra: ' + error.message);
-      });
+      }
     });
   },
   
@@ -321,10 +329,11 @@ const CheckoutSystem = {
     if (container) {
       container.innerHTML = '';
       fields.forEach(field => {
+        const fieldId = `field-${field.replace(/\s+/g, '-')}`;
         container.innerHTML += `
           <div class="form-group">
             <label>${field}:</label>
-            <input type="text" id="field-${field.replace(/\s+/g, '-')}" required class="modern-input">
+            <input type="text" id="${fieldId}" required class="modern-input">
           </div>
         `;
       });
@@ -383,7 +392,6 @@ const CheckoutSystem = {
       if (adminPhoneEl) adminPhoneEl.textContent = `📱 Teléfono: ${phoneNumber}`;
     }
     
-    // Actualizar el total mostrado según el método de pago
     const totalDisplay = document.getElementById('order-total-display');
     if (totalDisplay) {
       const total = this.selectedMethodPrices[method];
