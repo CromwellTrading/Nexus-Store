@@ -1103,8 +1103,20 @@ viewOrderDetails: function(orderId) {
             
             <h3>👤 Datos del Cliente</h3>
             <div class="customer-info">
-              <div><strong>Usuario:</strong> ${order.user_id}</div>
-              <div><strong>Método de Pago:</strong> ${order.payment?.method || 'No especificado'}</div>
+              <div><strong>ID:</strong> ${order.customer_id}</div>
+              <div><strong>Nombre:</strong> ${order.customer?.name || 'No especificado'}</div>
+              <div><strong>🆔 CI:</strong> ${order.customer?.ci || 'No especificado'}</div>
+              <div><strong>📱 Teléfono:</strong> ${order.customer?.phone || 'No especificado'}</div>
+              <div><strong>📍 Dirección:</strong> ${order.customer?.address || 'No especificado'}, ${order.customer?.province || ''}</div>
+            </div>
+            
+            <h3>💳 Información de Pago</h3>
+            <div class="payment-info">
+              <div><strong>Método:</strong> ${order.payment?.method || 'No especificado'}</div>
+              <div><strong>🔑 ID Transferencia:</strong> ${order.payment?.transferId || 'N/A'}</div>
+              ${order.payment?.transferProof ? `
+                <div><strong>📸 Comprobante:</strong> <a href="${order.payment?.transferProof}" target="_blank">Ver imagen</a></div>
+              ` : ''}
             </div>
             
             <h3>🛒 Productos</h3>
@@ -1126,8 +1138,21 @@ viewOrderDetails: function(orderId) {
             
             <h3>📝 Información Adicional</h3>
             ${order.recipient && Object.keys(order.recipient).length > 0 ? 
-              `<pre>${JSON.stringify(order.recipient, null, 2)}</pre>` : 
-              '<p>No hay información adicional</p>'}
+              `<div class="additional-info">
+                <h4>📦 Datos del Receptor</h4>
+                <div><strong>Nombre:</strong> ${order.recipient.fullName || 'N/A'}</div>
+                <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
+                <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
+              </div>` : 
+              '<p>No hay información adicional de receptor</p>'}
+              
+            ${order.requiredFields && Object.keys(order.requiredFields).length > 0 ? 
+              `<div class="required-fields-info">
+                <h4>📝 Campos Requeridos</h4>
+                ${Object.entries(order.requiredFields).map(([key, value]) => `
+                  <div><strong>${key}:</strong> ${value}</div>
+                `).join('')}
+              </div>` : ''}
           </div>
         </div>
       `;
@@ -1142,12 +1167,7 @@ viewOrderDetails: function(orderId) {
     });
 },
 
-renderCategoryOptions: function(type = this.productType) {
-  const categorySelect = document.getElementById('product-category');
-  if (!categorySelect) {
-    console.error('[Admin] No se encontró el selector de categorías');
-    return;
-  }
+renderCategoryOptions: function(type = this.product
   
   categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
   
