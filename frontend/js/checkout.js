@@ -238,55 +238,68 @@ const CheckoutSystem = {
     }
     
     document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
-      const method = document.querySelector('input[name="payment-method"]:checked')?.value;
-      const userId = UserProfile.getTelegramUserId();
-      
-      const proofFile = document.getElementById('transfer-proof')?.files[0];
-      if (!proofFile) {
-        alert('Por favor suba la captura de pantalla de la transferencia');
-        return;
-      }
-      
-      const proofPreview = document.getElementById('transfer-proof-preview');
-      proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
-      
-      let transferProofUrl;
-      try {
-        transferProofUrl = await ImageUploader.uploadImage(proofFile);
-        proofPreview.innerHTML = `
-          <img src="${transferProofUrl}" alt="Comprobante de pago" 
-               style="max-width: 200px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px;">
-          <p>✅ Comprobante subido correctamente</p>
-        `;
-      } catch (error) {
-        console.error('Error subiendo comprobante:', error);
-        proofPreview.innerHTML = `<div class="error">❌ Error subiendo comprobante: ${error.message}</div>`;
-        alert('Error al subir el comprobante: ' + error.message);
-        return;
-      }
-      
-      const transferData = {
-        transferProof: transferProofUrl,
-        transferId: `TRF-${Date.now()}`
-      };
-      
-      const recipientData = {};
-      if (document.getElementById('add-recipient')?.checked) {
-        recipientData.fullName = document.getElementById('recipient-name').value;
-        recipientData.ci = document.getElementById('recipient-ci').value;
-        recipientData.phone = document.getElementById('recipient-phone').value;
-      }
-      
-      const requiredFieldsData = {};
-      if (document.getElementById('required-fields-inputs')) {
-        document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
-          const input = group.querySelector('input');
-          const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
-          requiredFieldsData[fieldName] = input.value;
-        });
-      }
+      // Validar campos obligatorios
+      if (!this.validateCheckoutForm()) return;
       
       try {
+        const method = document.querySelector('input[name="payment-method"]:checked')?.value;
+        const userId = UserProfile.getTelegramUserId();
+        
+        // Mostrar estado de carga
+        const confirmBtn = document.getElementById('confirm-purchase');
+        const originalBtnText = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<div class="spinner"></div> Procesando...';
+        confirmBtn.disabled = true;
+        
+        // Subir comprobante de transferencia
+        const proofFile = document.getElementById('transfer-proof')?.files[0];
+        const proofPreview = document.getElementById('transfer-proof-preview');
+        proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
+        
+        let transferProofUrl;
+        try {
+          transferProofUrl = await ImageUploader.uploadImage(proofFile);
+          proofPreview.innerHTML = `
+            <img src="${transferProofUrl}" alt="Comprobante de pago" 
+                 style="max-width: 200px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px;">
+            <p>✅ Comprobante subido correctamente</p>
+          `;
+        } catch (uploadError) {
+          console.error('Error subiendo comprobante:', uploadError);
+          proofPreview.innerHTML = `<div class="error">❌ Error subiendo comprobante: ${uploadError.message}</div>`;
+          confirmBtn.innerHTML = originalBtnText;
+          confirmBtn.disabled = false;
+          return;
+        }
+        
+        // Preparar datos para enviar al backend
+        const transferData = {
+          transferProof: transferProofUrl,
+          transferId: `TRF-${Date.now()}`
+        };
+        
+        const recipientData = {};
+        if (document.getElementById('add-recipient')?.checked) {
+          recipientData.fullName = document.getElementById('recipient-name').value;
+          recipientData.ci = document.getElementById('recipient-ci').value;
+          recipientData.phone = document.getElementById('recipient-phone').value;
+        }
+        
+        const requiredFieldsData = {};
+        if (document.getElementById('required-fields-inputs')) {
+          document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
+            const input = group.querySelector('input');
+            const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+            requiredFieldsData[fieldName] = input.value;
+          });
+        }
+        
+        // Verificar que window.API_BASE_URL esté definido
+        if (!window.API_BASE_URL) {
+          throw new Error('URL del backend no configurada');
+        }
+        
+        // Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
           method: 'POST',
           headers: { 
@@ -302,11 +315,19 @@ const CheckoutSystem = {
           })
         });
         
-        const result = await response.json();
-        
+        // Manejar errores de respuesta
         if (!response.ok) {
-          throw new Error(result.error || 'Error en el servidor');
+          let errorMessage = 'Error en el servidor';
+          try {
+            const errorResponse = await response.json();
+            errorMessage = errorResponse.error || errorMessage;
+          } catch (e) {
+            errorMessage = `Error ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
+        
+        const result = await response.json();
         
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
@@ -314,9 +335,59 @@ const CheckoutSystem = {
         Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + result.orderId + ' ha sido creado');
       } catch (error) {
         console.error('Error confirmando compra:', error);
+        
+        // Mostrar error en la interfaz
+        const errorContainer = document.createElement('div');
+        errorContainer.className = 'error-message';
+        errorContainer.innerHTML = `
+          <strong>Error al confirmar la compra:</strong>
+          <p>${error.message}</p>
+          <p>Por favor, inténtalo de nuevo.</p>
+        `;
+        
+        const proofPreview = document.getElementById('transfer-proof-preview');
+        const existingError = proofPreview.querySelector('.error-message');
+        if (existingError) existingError.remove();
+        
+        proofPreview.appendChild(errorContainer);
+        
         alert('Error al confirmar la compra: ' + error.message);
+      } finally {
+        // Restaurar el botón de confirmación
+        const confirmBtn = document.getElementById('confirm-purchase');
+        if (confirmBtn) {
+          confirmBtn.innerHTML = '✅ Confirmar Compra';
+          confirmBtn.disabled = false;
+        }
       }
     });
+  },
+  
+  validateCheckoutForm: function() {
+    // Validar que se haya seleccionado un método de pago
+    const method = document.querySelector('input[name="payment-method"]:checked')?.value;
+    if (!method) {
+      alert('Por favor seleccione un método de pago');
+      return false;
+    }
+    
+    // Validar que se haya subido un comprobante
+    const proofFile = document.getElementById('transfer-proof')?.files[0];
+    if (!proofFile) {
+      alert('Por favor suba la captura de pantalla de la transferencia');
+      return false;
+    }
+    
+    // Validar campos requeridos para productos digitales
+    const requiredFields = document.querySelectorAll('#required-fields-inputs input[required]');
+    for (const field of requiredFields) {
+      if (!field.value.trim()) {
+        alert(`Por favor complete el campo: ${field.previousElementSibling.textContent}`);
+        return false;
+      }
+    }
+    
+    return true;
   },
   
   getRequiredFields: function(cartItems) {
