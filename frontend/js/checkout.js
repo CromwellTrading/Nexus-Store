@@ -1,12 +1,10 @@
 const CheckoutSystem = {
-  init: function() {},
   selectedMethodPrices: {},
     
   openCheckout: function(cart, totalByCurrency) {
     this.selectedMethodPrices = totalByCurrency;
     const userData = UserProfile.getUserData();
     const modal = document.getElementById('product-modal');
-    
     const isProfileComplete = userData.fullName && userData.ci && userData.phone && userData.address && userData.province;
     const startingStep = isProfileComplete ? 2 : 1;
     
@@ -46,16 +44,8 @@ const CheckoutSystem = {
               <label>Provincia:</label>
               <select id="checkout-province" required class="modern-select">
                 <option value="">Seleccionar provincia</option>
-                ${[
-                  'Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas',
-                  'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila',
-                  'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba',
-                  'Guantánamo', 'Isla de la Juventud'
-                ].map(prov => `
-                  <option value="${prov}" ${userData.province === prov ? 'selected' : ''}>
-                    ${prov}
-                  </option>
-                `).join('')}
+                ${['Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas', 'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila', 'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba', 'Guantánamo', 'Isla de la Juventud']
+                  .map(prov => `<option value="${prov}" ${userData.province === prov ? 'selected' : ''}>${prov}</option>`).join('')}
               </select>
             </div>
             
@@ -131,9 +121,7 @@ const CheckoutSystem = {
             <div class="order-summary">
               <h4>📦 Resumen del Pedido</h4>
               <div id="order-items-list"></div>
-              <div class="order-total" id="order-total-display">
-                <!-- Total se actualizará dinámicamente -->
-              </div>
+              <div class="order-total" id="order-total-display"></div>
             </div>
             
             <div class="transfer-info">
@@ -165,17 +153,13 @@ const CheckoutSystem = {
     `;
     
     modal.style.display = 'flex';
-    this.setupCheckoutEvents(cart, totalByCurrency);
+    this.setupCheckoutEvents(cart);
   },
   
-  setupCheckoutEvents: function(cart, totalByCurrency) {
-    const addRecipient = document.getElementById('add-recipient');
-    if (addRecipient) {
-      addRecipient.addEventListener('change', function() {
-        const recipientFields = document.getElementById('recipient-fields');
-        recipientFields.style.display = this.checked ? 'block' : 'none';
-      });
-    }
+  setupCheckoutEvents: function(cart) {
+    document.getElementById('add-recipient')?.addEventListener('change', function() {
+      document.getElementById('recipient-fields').style.display = this.checked ? 'block' : 'none';
+    });
     
     document.getElementById('next-to-payment')?.addEventListener('click', () => {
       const fullName = document.getElementById('checkout-fullname').value;
@@ -189,36 +173,24 @@ const CheckoutSystem = {
         return;
       }
       
-      UserProfile.userData.fullName = fullName;
-      UserProfile.userData.ci = ci;
-      UserProfile.userData.phone = phone;
-      UserProfile.userData.address = address;
-      UserProfile.userData.province = province;
+      UserProfile.userData = { fullName, ci, phone, address, province };
       UserProfile.saveUserData();
-      
       this.goToStep(2);
     });
     
     document.getElementById('back-to-info')?.addEventListener('click', () => this.goToStep(1));
     document.getElementById('next-to-confirm')?.addEventListener('click', () => {
       this.goToStep(3);
-      
-      // Mostrar campos requeridos para productos digitales
       const requiredFields = this.getRequiredFields(cart.items);
-      if (requiredFields.length > 0) {
-        this.showRequiredFields(requiredFields);
-      }
+      if (requiredFields.length > 0) this.showRequiredFields(requiredFields);
     });
     document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
-    
     document.getElementById('cancel-checkout')?.addEventListener('click', () => {
       document.getElementById('product-modal').style.display = 'none';
     });
     
     document.querySelectorAll('input[name="payment-method"]')?.forEach(radio => {
-      radio.addEventListener('change', () => {
-        this.updatePaymentInfo();
-      });
+      radio.addEventListener('change', () => this.updatePaymentInfo());
     });
     
     this.updatePaymentInfo();
@@ -242,21 +214,11 @@ const CheckoutSystem = {
         const method = document.querySelector('input[name="payment-method"]:checked')?.value;
         const userId = UserProfile.getTelegramUserId();
         
-        if (!method) {
-          alert('Por favor seleccione un método de pago');
-          return;
-        }
-        
-        if (!userId) {
-          alert('No se pudo identificar su usuario');
-          return;
-        }
+        if (!method) return alert('Por favor seleccione un método de pago');
+        if (!userId) return alert('No se pudo identificar su usuario');
         
         const proofFile = document.getElementById('transfer-proof')?.files[0];
-        if (!proofFile) {
-          alert('Por favor suba la captura de pantalla de la transferencia');
-          return;
-        }
+        if (!proofFile) return alert('Por favor suba la captura de pantalla de la transferencia');
 
         // Mostrar estado de carga
         const confirmBtn = document.getElementById('confirm-purchase');
@@ -285,11 +247,7 @@ const CheckoutSystem = {
         }
 
         // Preparar datos
-        const transferData = {
-          transferProof: transferProofUrl,
-          transferId: `TRF-${Date.now()}`
-        };
-
+        const transferData = { transferProof: transferProofUrl, transferId: `TRF-${Date.now()}` };
         const recipientData = {};
         if (document.getElementById('add-recipient')?.checked) {
           recipientData.fullName = document.getElementById('recipient-name').value;
@@ -346,7 +304,6 @@ const CheckoutSystem = {
         // Éxito - limpiar y notificar
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
-        
         Notifications.showNotification('🎉 ¡Compra realizada!', `Tu pedido #${result.orderId} ha sido creado`);
         
       } catch (error) {
@@ -364,7 +321,6 @@ const CheckoutSystem = {
         const proofPreview = document.getElementById('transfer-proof-preview');
         const existingError = proofPreview.querySelector('.error-message');
         if (existingError) existingError.remove();
-        
         proofPreview.appendChild(errorContainer);
         
         alert('Error al confirmar la compra: ' + error.message);
@@ -386,9 +342,7 @@ const CheckoutSystem = {
         const product = ProductView.getProductById(item.productId, 'digital');
         if (product && product.required_fields) {
           product.required_fields.forEach(field => {
-            if (field.required) {
-              fields.add(field.name);
-            }
+            if (field.required) fields.add(field.name);
           });
         }
       }
@@ -414,21 +368,13 @@ const CheckoutSystem = {
   },
   
   goToStep: function(step) {
-    document.querySelectorAll('.checkout-step').forEach(el => {
-      el.style.display = 'none';
-    });
-    
+    document.querySelectorAll('.checkout-step').forEach(el => el.style.display = 'none');
     const stepEl = document.getElementById(`step-${step}`);
-    if (stepEl) {
-      stepEl.style.display = 'block';
-    }
+    if (stepEl) stepEl.style.display = 'block';
     
     document.querySelectorAll('.step').forEach((el, index) => {
-      if (index + 1 <= step) {
-        el.classList.add('active');
-      } else {
-        el.classList.remove('active');
-      }
+      if (index + 1 <= step) el.classList.add('active');
+      else el.classList.remove('active');
     });
   },
   
@@ -446,37 +392,26 @@ const CheckoutSystem = {
     } else {
       if (userData.adminCards) {
         switch(method) {
-          case 'BPA':
-            cardNumber = userData.adminCards.bpa || 'Tarjeta no configurada';
-            break;
-          case 'BANDEC':
-            cardNumber = userData.adminCards.bandec || 'Tarjeta no configurada';
-            break;
-          case 'MLC':
-            cardNumber = userData.adminCards.mlc || 'Tarjeta no configurada';
-            break;
+          case 'BPA': cardNumber = userData.adminCards.bpa || 'Tarjeta no configurada'; break;
+          case 'BANDEC': cardNumber = userData.adminCards.bandec || 'Tarjeta no configurada'; break;
+          case 'MLC': cardNumber = userData.adminCards.mlc || 'Tarjeta no configurada'; break;
         }
       }
       
-      const adminCardEl = document.getElementById('admin-card-number');
-      const adminPhoneEl = document.getElementById('admin-phone-number');
-      if (adminCardEl) adminCardEl.textContent = `💳 Tarjeta: ${cardNumber}`;
-      if (adminPhoneEl) adminPhoneEl.textContent = `📱 Teléfono: ${phoneNumber}`;
+      document.getElementById('admin-card-number').textContent = `💳 Tarjeta: ${cardNumber}`;
+      document.getElementById('admin-phone-number').textContent = `📱 Teléfono: ${phoneNumber}`;
     }
     
-    // Determinar moneda según método de pago
-    let currency = 'CUP'; // Por defecto para BPA y BANDEC
+    // Determinar moneda
+    let currency = 'CUP';
     if (method === 'MLC') currency = 'MLC';
     else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
     
     const totalDisplay = document.getElementById('order-total-display');
     if (totalDisplay) {
       const total = this.selectedMethodPrices[currency];
-      if (total !== undefined) {
-        totalDisplay.textContent = `Total: ${total.toFixed(2)} ${currency}`;
-      } else {
-        totalDisplay.textContent = 'Total no disponible';
-      }
+      totalDisplay.textContent = total !== undefined ? 
+        `Total: ${total.toFixed(2)} ${currency}` : 'Total no disponible';
     }
   }
 };
