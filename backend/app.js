@@ -141,7 +141,7 @@ app.get('/api/products/:type/:id', async (req, res) => {
 });
 
 // =====================================================================
-// Rutas de carrito (SIN VERIFICACIONES DE AUTORIZACIÓN)
+// Rutas de carrito
 // =====================================================================
 app.get('/api/cart/:userId', async (req, res) => {
   const { userId } = req.params;
@@ -331,7 +331,7 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 app.post('/api/checkout', async (req, res) => {
   console.log('[CHECKOUT] Iniciando proceso de checkout');
   
-  const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
+  const { userId, paymentMethod, transferData, recipient, requiredFields, userData } = req.body;
   
   // Validación básica
   if (!userId || !paymentMethod) {
@@ -367,7 +367,7 @@ app.post('/api/checkout', async (req, res) => {
       // Obtener producto
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, prices')
+        .select('name, prices, images, tab_type')
         .eq('id', item.productId)
         .single();
       
@@ -384,7 +384,8 @@ app.post('/api/checkout', async (req, res) => {
         product_name: product.name,
         quantity: item.quantity,
         price: price,
-        tab_type: item.tabType
+        tab_type: product.tab_type,
+        image_url: product.images && product.images.length > 0 ? product.images[0] : null
       });
     }
     
@@ -394,7 +395,8 @@ app.post('/api/checkout', async (req, res) => {
       id: orderId,
       user_id: userId,
       total: total,
-      status: 'Pendiente'
+      status: 'Pendiente',
+      user_data: userData // Guardar datos del usuario
     };
     
     const { error: orderError } = await supabase
@@ -659,6 +661,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         status,
         created_at,
         updated_at,
+        user_data,
         order_details (payment_method, transfer_data, recipient_data, required_fields),
         order_items (product_name, quantity, price, image_url, tab_type)
       `)
@@ -673,6 +676,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
       status: order.status,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
+      userData: order.user_data,
       payment: {
         method: order.order_details[0]?.payment_method,
         ...order.order_details[0]?.transfer_data
@@ -701,6 +705,7 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         status,
         created_at,
         updated_at,
+        user_data,
         order_details (payment_method, transfer_data, recipient_data, required_fields),
         order_items (product_name, quantity, price, image_url, tab_type)
       `);
@@ -714,6 +719,7 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
       status: order.status,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
+      userData: order.user_data,
       payment: {
         method: order.order_details[0]?.payment_method,
         ...order.order_details[0]?.transfer_data
@@ -727,6 +733,57 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error obteniendo pedidos para admin:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
+  }
+});
+
+// Obtener un pedido específico (para admin)
+app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
+  const { orderId } = req.params;
+  
+  try {
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        user_data,
+        order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items (product_name, quantity, price, image_url, tab_type)
+      `)
+      .eq('id', orderId)
+      .single();
+    
+    if (error) throw error;
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+    
+    const parsedOrder = {
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      userData: order.user_data,
+      payment: {
+        method: order.order_details[0]?.payment_method,
+        ...order.order_details[0]?.transfer_data
+      },
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
+      items: order.order_items
+    };
+    
+    res.json(parsedOrder);
+  } catch (error) {
+    console.error('Error obteniendo pedido:', error);
+    res.status(500).json({ error: 'Error obteniendo pedido' });
   }
 });
 
