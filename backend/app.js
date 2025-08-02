@@ -191,21 +191,39 @@ app.post('/api/cart/add', async (req, res) => {
   }
   
   try {
+    console.log(`[CART] Añadiendo producto: ${productId}, tipo: ${tabType} para usuario: ${userId}`);
+    
+    // Verificar que el producto existe
+    const { data: product, error: productError } = await supabase
+      .from('products')
+      .select('id')
+      .eq('id', productId)
+      .single();
+      
+    if (productError || !product) {
+      console.error(`[CART] Producto no encontrado: ${productId}`);
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    
     let { data: cart, error } = await supabase
       .from('carts')
       .select('items')
       .eq('user_id', userId)
       .single();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error && error.code !== 'PGRST116') {
+      console.error('[CART] Error obteniendo carrito:', error);
+      throw error;
+    }
     
     let items = cart?.items || [];
     const existingItemIndex = items.findIndex(item => 
-      item.productId == productId && item.tabType === tabType
+      item.productId === productId && item.tabType === tabType
     );
     
     if (existingItemIndex !== -1) {
       items[existingItemIndex].quantity += 1;
+      console.log(`[CART] Incrementado cantidad: ${items[existingItemIndex].quantity}`);
     } else {
       items.push({ 
         productId, 
@@ -213,31 +231,34 @@ app.post('/api/cart/add', async (req, res) => {
         quantity: 1,
         addedAt: new Date().toISOString()
       });
+      console.log(`[CART] Nuevo item añadido`);
     }
     
-    if (cart) {
-      const { data: updatedCart, error } = await supabase
-        .from('carts')
-        .update({ items })
-        .eq('user_id', userId)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      res.json({ userId, items: updatedCart.items });
-    } else {
-      const { data: newCart, error } = await supabase
-        .from('carts')
-        .insert([{ user_id: userId, items }])
-        .select()
-        .single();
-      
-      if (error) throw error;
-      res.json({ userId, items: newCart.items });
+    const upsertData = {
+      user_id: userId,
+      items,
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data: updatedCart, error: upsertError } = await supabase
+      .from('carts')
+      .upsert(upsertData, { onConflict: 'user_id' })
+      .select()
+      .single();
+    
+    if (upsertError) {
+      console.error('[CART] Error upserting cart:', upsertError);
+      throw upsertError;
     }
+    
+    console.log('[CART] Carrito actualizado exitosamente');
+    res.json({ userId, items: updatedCart.items });
   } catch (error) {
-    console.error('Error añadiendo al carrito:', error);
-    res.status(500).json({ error: 'Error añadiendo al carrito' });
+    console.error('[CART] Error añadiendo al carrito:', error);
+    res.status(500).json({ 
+      error: 'Error añadiendo al carrito',
+      details: error.message 
+    });
   }
 });
 
