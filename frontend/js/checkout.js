@@ -306,6 +306,16 @@ const CheckoutSystem = {
           });
         }
 
+        // Obtener datos del cliente
+        const userData = UserProfile.getUserData();
+        const customerData = {
+          name: userData.fullName,
+          ci: userData.ci,
+          phone: userData.phone,
+          address: userData.address,
+          province: userData.province
+        };
+
         // 2. Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
           method: 'POST',
@@ -318,7 +328,8 @@ const CheckoutSystem = {
             paymentMethod: method,
             transferData: transferData,
             recipient: recipientData,
-            requiredFields: requiredFieldsData
+            requiredFields: requiredFieldsData,
+            customer: customerData
           })
         });
 
