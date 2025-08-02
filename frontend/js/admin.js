@@ -5,36 +5,13 @@ const AdminSystem = {
   telegramUserId: null,
   
   init: function() {
-    console.log('[Admin] Iniciando sistema de administración');
     this.telegramUserId = this.getTelegramUserId();
-    console.log(`[Admin] ID de Telegram: ${this.telegramUserId}`);
-    
-    const adminButton = document.getElementById('admin-button');
-    if (!adminButton) {
-      console.error('[Admin] Botón de admin no encontrado en el DOM');
-      return;
-    }
-    
-    this.checkAdminStatus().then(() => {
-      console.log(`[Admin] Verificación completada. ¿Es admin? ${this.isAdmin}`);
-      this.initializeAdmin();
-    }).catch(error => {
-      console.error('[Admin] Error verificando estado de admin:', error);
-      this.initializeAdmin();
-    });
+    this.checkAdminStatus().then(() => this.initializeAdmin());
   },
   
   getTelegramUserId: function() {
     const urlParams = new URLSearchParams(window.location.search);
-    let tgid = urlParams.get('tgid');
-    
-    if (!tgid) {
-      tgid = localStorage.getItem('telegramUserId');
-    }
-    
-    if (!tgid) {
-      tgid = sessionStorage.getItem('telegramUserId');
-    }
+    let tgid = urlParams.get('tgid') || localStorage.getItem('telegramUserId');
     
     if (!tgid && window.location.hostname === 'localhost') {
       tgid = '5376388604'; // ID de desarrollo
@@ -43,7 +20,6 @@ const AdminSystem = {
     
     if (tgid) {
       localStorage.setItem('telegramUserId', tgid);
-      console.log(`[Admin] ID de Telegram: ${tgid}`);
       return tgid;
     }
     
@@ -53,24 +29,16 @@ const AdminSystem = {
   
   checkAdminStatus: async function() {
     if (!this.telegramUserId) {
-      console.log('[Admin] No hay ID de Telegram. Usuario no es admin');
       this.isAdmin = false;
       return;
     }
     
     try {
-      console.log(`[Admin] Verificando estado de admin con backend: ${window.API_BASE_URL}/api/admin/ids`);
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
-      
-      if (!response.ok) {
-        throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
-      }
+      if (!response.ok) throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       
       const adminIds = await response.json();
-      console.log(`[Admin] IDs de admin recibidos: ${adminIds.join(', ')}`);
-      
       this.isAdmin = adminIds.includes(this.telegramUserId.toString());
-      console.log(`[Admin] ¿Usuario ${this.telegramUserId} es admin? ${this.isAdmin}`);
     } catch (error) {
       console.error('[Admin] Error verificando estado de admin:', error);
       this.isAdmin = false;
@@ -78,51 +46,25 @@ const AdminSystem = {
   },
   
   initializeAdmin: function() {
-    console.log('[Admin] Inicializando interfaz de admin');
     const adminButton = document.getElementById('admin-button');
-    const adminIndicator = document.getElementById('admin-indicator');
-    
-    if (!adminButton) {
-      console.error('[Admin] Botón de admin no encontrado en el DOM');
-      return;
-    }
+    if (!adminButton) return;
     
     if (this.isAdmin) {
-      console.log('[Admin] Mostrando botón de admin');
       adminButton.style.display = 'block';
       adminButton.classList.add('admin-active');
-      
-      if (adminIndicator) {
-        adminIndicator.style.display = 'block';
-      }
-      
-      adminButton.addEventListener('click', () => {
-        console.log('[Admin] Abriendo panel de administración');
-        this.openAdminPanel();
-      });
+      adminButton.addEventListener('click', () => this.openAdminPanel());
     } else {
-      console.log('[Admin] Ocultando botón de admin');
       adminButton.style.display = 'none';
-      if (adminIndicator) {
-        adminIndicator.style.display = 'none';
-      }
     }
   },
 
   openAdminPanel: function() {
-    // Verificación adicional de seguridad
-    if (!this.isAdmin) {
-      console.warn('[Admin] Intento de acceso no autorizado al panel');
-      alert('Acceso restringido: solo administradores pueden acceder');
-      return;
-    }
+    if (!this.isAdmin) return;
     
-    console.log('[Admin] Creando HTML del panel de admin');
     const modal = document.getElementById('product-modal');
     modal.innerHTML = this.getAdminPanelHTML();
     modal.style.display = 'flex';
     
-    console.log('[Admin] Configurando eventos del panel');
     this.setupAdminEvents();
     this.renderCategoryOptions();
     
@@ -300,22 +242,16 @@ const AdminSystem = {
   setupAdminEvents: function() {
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-        const tabType = tab.getAttribute('data-tab');
+        const tabType = tab.dataset.tab;
         document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         
-        document.querySelectorAll('.admin-tab-content').forEach(content => {
-          content.style.display = 'none';
-        });
+        document.querySelectorAll('.admin-tab-content').forEach(content => content.style.display = 'none');
         document.getElementById(`admin-${tabType}`).style.display = 'block';
         
-        if (tabType === 'products') {
-          this.renderProductsList();
-        } else if (tabType === 'categories') {
-          this.renderCategoriesList();
-        } else if (tabType === 'orders') {
-          this.loadOrders('all');
-        }
+        if (tabType === 'products') this.renderProductsList();
+        else if (tabType === 'categories') this.renderCategoriesList();
+        else if (tabType === 'orders') this.loadOrders('all');
       });
     });
     
@@ -327,7 +263,7 @@ const AdminSystem = {
     
     document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
       tab.addEventListener('click', (e) => {
-        const type = e.target.getAttribute('data-type');
+        const type = e.target.dataset.type;
         this.productType = type;
         document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
         e.target.classList.add('active');
@@ -342,15 +278,13 @@ const AdminSystem = {
 
     document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
       tab.addEventListener('click', (e) => {
-        const type = e.target.getAttribute('data-type');
-        this.categoryType = type;
+        this.categoryType = e.target.dataset.type;
         this.renderCategoriesList();
       });
     });
     
     document.getElementById('has-color-variant').addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      document.getElementById('color-variant-section').style.display = isChecked ? 'block' : 'none';
+      document.getElementById('color-variant-section').style.display = e.target.checked ? 'block' : 'none';
     });
     
     document.getElementById('add-color-btn').addEventListener('click', () => {
@@ -364,9 +298,7 @@ const AdminSystem = {
       `;
       
       container.querySelectorAll('.remove-color').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.target.closest('.color-variant').remove();
-        });
+        btn.addEventListener('click', (e) => e.target.closest('.color-variant').remove());
       });
     });
     
@@ -382,53 +314,32 @@ const AdminSystem = {
       `;
       
       container.querySelectorAll('.remove-field').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.target.closest('.required-field').remove();
-        });
+        btn.addEventListener('click', (e) => e.target.closest('.required-field').remove());
       });
     });
     
-    document.getElementById('save-product').addEventListener('click', () => {
-      this.saveProduct();
-    });
-    
+    document.getElementById('save-product').addEventListener('click', () => this.saveProduct());
     document.getElementById('cancel-product').addEventListener('click', () => {
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
     });
-    
-    document.getElementById('add-category-btn').addEventListener('click', () => {
-      this.addCategory();
-    });
-    
-    document.getElementById('order-status-filter')?.addEventListener('change', (e) => {
-      this.loadOrders(e.target.value);
-    });
-    
-    document.getElementById('product-images')?.addEventListener('change', (e) => {
-      this.previewImages(e.target, 'image-preview');
-    });
-    
-    document.getElementById('digital-image')?.addEventListener('change', (e) => {
-      this.previewImages(e.target, 'digital-image-preview', false);
-    });
+    document.getElementById('add-category-btn').addEventListener('click', () => this.addCategory());
+    document.getElementById('order-status-filter')?.addEventListener('change', (e) => this.loadOrders(e.target.value));
+    document.getElementById('product-images')?.addEventListener('change', (e) => this.previewImages(e.target, 'image-preview'));
+    document.getElementById('digital-image')?.addEventListener('change', (e) => this.previewImages(e.target, 'digital-image-preview', false));
     
     this.renderProductsList();
     this.renderCategoriesList();
     this.loadOrders('all');
   },
   
-  previewImages: function(input, previewId, isMultiple = true) {
+  previewImages: function(input, previewId) {
     const preview = document.getElementById(previewId);
     preview.innerHTML = '';
     
-    if (!input.files || input.files.length === 0) {
-      return;
-    }
+    if (!input.files || input.files.length === 0) return;
     
-    const files = Array.from(input.files);
-    
-    files.forEach(file => {
+    Array.from(input.files).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = document.createElement('img');
@@ -443,23 +354,6 @@ const AdminSystem = {
       };
       reader.readAsDataURL(file);
     });
-    
-    files.forEach((file, index) => {
-      this.uploadAndPreviewImage(file, previewId, index, files.length);
-    });
-  },
-  
-  uploadAndPreviewImage: async function(file, previewId, index, total) {
-    try {
-      const imageUrl = await ImageUploader.uploadImage(file);
-      console.log(`Imagen ${index+1}/${total} subida: ${imageUrl}`);
-    } catch (error) {
-      console.error(`Error subiendo imagen ${index+1}:`, error);
-      const errorElement = document.createElement('div');
-      errorElement.className = 'image-upload-error';
-      errorElement.textContent = `❌ Error: ${error.message}`;
-      document.getElementById(previewId).appendChild(errorElement);
-    }
   },
   
   saveProduct: async function() {
@@ -469,12 +363,9 @@ const AdminSystem = {
     const categoryId = document.getElementById('product-category').value;
     const details = document.getElementById('product-details').value;
     
-    const priceInputs = document.querySelectorAll('.price-currency');
     const prices = {};
-    priceInputs.forEach(input => {
-      if (input.value) {
-        prices[input.dataset.currency] = parseFloat(input.value);
-      }
+    document.querySelectorAll('.price-currency').forEach(input => {
+      if (input.value) prices[input.dataset.currency] = parseFloat(input.value);
     });
     
     if (!name || !description || !categoryId) {
@@ -482,89 +373,55 @@ const AdminSystem = {
       return;
     }
     
-    const product = {
-      name,
-      description,
-      prices,
-      details: details || '',
-      date_created: new Date().toISOString()
-    };
-    
-    if (type === 'fisico') {
-      const imageFiles = document.getElementById('product-images').files;
-      if (imageFiles.length > 0) {
-        product.images = [];
-        for (let i = 0; i < imageFiles.length; i++) {
-          try {
-            const imageUrl = await ImageUploader.uploadImage(imageFiles[i]);
-            product.images.push(imageUrl);
-          } catch (error) {
-            console.error('Error en subida de imagen:', error);
-            alert(`Error subiendo imagen ${i+1}: ${error.message}`);
-            return;
-          }
-        }
-      }
-      
-      product.hasColorVariant = document.getElementById('has-color-variant').checked;
-      
-      if (product.hasColorVariant) {
-        product.colors = [];
-        document.querySelectorAll('.color-variant').forEach(variant => {
-          const color = variant.querySelector('.color-picker').value;
-          const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
-          product.colors.push({ color, name });
-        });
-      }
-    } else {
-      const imageFile = document.getElementById('digital-image').files[0];
-      if (imageFile) {
-        try {
-          const imageUrl = await ImageUploader.uploadImage(imageFile);
-          product.images = [imageUrl];
-        } catch (error) {
-          console.error('Error en subida de imagen digital:', error);
-          alert('Error subiendo imagen: ' + error.message);
-          return;
-        }
-      }
-      
-      product.requiredFields = [];
-      document.querySelectorAll('.required-field').forEach(field => {
-        const fieldName = field.querySelector('.field-name').value.trim();
-        const isRequired = field.querySelector('.field-required').checked;
-        
-        if (fieldName) {
-          product.requiredFields.push({
-            name: fieldName,
-            required: isRequired
-          });
-        }
-      });
-    }
+    const product = { name, description, prices, details: details || '', date_created: new Date().toISOString() };
     
     try {
+      if (type === 'fisico') {
+        const imageFiles = document.getElementById('product-images').files;
+        if (imageFiles.length > 0) {
+          product.images = [];
+          for (let i = 0; i < imageFiles.length; i++) {
+            const imageUrl = await ImageUploader.uploadImage(imageFiles[i]);
+            product.images.push(imageUrl);
+          }
+        }
+        
+        product.hasColorVariant = document.getElementById('has-color-variant').checked;
+        if (product.hasColorVariant) {
+          product.colors = [];
+          document.querySelectorAll('.color-variant').forEach(variant => {
+            const color = variant.querySelector('.color-picker').value;
+            const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
+            product.colors.push({ color, name });
+          });
+        }
+      } else {
+        const imageFile = document.getElementById('digital-image').files[0];
+        if (imageFile) {
+          const imageUrl = await ImageUploader.uploadImage(imageFile);
+          product.images = [imageUrl];
+        }
+        
+        product.requiredFields = [];
+        document.querySelectorAll('.required-field').forEach(field => {
+          const fieldName = field.querySelector('.field-name').value.trim();
+          const isRequired = field.querySelector('.field-required').checked;
+          if (fieldName) product.requiredFields.push({ name: fieldName, required: isRequired });
+        });
+      }
+      
       const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Telegram-ID': this.telegramUserId.toString()
         },
-        body: JSON.stringify({
-          type: type,
-          categoryId: categoryId,
-          product: product
-        })
+        body: JSON.stringify({ type: type, categoryId: categoryId, product: product })
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error al guardar: ${errorText}`);
-      }
+      if (!response.ok) throw new Error(await response.text());
       
-      const newProduct = await response.json();
       alert('✅ Producto creado correctamente!');
-      
       this.renderProductsList();
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
@@ -575,24 +432,12 @@ const AdminSystem = {
   
   renderProductsList: function() {
     const container = document.getElementById('products-list');
-    if (!container) {
-      console.error('[Admin] No se encontró el contenedor de productos');
-      return;
-    }
-    
     container.innerHTML = '<div class="loading">Cargando productos...</div>';
     
     fetch(`${window.API_BASE_URL}/api/admin/products`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-      })
+      .then(response => response.json())
       .then(products => {
         if (!products || products.length === 0) {
           container.innerHTML = '<p>No hay productos disponibles</p>';
@@ -606,7 +451,7 @@ const AdminSystem = {
               <div class="admin-product-item">
                 <div class="product-info">
                   <div class="product-image-preview">
-                    ${product.images && product.images.length > 0 ? 
+                    ${product.images?.length > 0 ? 
                       `<img src="${product.images[0]}" alt="${product.name}" style="width: 60px; height: 60px; object-fit: cover;">` : 
                       `<div class="no-image">🖼️</div>`
                     }
@@ -615,9 +460,7 @@ const AdminSystem = {
                     <strong>${product.name}</strong>
                     <div>Tipo: ${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
                     <div>Categoría: ${product.category || 'Sin categoría'}</div>
-                    <div>${Object.entries(product.prices || {}).map(([currency, price]) => 
-                      `${currency}: ${price}`
-                    ).join(', ')}</div>
+                    <div>${Object.entries(product.prices || {}).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
                   </div>
                 </div>
                 <div class="product-actions">
@@ -630,52 +473,33 @@ const AdminSystem = {
         `;
         
         container.querySelectorAll('.edit-product').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const id = e.target.getAttribute('data-id');
-            this.editProduct(id);
-          });
+          btn.addEventListener('click', (e) => this.editProduct(e.target.dataset.id));
         });
         
         container.querySelectorAll('.delete-product').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            const id = e.target.getAttribute('data-id');
-            
-            if (confirm('¿Estás seguro de eliminar este producto?')) {
-              this.deleteProduct(id);
-            }
+            if (confirm('¿Estás seguro de eliminar este producto?')) this.deleteProduct(e.target.dataset.id);
           });
         });
       })
       .catch(error => {
-        console.error('Error cargando productos:', error);
-        container.innerHTML = `
-          <div class="error">
-            <p>Error cargando productos</p>
-            <p><small>${error.message}</small></p>
-          </div>
-        `;
+        container.innerHTML = `<div class="error"><p>Error cargando productos</p><p><small>${error.message}</small></p></div>`;
       });
   },
   
   editProduct: function(id) {
     fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
       .then(response => response.json())
       .then(product => {
-        if (!product) {
-          return;
-        }
-        
         const form = document.getElementById('product-form');
         form.style.display = 'block';
         document.getElementById('add-product-btn').style.display = 'none';
         
         this.productType = product.type;
         document.querySelectorAll('.type-tab').forEach(tab => {
-          tab.classList.toggle('active', tab.getAttribute('data-type') === product.type);
+          tab.classList.toggle('active', tab.dataset.type === product.type);
         });
         
         document.getElementById('product-name').value = product.name;
@@ -685,20 +509,16 @@ const AdminSystem = {
         
         const prices = product.prices || {};
         document.querySelectorAll('.price-currency').forEach(input => {
-          const currency = input.dataset.currency;
-          if (prices[currency]) {
-            input.value = prices[currency];
-          }
+          if (prices[input.dataset.currency]) input.value = prices[input.dataset.currency];
         });
         
         if (product.type === 'fisico') {
           document.getElementById('has-color-variant').checked = !!product.has_color_variant;
-          document.getElementById('color-variant-section').style.display = 
-            product.has_color_variant ? 'block' : 'none';
+          document.getElementById('color-variant-section').style.display = product.has_color_variant ? 'block' : 'none';
           
           const preview = document.getElementById('image-preview');
           preview.innerHTML = '';
-          if (product.images && product.images.length > 0) {
+          if (product.images) {
             product.images.forEach(img => {
               const imgEl = document.createElement('img');
               imgEl.src = img;
@@ -715,7 +535,6 @@ const AdminSystem = {
           if (product.has_color_variant && product.colors) {
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
-            
             product.colors.forEach(color => {
               container.innerHTML += `
                 <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -727,15 +546,13 @@ const AdminSystem = {
             });
             
             container.querySelectorAll('.remove-color').forEach(btn => {
-              btn.addEventListener('click', (e) => {
-                e.target.closest('.color-variant').remove();
-              });
+              btn.addEventListener('click', (e) => e.target.closest('.color-variant').remove());
             });
           }
         } else {
           const preview = document.getElementById('digital-image-preview');
           preview.innerHTML = '';
-          if (product.images && product.images.length > 0) {
+          if (product.images?.length > 0) {
             const imgEl = document.createElement('img');
             imgEl.src = product.images[0];
             imgEl.style.maxWidth = '200px';
@@ -746,19 +563,17 @@ const AdminSystem = {
           
           const container = document.getElementById('required-fields-container');
           container.innerHTML = '';
-          if (product.required_fields) {
-            if (product.required_fields.length > 0) {
-              product.required_fields.forEach(field => {
-                container.innerHTML += `
-                  <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                    <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
-                    <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
-                    <label>Requerido</label>
-                    <button class="remove-field">❌</button>
-                  </div>
-                `;
-              });
-            }
+          if (product.required_fields?.length > 0) {
+            product.required_fields.forEach(field => {
+              container.innerHTML += `
+                <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                  <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
+                  <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
+                  <label>Requerido</label>
+                  <button class="remove-field">❌</button>
+                </div>
+              `;
+            });
           } else {
             container.innerHTML = `
               <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -771,19 +586,13 @@ const AdminSystem = {
           }
           
           container.querySelectorAll('.remove-field').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-              e.target.closest('.required-field').remove();
-            });
+            btn.addEventListener('click', (e) => e.target.closest('.required-field').remove());
           });
         }
         
-        document.getElementById('save-product').onclick = () => {
-          this.saveProduct();
-        };
+        document.getElementById('save-product').onclick = () => this.saveProduct();
       })
-      .catch(error => {
-        alert('Error al cargar el producto para edición');
-      });
+      .catch(() => alert('Error al cargar el producto para edición'));
   },
   
   deleteProduct: function(id) {
@@ -791,24 +600,15 @@ const AdminSystem = {
     
     fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Telegram-ID': this.telegramUserId.toString()
-      }
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
     .then(response => {
       if (response.ok) {
         this.renderProductsList();
         alert('✅ Producto eliminado correctamente');
-      } else {
-        return response.text().then(errorText => {
-          throw new Error(`Error del servidor: ${errorText}`);
-        });
-      }
+      } else throw new Error('Error del servidor');
     })
-    .catch(error => {
-      console.error('Error eliminando producto:', error);
-      alert('Error al eliminar el producto: ' + error.message);
-    });
+    .catch(error => alert('Error al eliminar el producto: ' + error.message));
   },
   
   addCategory: function() {
@@ -816,10 +616,7 @@ const AdminSystem = {
     const nameInput = document.getElementById('new-category-name');
     const name = nameInput.value.trim();
     
-    if (!name) {
-      alert('Por favor ingrese un nombre para la categoría');
-      return;
-    }
+    if (!name) return alert('Por favor ingrese un nombre para la categoría');
     
     const btn = document.getElementById('add-category-btn');
     const originalText = btn.innerHTML;
@@ -829,176 +626,113 @@ const AdminSystem = {
     fetch(`${window.API_BASE_URL}/api/admin/categories`, {
       method: 'POST',
       headers: { 
-      'Content-Type': 'application/json',
-      'Telegram-ID': this.telegramUserId.toString()
-    },
-    body: JSON.stringify({
-      type: type,
-      name: name
+        'Content-Type': 'application/json',
+        'Telegram-ID': this.telegramUserId.toString()
+      },
+      body: JSON.stringify({ type, name })
     })
-  })
-  .then(response => {
-    if (response.status === 201) {
-      return response.json();
-    } else if (response.status === 400) {
-      return response.json().then(data => {
-        throw new Error(data.error);
-      });
-    } else {
-      throw new Error(`Error ${response.status}`);
-    }
-  })
-  .then(data => {
-    alert(`✅ Categoría "${name}" creada correctamente!`);
-    nameInput.value = '';
-    this.renderCategoriesList();
-    this.renderCategoryOptions();
-  })
-  .catch(error => {
-    console.error('Error añadiendo categoría:', error);
-    alert(`❌ Error: ${error.message}`);
-  })
-  .finally(() => {
-    btn.innerHTML = originalText;
-    btn.disabled = false;
-  });
-},
-
-renderCategoriesList: function() {
-  const type = this.categoryType;
-  const container = document.getElementById('categories-list');
-  if (!container) {
-    console.error('[Admin] No se encontró el contenedor de categorías');
-    return;
-  }
-  
-  container.innerHTML = '<div class="loading">Cargando categorías...</div>';
-  
-  fetch(`${window.API_BASE_URL}/api/admin/categories`, {
-    headers: {
-      'Telegram-ID': this.telegramUserId.toString()
-    }
-  })
-  .then(response => {
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-    return response.json();
-  })
-  .then(categories => {
-    const filtered = categories.filter(cat => cat.type === type);
-    
-    if (!filtered || filtered.length === 0) {
-      container.innerHTML = '<p>No hay categorías definidas</p>';
-      return;
-    }
-    
-    container.innerHTML = `
-      <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
-      <div class="admin-items-list">
-        ${filtered.map(category => `
-          <div class="admin-category-item">
-            <div class="category-info">
-              <strong>${category.name}</strong>
-              <small>Tipo: ${category.type}</small>
-            </div>
-            <div class="category-actions">
-              <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    
-    container.querySelectorAll('.delete-category').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.target.getAttribute('data-id');
-        this.deleteCategory(id);
-      });
-    });
-  })
-  .catch(error => {
-    console.error('Error cargando categorías:', error);
-    container.innerHTML = `
-      <div class="error">
-        <p>Error cargando categorías</p>
-        <p><small>${error.message}</small></p>
-      </div>
-    `;
-  });
-},
-
-deleteCategory: function(id) {
-  if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) {
-    return;
-  }
-  
-  fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
-    method: 'DELETE',
-    headers: {
-      'Telegram-ID': this.telegramUserId.toString()
-    }
-  })
-  .then(response => {
-    if (response.ok) {
-      this.renderCategoriesList();
-      this.renderProductsList();
-      alert('✅ Categoría eliminada correctamente');
-    } else {
-      throw new Error('Error al eliminar categoría');
-    }
-  })
-  .catch(error => {
-    alert('Error al eliminar categoría: ' + error.message);
-  });
-},
-
-loadOrders: function(filter = 'all') {
-  const ordersList = document.getElementById('admin-orders-list');
-  if (!ordersList) {
-    console.error('[Admin] No se encontró el contenedor de pedidos');
-    return;
-  }
-  
-  ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
-  
-  fetch(`${window.API_BASE_URL}/api/admin/orders`, {
-    headers: {
-      'Telegram-ID': this.telegramUserId.toString(),
-      'Content-Type': 'application/json'
-    }
-  })
     .then(response => {
-      if (!response.ok) {
-        return response.text().then(text => {
-          throw new Error(`Error ${response.status}: ${text}`);
-        });
-      }
-      return response.json();
+      if (response.status === 201) return response.json();
+      else if (response.status === 400) return response.json().then(data => { throw new Error(data.error); });
+      else throw new Error(`Error ${response.status}`);
     })
-    .then(orders => {
-      let filteredOrders = orders;
+    .then(() => {
+      alert(`✅ Categoría "${name}" creada correctamente!`);
+      nameInput.value = '';
+      this.renderCategoriesList();
+      this.renderCategoryOptions();
+    })
+    .catch(error => alert(`❌ Error: ${error.message}`))
+    .finally(() => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    });
+  },
+  
+  renderCategoriesList: function() {
+    const type = this.categoryType;
+    const container = document.getElementById('categories-list');
+    container.innerHTML = '<div class="loading">Cargando categorías...</div>';
+    
+    fetch(`${window.API_BASE_URL}/api/admin/categories`, {
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
+    })
+    .then(response => response.json())
+    .then(categories => {
+      const filtered = categories.filter(cat => cat.type === type);
       
-      if (filter !== 'all') {
-        filteredOrders = orders.filter(order => order.status === filter);
+      if (filtered.length === 0) {
+        container.innerHTML = '<p>No hay categorías definidas</p>';
+        return;
       }
       
-      const statusOrder = {
-        'Pendiente': 1,
-        'En proceso': 2,
-        'Enviado': 3,
-        'Completado': 4
-      };
+      container.innerHTML = `
+        <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
+        <div class="admin-items-list">
+          ${filtered.map(category => `
+            <div class="admin-category-item">
+              <div class="category-info">
+                <strong>${category.name}</strong>
+                <small>Tipo: ${category.type}</small>
+              </div>
+              <div class="category-actions">
+                <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
       
-      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      container.querySelectorAll('.delete-category').forEach(btn => {
+        btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id));
+      });
+    })
+    .catch(error => {
+      container.innerHTML = `<div class="error"><p>Error cargando categorías</p><p><small>${error.message}</small></p></div>`;
+    });
+  },
+  
+  deleteCategory: function(id) {
+    if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) return;
+    
+    fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
+      method: 'DELETE',
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
+    })
+    .then(response => {
+      if (response.ok) {
+        this.renderCategoriesList();
+        this.renderProductsList();
+        alert('✅ Categoría eliminada correctamente');
+      } else throw new Error('Error al eliminar categoría');
+    })
+    .catch(error => alert('Error al eliminar categoría: ' + error.message));
+  },
+  
+  loadOrders: function(filter = 'all') {
+    const ordersList = document.getElementById('admin-orders-list');
+    ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+    
+    fetch(`${window.API_BASE_URL}/api/admin/orders`, {
+      headers: { 
+        'Telegram-ID': this.telegramUserId.toString(),
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(orders => {
+      let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
       
       if (filteredOrders.length === 0) {
         ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
         return;
       }
       
-      ordersList.innerHTML = '';
+      // Ordenar por estado
+      const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
+      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
       
+      ordersList.innerHTML = '';
       filteredOrders.forEach(order => {
         const orderElement = document.createElement('div');
         orderElement.className = 'admin-order';
@@ -1026,67 +760,41 @@ loadOrders: function(filter = 'all') {
         ordersList.appendChild(orderElement);
       });
       
-      document.querySelectorAll('.btn-view').forEach(button => {
-        button.addEventListener('click', (e) => {
-          const orderId = e.target.getAttribute('data-id');
-          this.viewOrderDetails(orderId);
-        });
+      document.querySelectorAll('.btn-view').forEach(btn => {
+        btn.addEventListener('click', (e) => this.viewOrderDetails(e.target.dataset.id));
       });
       
       document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', (e) => {
-          const orderId = e.target.getAttribute('data-id');
-          const newStatus = e.target.value;
-          this.updateOrderStatus(orderId, newStatus);
-        });
+        select.addEventListener('change', (e) => this.updateOrderStatus(e.target.dataset.id, e.target.value));
       });
     })
     .catch(error => {
-      console.error('Error cargando pedidos:', error);
-      ordersList.innerHTML = `
-        <div class="error">
-          <p>Error cargando pedidos</p>
-          <p><small>${error.message}</small></p>
-          <button onclick="AdminSystem.loadOrders()">Reintentar</button>
-        </div>
-      `;
+      ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
     });
-},
-
-updateOrderStatus: function(orderId, newStatus) {
-  fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
-    method: 'PUT',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Telegram-ID': this.telegramUserId.toString()
-    },
-    body: JSON.stringify({ status: newStatus })
-  })
-  .then(response => {
-    if (response.ok) {
+  },
+  
+  updateOrderStatus: function(orderId, newStatus) {
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Telegram-ID': this.telegramUserId.toString()
+      },
+      body: JSON.stringify({ status: newStatus })
+    })
+    .then(() => {
       this.loadOrders(document.getElementById('order-status-filter').value);
       alert('✅ Estado actualizado correctamente');
-    } else {
-      throw new Error('Error actualizando estado');
-    }
-  })
-  .catch(error => {
-    alert('Error actualizando estado: ' + error.message);
-  });
-},
-
-viewOrderDetails: function(orderId) {
-  fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
-    headers: {
-      'Telegram-ID': this.telegramUserId.toString()
-    }
-  })
+    })
+    .catch(error => alert('Error actualizando estado: ' + error.message));
+  },
+  
+  viewOrderDetails: function(orderId) {
+    fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
+    })
     .then(response => response.json())
     .then(order => {
-      if (!order) {
-        return;
-      }
-      
       const modal = document.getElementById('product-modal');
       modal.innerHTML = `
         <div class="modal-content">
@@ -1157,27 +865,22 @@ viewOrderDetails: function(orderId) {
         </div>
       `;
       
-      modal.querySelector('.close-modal').addEventListener('click', () => {
-        this.openAdminPanel();
-      });
+      modal.querySelector('.close-modal').addEventListener('click', () => this.openAdminPanel());
     })
     .catch(error => {
-      console.error('Error cargando detalles:', error);
-      alert('Error al cargar detalles del pedido');
+      alert(`Error cargando detalles del pedido: ${error.message}`);
     });
-},
-
-renderCategoryOptions: function(type = this.productType) {
-  const categorySelect = document.getElementById('product-category');
-  if (!categorySelect) return;
+  },
   
-  categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
-  
-  fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
-    headers: {
-      'Telegram-ID': this.telegramUserId.toString()
-    }
-  })
+  renderCategoryOptions: function(type = this.productType) {
+    const categorySelect = document.getElementById('product-category');
+    if (!categorySelect) return;
+    
+    categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
+    
+    fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
+      headers: { 'Telegram-ID': this.telegramUserId.toString() }
+    })
     .then(response => response.json())
     .then(categories => {
       categories.forEach(category => {
@@ -1187,35 +890,29 @@ renderCategoryOptions: function(type = this.productType) {
         categorySelect.appendChild(option);
       });
     })
-    .catch(error => {
-      console.error('Error cargando categorías:', error);
-    });
-},
-
-resetProductForm: function() {
-  document.getElementById('product-name').value = '';
-  document.getElementById('product-description').value = '';
-  document.getElementById('product-details').value = '';
-  document.getElementById('has-color-variant').checked = false;
-  document.getElementById('color-variant-section').style.display = 'none';
-  document.getElementById('color-variants-container').innerHTML = '';
-  document.getElementById('image-preview').innerHTML = '';
-  document.getElementById('digital-image-preview').innerHTML = '';
-  document.getElementById('required-fields-container').innerHTML = `
-    <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-      <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
-      <input type="checkbox" class="field-required" checked>
-      <label>Requerido</label>
-      <button class="remove-field">❌</button>
-    </div>
-  `;
+    .catch(error => console.error('Error cargando categorías:', error));
+  },
   
-  document.querySelectorAll('.price-currency').forEach(input => {
-    input.value = '';
-  });
-}
+  resetProductForm: function() {
+    document.getElementById('product-name').value = '';
+    document.getElementById('product-description').value = '';
+    document.getElementById('product-details').value = '';
+    document.getElementById('has-color-variant').checked = false;
+    document.getElementById('color-variant-section').style.display = 'none';
+    document.getElementById('color-variants-container').innerHTML = '';
+    document.getElementById('image-preview').innerHTML = '';
+    document.getElementById('digital-image-preview').innerHTML = '';
+    document.getElementById('required-fields-container').innerHTML = `
+      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+        <input type="checkbox" class="field-required" checked>
+        <label>Requerido</label>
+        <button class="remove-field">❌</button>
+      </div>
+    `;
+    
+    document.querySelectorAll('.price-currency').forEach(input => input.value = '');
+  }
 };
 
-window.addEventListener('DOMContentLoaded', () => {
-  AdminSystem.init();
-});
+window.addEventListener('DOMContentLoaded', () => AdminSystem.init());
