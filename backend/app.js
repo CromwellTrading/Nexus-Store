@@ -4,7 +4,6 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import TelegramBot from 'node-telegram-bot-api';
-import pg from 'pg';
 
 // =====================================================================
 // Configuración inicial
@@ -13,12 +12,6 @@ console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-
-// Configurar pool de PostgreSQL
-const pool = new pg.Pool({
-  connectionString: process.env.SUPABASE_DB_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
 
 // =====================================================================
 // Configuración de Supabase
@@ -333,149 +326,130 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 });
 
 // =====================================================================
-// Checkout
+// Checkout - Versión simplificada y corregida
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
+  console.log('[CHECKOUT] Iniciando proceso de checkout');
+  
   const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
   
-  console.log(`[CHECKOUT] Iniciando proceso para usuario: ${userId}`);
-  
-  // Verificar que todos los parámetros requeridos estén presentes
-  if (!userId || !paymentMethod || !transferData) {
+  // Validación básica
+  if (!userId || !paymentMethod) {
     return res.status(400).json({ 
       error: 'Datos incompletos',
-      message: 'Faltan parámetros requeridos para el checkout'
+      message: 'Faltan parámetros requeridos: userId y paymentMethod'
     });
   }
   
-  const client = await pool.connect();
-  
   try {
-    await client.query('BEGIN');
+    // 1. Obtener carrito desde Supabase
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
     
-    // 1. Obtener carrito
-    const cartRes = await client.query(
-      'SELECT items FROM carts WHERE user_id = $1 FOR UPDATE',
-      [userId]
-    );
+    if (cartError || !cart) {
+      console.error('[CHECKOUT] Error obteniendo carrito:', cartError);
+      return res.status(400).json({ error: 'Carrito no encontrado' });
+    }
     
-    if (!cartRes.rows.length || !cartRes.rows[0].items) {
-      console.log('[CHECKOUT] Carrito vacío');
+    const items = cart.items;
+    if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Carrito vacío' });
     }
     
-    const items = cartRes.rows[0].items;
+    // 2. Calcular total
     let total = 0;
     const orderItems = [];
     
-    console.log(`[CHECKOUT] Procesando ${items.length} items`);
-    
-    // 2. Procesar cada item
     for (const item of items) {
-      console.log(`[CHECKOUT] Procesando item: ${JSON.stringify(item)}`);
+      // Obtener producto
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('name, prices')
+        .eq('id', item.productId)
+        .single();
       
-      const productRes = await client.query(
-        `SELECT id, name, prices->>$1 AS price, images->0 AS image
-         FROM products WHERE id = $2`,
-        [paymentMethod, item.productId]
-      );
-      
-      if (productRes.rows.length) {
-        const product = productRes.rows[0];
-        console.log(`[CHECKOUT] Producto encontrado: ${product.name}`);
-        
-        const price = parseFloat(product.price) || 0;
-        const itemTotal = price * item.quantity;
-        total += itemTotal;
-        
-        orderItems.push({
-          product_id: product.id,
-          product_name: product.name,
-          quantity: item.quantity,
-          price: price,
-          image_url: product.image,
-          tab_type: item.tabType
-        });
-      } else {
-        console.error(`[CHECKOUT] Producto no encontrado: ${item.productId}`);
+      if (productError || !product) {
+        console.warn(`[CHECKOUT] Producto no encontrado: ${item.productId}`);
+        continue;
       }
+      
+      const price = product.prices[paymentMethod] || 0;
+      total += price * item.quantity;
+      
+      orderItems.push({
+        product_id: item.productId,
+        product_name: product.name,
+        quantity: item.quantity,
+        price: price,
+        tab_type: item.tabType
+      });
     }
-    
-    console.log(`[CHECKOUT] Total calculado: ${total}`);
     
     // 3. Crear orden
-    const orderId = `ORD-${Date.now()}`;
-    console.log(`[CHECKOUT] Creando orden: ${orderId}`);
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const orderData = {
+      id: orderId,
+      user_id: userId,
+      total: total,
+      status: 'Pendiente'
+    };
     
-    const orderRes = await client.query(
-      `INSERT INTO orders (id, user_id, total, status)
-       VALUES ($1, $2, $3, 'Pendiente')
-       RETURNING *`,
-      [orderId, userId, total]
-    );
-    const order = orderRes.rows[0];
+    const { error: orderError } = await supabase
+      .from('orders')
+      .insert([orderData]);
     
-    // 4. Añadir items a la orden
-    console.log(`[CHECKOUT] Añadiendo ${orderItems.length} items a la orden`);
-    for (const item of orderItems) {
-      await client.query(
-        `INSERT INTO order_items 
-         (order_id, product_id, product_name, quantity, price, image_url, tab_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          orderId,
-          item.product_id,
-          item.product_name,
-          item.quantity,
-          item.price,
-          item.image_url,
-          item.tab_type
-        ]
-      );
-    }
+    if (orderError) throw orderError;
     
-    // 5. Guardar detalles adicionales
-    console.log(`[CHECKOUT] Guardando detalles adicionales`);
-    await client.query(
-      `INSERT INTO order_details 
-       (order_id, payment_method, transfer_data, recipient_data, required_fields)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        orderId,
-        paymentMethod,
-        JSON.stringify(transferData),
-        JSON.stringify(recipient || {}),
-        JSON.stringify(requiredFields || {})
-      ]
-    );
+    // 4. Guardar detalles de la orden
+    const orderDetails = {
+      order_id: orderId,
+      payment_method: paymentMethod,
+      transfer_data: transferData || {},
+      recipient_data: recipient || {},
+      required_fields: requiredFields || {}
+    };
+    
+    const { error: detailsError } = await supabase
+      .from('order_details')
+      .insert([orderDetails]);
+    
+    if (detailsError) throw detailsError;
+    
+    // 5. Guardar items de la orden
+    const itemsToInsert = orderItems.map(item => ({
+      ...item,
+      order_id: orderId
+    }));
+    
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(itemsToInsert);
+    
+    if (itemsError) throw itemsError;
     
     // 6. Vaciar carrito
-    console.log(`[CHECKOUT] Vaciando carrito`);
-    await client.query(
-      'DELETE FROM carts WHERE user_id = $1',
-      [userId]
-    );
+    await supabase
+      .from('carts')
+      .delete()
+      .eq('user_id', userId);
     
-    await client.query('COMMIT');
-    
-    console.log(`[CHECKOUT] Proceso completado exitosamente`);
+    console.log(`[CHECKOUT] Orden creada exitosamente: ${orderId}`);
     
     res.json({ 
       success: true, 
       orderId,
-      total,
-      order
+      total
     });
+    
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('[CHECKOUT] Error en checkout:', error);
+    console.error('[CHECKOUT] Error crítico:', error);
     res.status(500).json({ 
       error: 'Error en checkout',
-      message: error.message,
-      details: error.stack
+      message: error.message
     });
-  } finally {
-    client.release();
   }
 });
 
