@@ -326,12 +326,12 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 });
 
 // =====================================================================
-// Checkout - Versión mejorada
+// Checkout - Versión simplificada y corregida
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
   console.log('[CHECKOUT] Iniciando proceso de checkout');
   
-  const { userId, paymentMethod, transferData, recipient, requiredFields, customer } = req.body;
+  const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
   
   // Validación básica
   if (!userId || !paymentMethod) {
@@ -367,7 +367,7 @@ app.post('/api/checkout', async (req, res) => {
       // Obtener producto
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select('name, prices, images')
+        .select('name, prices')
         .eq('id', item.productId)
         .single();
       
@@ -379,15 +379,11 @@ app.post('/api/checkout', async (req, res) => {
       const price = product.prices[paymentMethod] || 0;
       total += price * item.quantity;
       
-      // Usar la primera imagen del producto
-      const imageUrl = product.images && product.images.length > 0 ? product.images[0] : null;
-      
       orderItems.push({
         product_id: item.productId,
         product_name: product.name,
         quantity: item.quantity,
         price: price,
-        image_url: imageUrl,
         tab_type: item.tabType
       });
     }
@@ -398,9 +394,7 @@ app.post('/api/checkout', async (req, res) => {
       id: orderId,
       user_id: userId,
       total: total,
-      status: 'Pendiente',
-      customer_name: customer?.name || 'Sin nombre',
-      customer_id: userId
+      status: 'Pendiente'
     };
     
     const { error: orderError } = await supabase
@@ -415,8 +409,7 @@ app.post('/api/checkout', async (req, res) => {
       payment_method: paymentMethod,
       transfer_data: transferData || {},
       recipient_data: recipient || {},
-      required_fields: requiredFields || {},
-      customer_data: customer || {}
+      required_fields: requiredFields || {}
     };
     
     const { error: detailsError } = await supabase
@@ -658,43 +651,38 @@ app.get('/api/orders/user/:userId', async (req, res) => {
   const { userId } = req.params;
   
   try {
-    // Obtener órdenes principales
-    const { data: orders, error: ordersError } = await supabase
+    const { data: orders, error } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items (product_name, quantity, price, image_url, tab_type)
+      `)
       .eq('user_id', userId);
     
-    if (ordersError) throw ordersError;
+    if (error) throw error;
     
-    // Obtener detalles completos para cada orden
-    const ordersWithDetails = await Promise.all(orders.map(async (order) => {
-      // Obtener detalles adicionales
-      const { data: details, error: detailsError } = await supabase
-        .from('order_details')
-        .select('*')
-        .eq('order_id', order.id)
-        .single();
-      
-      // Obtener items
-      const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', order.id);
-      
-      return {
-        ...order,
-        payment: {
-          method: details?.payment_method,
-          ...details?.transfer_data
-        },
-        recipient: details?.recipient_data,
-        requiredFields: details?.required_fields,
-        customer: details?.customer_data,
-        items: items || []
-      };
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details[0]?.payment_method,
+        ...order.order_details[0]?.transfer_data
+      },
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
+      items: order.order_items
     }));
     
-    res.json(ordersWithDetails);
+    res.json(parsedOrders);
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
@@ -704,94 +692,41 @@ app.get('/api/orders/user/:userId', async (req, res) => {
 // Obtener todos los pedidos (para admin)
 app.get('/api/admin/orders', isAdmin, async (req, res) => {
   try {
-    // Obtener todas las órdenes
-    const { data: orders, error: ordersError } = await supabase
+    const { data: orders, error } = await supabase
       .from('orders')
-      .select('*');
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items (product_name, quantity, price, image_url, tab_type)
+      `);
     
-    if (ordersError) throw ordersError;
+    if (error) throw error;
     
-    // Obtener detalles completos para cada orden
-    const ordersWithDetails = await Promise.all(orders.map(async (order) => {
-      // Obtener detalles adicionales
-      const { data: details, error: detailsError } = await supabase
-        .from('order_details')
-        .select('*')
-        .eq('order_id', order.id)
-        .single();
-      
-      // Obtener items
-      const { data: items, error: itemsError } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', order.id);
-      
-      return {
-        ...order,
-        payment: {
-          method: details?.payment_method,
-          ...details?.transfer_data
-        },
-        recipient: details?.recipient_data,
-        requiredFields: details?.required_fields,
-        customer: details?.customer_data,
-        items: items || []
-      };
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      payment: {
+        method: order.order_details[0]?.payment_method,
+        ...order.order_details[0]?.transfer_data
+      },
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
+      items: order.order_items
     }));
     
-    res.json(ordersWithDetails);
+    res.json(parsedOrders);
   } catch (error) {
     console.error('Error obteniendo pedidos para admin:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
-  }
-});
-
-// Obtener un pedido específico (para admin)
-app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
-  const { orderId } = req.params;
-  
-  try {
-    // Obtener la orden
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', orderId)
-      .single();
-    
-    if (orderError) throw orderError;
-    
-    // Obtener detalles adicionales
-    const { data: details, error: detailsError } = await supabase
-      .from('order_details')
-      .select('*')
-      .eq('order_id', orderId)
-      .single();
-    
-    if (detailsError) throw detailsError;
-    
-    // Obtener items
-    const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', orderId);
-    
-    if (itemsError) throw itemsError;
-    
-    res.json({
-      ...order,
-      payment: {
-        method: details?.payment_method,
-        ...details?.transfer_data
-      },
-      recipient: details?.recipient_data,
-      requiredFields: details?.required_fields,
-      customer: details?.customer_data,
-      items: items || []
-    });
-    
-  } catch (error) {
-    console.error('Error obteniendo pedido:', error);
-    res.status(500).json({ error: 'Error obteniendo pedido' });
   }
 });
 
