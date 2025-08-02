@@ -238,24 +238,36 @@ const CheckoutSystem = {
     }
     
     document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
-      // Validar campos obligatorios
-      if (!this.validateCheckoutForm()) return;
-      
       try {
         const method = document.querySelector('input[name="payment-method"]:checked')?.value;
         const userId = UserProfile.getTelegramUserId();
         
+        if (!method) {
+          alert('Por favor seleccione un método de pago');
+          return;
+        }
+        
+        if (!userId) {
+          alert('No se pudo identificar su usuario');
+          return;
+        }
+        
+        const proofFile = document.getElementById('transfer-proof')?.files[0];
+        if (!proofFile) {
+          alert('Por favor suba la captura de pantalla de la transferencia');
+          return;
+        }
+
         // Mostrar estado de carga
         const confirmBtn = document.getElementById('confirm-purchase');
         const originalBtnText = confirmBtn.innerHTML;
         confirmBtn.innerHTML = '<div class="spinner"></div> Procesando...';
         confirmBtn.disabled = true;
         
-        // Subir comprobante de transferencia
-        const proofFile = document.getElementById('transfer-proof')?.files[0];
         const proofPreview = document.getElementById('transfer-proof-preview');
         proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
-        
+
+        // 1. Subir comprobante
         let transferProofUrl;
         try {
           transferProofUrl = await ImageUploader.uploadImage(proofFile);
@@ -271,20 +283,20 @@ const CheckoutSystem = {
           confirmBtn.disabled = false;
           return;
         }
-        
-        // Preparar datos para enviar al backend
+
+        // Preparar datos
         const transferData = {
           transferProof: transferProofUrl,
           transferId: `TRF-${Date.now()}`
         };
-        
+
         const recipientData = {};
         if (document.getElementById('add-recipient')?.checked) {
           recipientData.fullName = document.getElementById('recipient-name').value;
           recipientData.ci = document.getElementById('recipient-ci').value;
           recipientData.phone = document.getElementById('recipient-phone').value;
         }
-        
+
         const requiredFieldsData = {};
         if (document.getElementById('required-fields-inputs')) {
           document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
@@ -293,13 +305,8 @@ const CheckoutSystem = {
             requiredFieldsData[fieldName] = input.value;
           });
         }
-        
-        // Verificar que window.API_BASE_URL esté definido
-        if (!window.API_BASE_URL) {
-          throw new Error('URL del backend no configurada');
-        }
-        
-        // Enviar datos al backend
+
+        // 2. Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
           method: 'POST',
           headers: { 
@@ -314,27 +321,29 @@ const CheckoutSystem = {
             requiredFields: requiredFieldsData
           })
         });
-        
-        // Manejar errores de respuesta
+
+        // Manejar respuesta
         if (!response.ok) {
           let errorMessage = 'Error en el servidor';
           try {
-            const errorResponse = await response.json();
-            errorMessage = errorResponse.error || errorMessage;
+            const errorBody = await response.json();
+            errorMessage = errorBody.error || errorBody.message || errorMessage;
           } catch (e) {
             errorMessage = `Error ${response.status}: ${response.statusText}`;
           }
           throw new Error(errorMessage);
         }
-        
+
         const result = await response.json();
         
+        // Éxito - limpiar y notificar
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
         
-        Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + result.orderId + ' ha sido creado');
+        Notifications.showNotification('🎉 ¡Compra realizada!', `Tu pedido #${result.orderId} ha sido creado`);
+        
       } catch (error) {
-        console.error('Error confirmando compra:', error);
+        console.error('Error en checkout:', error);
         
         // Mostrar error en la interfaz
         const errorContainer = document.createElement('div');
@@ -353,7 +362,7 @@ const CheckoutSystem = {
         
         alert('Error al confirmar la compra: ' + error.message);
       } finally {
-        // Restaurar el botón de confirmación
+        // Restaurar botón
         const confirmBtn = document.getElementById('confirm-purchase');
         if (confirmBtn) {
           confirmBtn.innerHTML = '✅ Confirmar Compra';
@@ -361,33 +370,6 @@ const CheckoutSystem = {
         }
       }
     });
-  },
-  
-  validateCheckoutForm: function() {
-    // Validar que se haya seleccionado un método de pago
-    const method = document.querySelector('input[name="payment-method"]:checked')?.value;
-    if (!method) {
-      alert('Por favor seleccione un método de pago');
-      return false;
-    }
-    
-    // Validar que se haya subido un comprobante
-    const proofFile = document.getElementById('transfer-proof')?.files[0];
-    if (!proofFile) {
-      alert('Por favor suba la captura de pantalla de la transferencia');
-      return false;
-    }
-    
-    // Validar campos requeridos para productos digitales
-    const requiredFields = document.querySelectorAll('#required-fields-inputs input[required]');
-    for (const field of requiredFields) {
-      if (!field.value.trim()) {
-        alert(`Por favor complete el campo: ${field.previousElementSibling.textContent}`);
-        return false;
-      }
-    }
-    
-    return true;
   },
   
   getRequiredFields: function(cartItems) {
