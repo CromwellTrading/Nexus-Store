@@ -108,27 +108,22 @@ const CartSystem = {
     let totalByCurrency = {};
     
     if (this.cart.items && this.cart.items.length > 0) {
-      // Usamos Promise.all para cargar todos los productos en paralelo
       cartContent = await Promise.all(this.cart.items.map(async item => {
         const product = await ProductView.getProductById(item.productId, item.tabType);
         if (!product) return '';
         
-        // Precio: ahora es un objeto, tomamos CUP o el primero
         const prices = product.prices;
         const price = prices?.CUP || Object.values(prices)[0] || 0;
         const itemTotal = price * item.quantity;
         
-        // Acumular totales por moneda
         Object.entries(prices || {}).forEach(([currency, priceVal]) => {
           if (priceVal) {
             totalByCurrency[currency] = (totalByCurrency[currency] || 0) + (priceVal * item.quantity);
           }
         });
         
-        // Imagen: ahora es un array, tomamos la primera
         let imageUrl = 'placeholder.jpg';
         if (product.images && product.images.length > 0) {
-          // Asegurarse de que es un array y tomar la primera URL
           imageUrl = Array.isArray(product.images) ? product.images[0] : product.images;
         }
         
@@ -153,7 +148,6 @@ const CartSystem = {
       })).then(items => items.join(''));
     }
     
-    // Crear HTML de totales por moneda
     let totalDisplay = '';
     if (Object.keys(totalByCurrency).length > 0) {
       totalDisplay = Object.entries(totalByCurrency)
