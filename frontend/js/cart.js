@@ -41,18 +41,18 @@ const CartSystem = {
         body: JSON.stringify({ userId, productId, tabType })
       });
       
-      if (!response.ok) throw new Error('Error al añadir al carrito');
+      const result = await response.json();
       
-      this.cart = await response.json();
-      this.updateCartIcon();
-      if (Notifications && Notifications.showNotification) {
-        Notifications.showNotification('🛒 Producto añadido', `Producto añadido al carrito!`);
+      if (!response.ok) {
+        throw new Error(result.error || 'Error desconocido');
       }
+      
+      this.cart = result;
+      this.updateCartIcon();
+      Notifications.showNotification('🛒 Producto añadido', `¡Producto añadido al carrito!`);
     } catch (error) {
       console.error('Error añadiendo al carrito:', error);
-      if (Notifications && Notifications.showNotification) {
-        Notifications.showNotification('❌ Error', 'No se pudo añadir al carrito');
-      }
+      Notifications.showNotification('❌ Error', error.message || 'No se pudo añadir al carrito');
     }
   },
   
@@ -108,6 +108,7 @@ const CartSystem = {
     let totalByCurrency = {};
     
     if (this.cart.items && this.cart.items.length > 0) {
+      // Usamos Promise.all para cargar todos los productos en paralelo
       cartContent = await Promise.all(this.cart.items.map(async item => {
         const product = await ProductView.getProductById(item.productId, item.tabType);
         if (!product) return '';
