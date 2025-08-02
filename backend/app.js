@@ -340,6 +340,14 @@ app.post('/api/checkout', async (req, res) => {
   
   console.log(`[CHECKOUT] Iniciando proceso para usuario: ${userId}`);
   
+  // Verificar que todos los parámetros requeridos estén presentes
+  if (!userId || !paymentMethod || !transferData) {
+    return res.status(400).json({ 
+      error: 'Datos incompletos',
+      message: 'Faltan parámetros requeridos para el checkout'
+    });
+  }
+  
   const client = await pool.connect();
   
   try {
@@ -436,8 +444,8 @@ app.post('/api/checkout', async (req, res) => {
         orderId,
         paymentMethod,
         JSON.stringify(transferData),
-        JSON.stringify(recipient),
-        JSON.stringify(requiredFields)
+        JSON.stringify(recipient || {}),
+        JSON.stringify(requiredFields || {})
       ]
     );
     
