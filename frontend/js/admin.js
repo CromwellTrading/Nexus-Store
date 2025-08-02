@@ -1005,7 +1005,7 @@ loadOrders: function(filter = 'all') {
         orderElement.innerHTML = `
           <div class="order-header">
             <div class="order-id">📋 Pedido #${order.id}</div>
-            <div class="order-date">📅 ${new Date(order.created_at).toLocaleDateString()}</div>
+            <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
             <div class="order-status">
               <select class="status-select" data-id="${order.id}">
                 <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
@@ -1016,7 +1016,7 @@ loadOrders: function(filter = 'all') {
             </div>
           </div>
           <div class="order-details">
-            <div><strong>👤 Cliente:</strong> ${order.user_id}</div>
+            <div><strong>👤 Cliente:</strong> ${order.userData?.fullName || order.userId}</div>
             <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
           </div>
           <div class="order-actions">
@@ -1096,18 +1096,18 @@ viewOrderDetails: function(orderId) {
           </div>
           <div class="order-details-full">
             <div class="order-info">
-              <div><strong>📅 Fecha:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+              <div><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</div>
               <div><strong>🔄 Estado:</strong> ${order.status}</div>
               <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
             </div>
             
             <h3>👤 Datos del Cliente</h3>
             <div class="customer-info">
-              <div><strong>ID:</strong> ${order.customer_id}</div>
-              <div><strong>Nombre:</strong> ${order.customer?.name || 'No especificado'}</div>
-              <div><strong>🆔 CI:</strong> ${order.customer?.ci || 'No especificado'}</div>
-              <div><strong>📱 Teléfono:</strong> ${order.customer?.phone || 'No especificado'}</div>
-              <div><strong>📍 Dirección:</strong> ${order.customer?.address || 'No especificado'}, ${order.customer?.province || ''}</div>
+              <div><strong>ID:</strong> ${order.userId}</div>
+              <div><strong>Nombre:</strong> ${order.userData?.fullName || 'No especificado'}</div>
+              <div><strong>🆔 CI:</strong> ${order.userData?.ci || 'No especificado'}</div>
+              <div><strong>📱 Teléfono:</strong> ${order.userData?.phone || 'No especificado'}</div>
+              <div><strong>📍 Dirección:</strong> ${order.userData?.address || 'No especificado'}, ${order.userData?.province || ''}</div>
             </div>
             
             <h3>💳 Información de Pago</h3>
@@ -1167,7 +1167,9 @@ viewOrderDetails: function(orderId) {
     });
 },
 
-renderCategoryOptions: function(type = this.product
+renderCategoryOptions: function(type = this.productType) {
+  const categorySelect = document.getElementById('product-category');
+  if (!categorySelect) return;
   
   categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
   
