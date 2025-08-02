@@ -5,25 +5,19 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import TelegramBot from 'node-telegram-bot-api';
 
-// =====================================================================
 // Configuración inicial
-// =====================================================================
 console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// =====================================================================
 // Configuración de Supabase
-// =====================================================================
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-// =====================================================================
 // Middlewares
-// =====================================================================
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -31,7 +25,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware simplificado
 app.use((req, res, next) => {
   req.telegramId = req.headers['telegram-id'] || 
                    req.query.tgid || 
@@ -45,32 +38,18 @@ const isAdmin = (req, res, next) => {
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   
-  if (!req.telegramId) {
-    return res.status(401).json({ error: 'Se requiere Telegram-ID' });
-  }
-  
-  if (!adminIds.includes(req.telegramId.toString())) {
-    return res.status(403).json({ error: 'Acceso no autorizado' });
-  }
-  
+  if (!req.telegramId) return res.status(401).json({ error: 'Se requiere Telegram-ID' });
+  if (!adminIds.includes(req.telegramId.toString())) return res.status(403).json({ error: 'Acceso no autorizado' });
   next();
 };
 
-// =====================================================================
 // Rutas básicas
-// =====================================================================
-app.get('/', (req, res) => {
-  res.send('Backend Nexus Store funcionando correctamente');
-});
-
-app.get('/api/admin/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date(),
-    supabaseConnected: !!process.env.SUPABASE_URL
-  });
-});
-
+app.get('/', (req, res) => res.send('Backend Nexus Store funcionando'));
+app.get('/api/admin/health', (req, res) => res.json({ 
+  status: 'ok', 
+  timestamp: new Date(),
+  supabaseConnected: !!process.env.SUPABASE_URL
+}));
 app.get('/api/admin/ids', (req, res) => {
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
@@ -78,12 +57,8 @@ app.get('/api/admin/ids', (req, res) => {
   res.json(adminIds);
 });
 
-// =====================================================================
 // Rutas de productos
-// =====================================================================
 app.get('/api/products/:type', async (req, res) => {
-  const { type } = req.params;
-  
   try {
     const { data: products, error } = await supabase
       .from('products')
@@ -92,7 +67,7 @@ app.get('/api/products/:type', async (req, res) => {
         has_color_variant, colors, required_fields, date_created,
         categories!inner(name)
       `)
-      .eq('type', type);
+      .eq('type', req.params.type);
     
     if (error) throw error;
 
@@ -100,10 +75,7 @@ app.get('/api/products/:type', async (req, res) => {
     products.forEach(product => {
       const categoryName = product.categories.name;
       if (!result[categoryName]) result[categoryName] = [];
-      result[categoryName].push({
-        ...product,
-        category: categoryName
-      });
+      result[categoryName].push({ ...product, category: categoryName });
     });
     
     res.json(result);
@@ -114,51 +86,33 @@ app.get('/api/products/:type', async (req, res) => {
 });
 
 app.get('/api/products/:type/:id', async (req, res) => {
-  const { type, id } = req.params;
-  
   try {
     const { data: product, error } = await supabase
       .from('products')
       .select('*, categories!inner(name)')
-      .eq('type', type)
-      .eq('id', id)
+      .eq('type', req.params.type)
+      .eq('id', req.params.id)
       .single();
     
     if (error) throw error;
-    
-    if (product) {
-      res.json({
-        ...product,
-        category: product.categories.name
-      });
-    } else {
-      res.status(404).json({ error: 'Producto no encontrado' });
-    }
+    res.json({ ...product, category: product.categories.name });
   } catch (error) {
     console.error('Error obteniendo producto:', error);
     res.status(500).json({ error: 'Error obteniendo producto' });
   }
 });
 
-// =====================================================================
 // Rutas de carrito
-// =====================================================================
 app.get('/api/cart/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
   try {
     const { data: cart, error } = await supabase
       .from('carts')
       .select('items')
-      .eq('user_id', userId)
+      .eq('user_id', req.params.userId)
       .single();
     
     if (error && error.code !== 'PGRST116') throw error;
-    
-    res.json({
-      userId,
-      items: cart?.items || []
-    });
+    res.json({ userId: req.params.userId, items: cart?.items || [] });
   } catch (error) {
     console.error('Error obteniendo carrito:', error);
     res.status(500).json({ error: 'Error obteniendo carrito' });
@@ -166,9 +120,8 @@ app.get('/api/cart/:userId', async (req, res) => {
 });
 
 app.post('/api/cart/add', async (req, res) => {
-  const { userId, productId, tabType } = req.body;
-  
   try {
+    const { userId, productId, tabType } = req.body;
     let { data: cart, error } = await supabase
       .from('carts')
       .select('items')
@@ -178,35 +131,18 @@ app.post('/api/cart/add', async (req, res) => {
     if (error && error.code !== 'PGRST116') throw error;
     
     let items = cart?.items || [];
-    const existingItemIndex = items.findIndex(item => 
-      item.productId == productId && item.tabType === tabType
-    );
+    const existingItemIndex = items.findIndex(item => item.productId == productId && item.tabType === tabType);
     
-    if (existingItemIndex !== -1) {
-      items[existingItemIndex].quantity += 1;
-    } else {
-      items.push({ 
-        productId, 
-        tabType, 
-        quantity: 1,
-        addedAt: new Date().toISOString()
-      });
-    }
-    
-    const upsertData = {
-      user_id: userId,
-      items,
-      updated_at: new Date().toISOString()
-    };
+    if (existingItemIndex !== -1) items[existingItemIndex].quantity += 1;
+    else items.push({ productId, tabType, quantity: 1, addedAt: new Date().toISOString() });
     
     const { data: updatedCart, error: upsertError } = await supabase
       .from('carts')
-      .upsert(upsertData, { onConflict: 'user_id' })
+      .upsert({ user_id: userId, items, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
       .select()
       .single();
     
     if (upsertError) throw upsertError;
-    
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
     console.error('Error añadiendo al carrito:', error);
@@ -215,9 +151,8 @@ app.post('/api/cart/add', async (req, res) => {
 });
 
 app.post('/api/cart/remove', async (req, res) => {
-  const { userId, productId, tabType } = req.body;
-  
   try {
+    const { userId, productId, tabType } = req.body;
     const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('items')
@@ -225,21 +160,15 @@ app.post('/api/cart/remove', async (req, res) => {
       .single();
     
     if (cartError) {
-      if (cartError.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Carrito no encontrado' });
-      }
+      if (cartError.code === 'PGRST116') return res.status(404).json({ error: 'Carrito no encontrado' });
       throw cartError;
     }
     
     let items = cart.items;
     const initialLength = items.length;
-    items = items.filter(item => 
-      !(item.productId == productId && item.tabType === tabType)
-    );
+    items = items.filter(item => !(item.productId == productId && item.tabType === tabType));
     
-    if (items.length === initialLength) {
-      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
-    }
+    if (items.length === initialLength) return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
     
     const { data: updatedCart, error } = await supabase
       .from('carts')
@@ -257,13 +186,10 @@ app.post('/api/cart/remove', async (req, res) => {
 });
 
 app.post('/api/cart/update', async (req, res) => {
-  const { userId, productId, tabType, quantity } = req.body;
-  
-  if (quantity < 1) {
-    return res.status(400).json({ error: 'Cantidad inválida' });
-  }
-  
   try {
+    const { userId, productId, tabType, quantity } = req.body;
+    if (quantity < 1) return res.status(400).json({ error: 'Cantidad inválida' });
+    
     const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('items')
@@ -271,20 +197,14 @@ app.post('/api/cart/update', async (req, res) => {
       .single();
     
     if (cartError) {
-      if (cartError.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Carrito no encontrado' });
-      }
+      if (cartError.code === 'PGRST116') return res.status(404).json({ error: 'Carrito no encontrado' });
       throw cartError;
     }
     
     let items = cart.items;
-    const itemIndex = items.findIndex(item => 
-      item.productId == productId && item.tabType === tabType
-    );
+    const itemIndex = items.findIndex(item => item.productId == productId && item.tabType === tabType);
     
-    if (itemIndex === -1) {
-      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
-    }
+    if (itemIndex === -1) return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
     
     items[itemIndex].quantity = quantity;
     
@@ -304,45 +224,33 @@ app.post('/api/cart/update', async (req, res) => {
 });
 
 app.post('/api/cart/clear/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
   try {
     const { error, count } = await supabase
       .from('carts')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', req.params.userId);
     
     if (error) throw error;
-    
-    if (count > 0) {
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: 'Carrito no encontrado' });
-    }
+    if (count > 0) res.json({ success: true });
+    else res.status(404).json({ error: 'Carrito no encontrado' });
   } catch (error) {
     console.error('Error vaciando carrito:', error);
     res.status(500).json({ error: 'Error vaciando carrito' });
   }
 });
 
-// =====================================================================
-// Checkout - Versión simplificada y corregida
-// =====================================================================
+// Checkout
 app.post('/api/checkout', async (req, res) => {
   console.log('[CHECKOUT] Iniciando proceso de checkout');
   
   const { userId, paymentMethod, transferData, recipient, requiredFields, userData } = req.body;
   
-  // Validación básica
   if (!userId || !paymentMethod) {
-    return res.status(400).json({ 
-      error: 'Datos incompletos',
-      message: 'Faltan parámetros requeridos: userId y paymentMethod'
-    });
+    return res.status(400).json({ error: 'Faltan parámetros requeridos: userId y paymentMethod' });
   }
   
   try {
-    // 1. Obtener carrito desde Supabase
+    // 1. Obtener carrito
     const { data: cart, error: cartError } = await supabase
       .from('carts')
       .select('items')
@@ -355,117 +263,84 @@ app.post('/api/checkout', async (req, res) => {
     }
     
     const items = cart.items;
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'Carrito vacío' });
+    if (!items || items.length === 0) return res.status(400).json({ error: 'Carrito vacío' });
+    
+    // 2. Obtener productos
+    const productIds = items.map(item => item.productId);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, prices, images, tab_type')
+      .in('id', productIds);
+    
+    if (productsError || !products) {
+      console.error('[CHECKOUT] Error obteniendo productos:', productsError);
+      return res.status(400).json({ error: 'Error obteniendo productos' });
     }
     
-    // 2. Calcular total
+    // 3. Calcular total y preparar items
     let total = 0;
     const orderItems = [];
+    const productMap = {};
+    products.forEach(product => productMap[product.id] = product);
     
-    for (const item of items) {
-      // Obtener producto
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('name, prices, images, tab_type')
-        .eq('id', item.productId)
-        .single();
-      
-      if (productError || !product) {
-        console.warn(`[CHECKOUT] Producto no encontrado: ${item.productId}`);
-        continue;
+    items.forEach(item => {
+      const product = productMap[item.productId];
+      if (product) {
+        const price = product.prices[paymentMethod] || 0;
+        total += price * item.quantity;
+        orderItems.push({
+          product_id: item.productId,
+          product_name: product.name,
+          quantity: item.quantity,
+          price: price,
+          tab_type: product.tab_type,
+          image_url: product.images?.[0] || null
+        });
       }
-      
-      const price = product.prices[paymentMethod] || 0;
-      total += price * item.quantity;
-      
-      orderItems.push({
-        product_id: item.productId,
-        product_name: product.name,
-        quantity: item.quantity,
-        price: price,
-        tab_type: product.tab_type,
-        image_url: product.images && product.images.length > 0 ? product.images[0] : null
-      });
-    }
+    });
     
-    // 3. Crear orden
+    // 4. Crear orden
     const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const orderData = {
       id: orderId,
       user_id: userId,
       total: total,
       status: 'Pendiente',
-      user_data: userData // Guardar datos del usuario
+      user_data: userData
     };
     
-    const { error: orderError } = await supabase
-      .from('orders')
-      .insert([orderData]);
+    await supabase.from('orders').insert([orderData]);
     
-    if (orderError) throw orderError;
-    
-    // 4. Guardar detalles de la orden
-    const orderDetails = {
+    // 5. Guardar detalles
+    await supabase.from('order_details').insert([{
       order_id: orderId,
       payment_method: paymentMethod,
       transfer_data: transferData || {},
       recipient_data: recipient || {},
       required_fields: requiredFields || {}
-    };
+    }]);
     
-    const { error: detailsError } = await supabase
-      .from('order_details')
-      .insert([orderDetails]);
+    // 6. Guardar items
+    await supabase.from('order_items').insert(
+      orderItems.map(item => ({ ...item, order_id: orderId }))
+    );
     
-    if (detailsError) throw detailsError;
+    // 7. Vaciar carrito
+    await supabase.from('carts').delete().eq('user_id', userId);
     
-    // 5. Guardar items de la orden
-    const itemsToInsert = orderItems.map(item => ({
-      ...item,
-      order_id: orderId
-    }));
-    
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(itemsToInsert);
-    
-    if (itemsError) throw itemsError;
-    
-    // 6. Vaciar carrito
-    await supabase
-      .from('carts')
-      .delete()
-      .eq('user_id', userId);
-    
-    console.log(`[CHECKOUT] Orden creada exitosamente: ${orderId}`);
-    
-    res.json({ 
-      success: true, 
-      orderId,
-      total
-    });
+    console.log(`[CHECKOUT] Orden creada: ${orderId}`);
+    res.json({ success: true, orderId, total });
     
   } catch (error) {
     console.error('[CHECKOUT] Error crítico:', error);
-    res.status(500).json({ 
-      error: 'Error en checkout',
-      message: error.message
-    });
+    res.status(500).json({ error: 'Error en checkout', message: error.message });
   }
 });
 
-// =====================================================================
 // Rutas de administración
-// =====================================================================
-
-// Obtener todas las categorías
 app.get('/api/admin/categories', isAdmin, async (req, res) => {
   try {
-    const { data: categories, error } = await supabase
-      .from('categories')
-      .select('*');
-    
+    const { data: categories, error } = await supabase.from('categories').select('*');
     if (error) throw error;
     res.json(categories);
   } catch (error) {
@@ -474,15 +349,11 @@ app.get('/api/admin/categories', isAdmin, async (req, res) => {
   }
 });
 
-// Crear nueva categoría
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
-  const { type, name } = req.body;
-  
-  if (!type || !name) {
-    return res.status(400).json({ error: 'Faltan datos requeridos' });
-  }
-  
   try {
+    const { type, name } = req.body;
+    if (!type || !name) return res.status(400).json({ error: 'Faltan datos requeridos' });
+    
     const { data: existingCategory, error: existError } = await supabase
       .from('categories')
       .select('id')
@@ -490,13 +361,7 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
       .eq('name', name);
     
     if (existError) throw existError;
-    
-    if (existingCategory && existingCategory.length > 0) {
-      return res.status(400).json({ 
-        error: 'La categoría ya existe',
-        existingId: existingCategory[0].id
-      });
-    }
+    if (existingCategory && existingCategory.length > 0) return res.status(400).json({ error: 'La categoría ya existe' });
     
     const { data, error } = await supabase
       .from('categories')
@@ -512,22 +377,15 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
   }
 });
 
-// Eliminar categoría
 app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
-  const { id } = req.params;
-  
   try {
     const { error, count } = await supabase
       .from('categories')
       .delete()
-      .eq('id', id);
+      .eq('id', req.params.id);
     
     if (error) throw error;
-    
-    if (count === 0) {
-      return res.status(404).json({ error: 'Categoría no encontrada' });
-    }
-    
+    if (count === 0) return res.status(404).json({ error: 'Categoría no encontrada' });
     res.json({ success: true });
   } catch (error) {
     console.error('Error eliminando categoría:', error);
@@ -535,24 +393,18 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
   }
 });
 
-// Crear nuevo producto
 app.post('/api/admin/products', isAdmin, async (req, res) => {
-  const { type, categoryId, product } = req.body;
-  
-  if (!type || !categoryId || !product) {
-    return res.status(400).json({ error: 'Faltan datos requeridos' });
-  }
-  
   try {
+    const { type, categoryId, product } = req.body;
+    if (!type || !categoryId || !product) return res.status(400).json({ error: 'Faltan datos requeridos' });
+    
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .select('id')
       .eq('id', categoryId)
       .single();
     
-    if (categoryError || !category) {
-      return res.status(400).json({ error: 'Categoría inválida' });
-    }
+    if (categoryError || !category) return res.status(400).json({ error: 'Categoría inválida' });
     
     const { data, error } = await supabase
       .from('products')
@@ -573,25 +425,18 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       .single();
     
     if (error) throw error;
-    res.json({
-      id: data.id,
-      ...product
-    });
+    res.json({ id: data.id, ...product });
   } catch (error) {
     console.error('Error creando producto:', error);
     res.status(500).json({ error: 'Error creando producto' });
   }
 });
 
-// Obtener todos los productos (para admin)
 app.get('/api/admin/products', isAdmin, async (req, res) => {
   try {
     const { data: products, error } = await supabase
       .from('products')
-      .select(`
-        *,
-        categories (id, name)
-      `);
+      .select('*, categories (id, name)');
     
     if (error) throw error;
     
@@ -607,22 +452,15 @@ app.get('/api/admin/products', isAdmin, async (req, res) => {
   }
 });
 
-// Eliminar producto
 app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
-  const { id } = req.params;
-  
   try {
     const { error, count } = await supabase
       .from('products')
       .delete()
-      .eq('id', id);
+      .eq('id', req.params.id);
     
     if (error) throw error;
-    
-    if (count === 0) {
-      return res.status(404).json({ error: 'Producto no encontrado' });
-    }
-    
+    if (count === 0) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json({ success: true });
   } catch (error) {
     console.error('Error eliminando producto:', error);
@@ -630,15 +468,12 @@ app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
   }
 });
 
-// Obtener categorías por tipo
 app.get('/api/categories/:type', async (req, res) => {
-  const { type } = req.params;
-  
   try {
     const { data: categories, error } = await supabase
       .from('categories')
       .select('id, name')
-      .eq('type', type);
+      .eq('type', req.params.type);
     
     if (error) throw error;
     res.json(categories);
@@ -648,10 +483,8 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
-// Obtener pedidos de usuario
+// Rutas de pedidos
 app.get('/api/orders/user/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
   try {
     const { data: orders, error } = await supabase
       .from('orders')
@@ -662,38 +495,37 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
       `)
-      .eq('user_id', userId);
+      .eq('user_id', req.params.userId);
     
     if (error) throw error;
     
     const parsedOrders = orders.map(order => ({
       id: order.id,
-      userId,
+      userId: req.params.userId,
       total: order.total,
       status: order.status,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       userData: order.user_data,
       payment: {
-        method: order.order_details[0]?.payment_method,
-        ...order.order_details[0]?.transfer_data
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
       },
-      recipient: order.order_details[0]?.recipient_data,
-      requiredFields: order.order_details[0]?.required_fields,
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
       items: order.order_items
     }));
     
     res.json(parsedOrders);
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
-    res.status(500).json({ error: 'Error obteniendo pedidos' });
+    res.status(500).json({ error: 'Error obteniendo pedidos', details: error.message });
   }
 });
 
-// Obtener todos los pedidos (para admin)
 app.get('/api/admin/orders', isAdmin, async (req, res) => {
   try {
     const { data: orders, error } = await supabase
@@ -706,8 +538,8 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
       `);
     
     if (error) throw error;
@@ -721,25 +553,22 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
       updatedAt: order.updated_at,
       userData: order.user_data,
       payment: {
-        method: order.order_details[0]?.payment_method,
-        ...order.order_details[0]?.transfer_data
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
       },
-      recipient: order.order_details[0]?.recipient_data,
-      requiredFields: order.order_details[0]?.required_fields,
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
       items: order.order_items
     }));
     
     res.json(parsedOrders);
   } catch (error) {
     console.error('Error obteniendo pedidos para admin:', error);
-    res.status(500).json({ error: 'Error obteniendo pedidos' });
+    res.status(500).json({ error: 'Error obteniendo pedidos', details: error.message });
   }
 });
 
-// Obtener un pedido específico (para admin)
 app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
-  const { orderId } = req.params;
-  
   try {
     const { data: order, error } = await supabase
       .from('orders')
@@ -751,17 +580,14 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
       `)
-      .eq('id', orderId)
+      .eq('id', req.params.orderId)
       .single();
     
     if (error) throw error;
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Pedido no encontrado' });
-    }
+    if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
     
     const parsedOrder = {
       id: order.id,
@@ -772,34 +598,30 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
       updatedAt: order.updated_at,
       userData: order.user_data,
       payment: {
-        method: order.order_details[0]?.payment_method,
-        ...order.order_details[0]?.transfer_data
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
       },
-      recipient: order.order_details[0]?.recipient_data,
-      requiredFields: order.order_details[0]?.required_fields,
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
       items: order.order_items
     };
     
     res.json(parsedOrder);
   } catch (error) {
     console.error('Error obteniendo pedido:', error);
-    res.status(500).json({ error: 'Error obteniendo pedido' });
+    res.status(500).json({ error: 'Error obteniendo pedido', details: error.message });
   }
 });
 
-// Actualizar estado de pedido
 app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
-  const { orderId } = req.params;
-  const { status } = req.body;
-  
   try {
     const { data: updatedOrder, error } = await supabase
       .from('orders')
       .update({ 
-        status, 
+        status: req.body.status, 
         updated_at: new Date().toISOString() 
       })
-      .eq('id', orderId)
+      .eq('id', req.params.orderId)
       .select()
       .single();
     
@@ -811,9 +633,7 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   }
 });
 
-// =====================================================================
 // Bot de Telegram
-// =====================================================================
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
   
@@ -825,9 +645,7 @@ app.listen(PORT, () => {
       ? process.env.ADMIN_IDS.split(',').map(Number) 
       : [];
     
-    const getFrontendUrl = () => {
-      return process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
-    };
+    const getFrontendUrl = () => process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
     
     bot.onText(/\/start/, (msg) => {
       const chatId = msg.chat.id;
@@ -837,16 +655,10 @@ app.listen(PORT, () => {
       const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟`;
       
       const keyboard = {
-        inline_keyboard: [[{
-          text: "🚀 ABRIR TIENDA AHORA",
-          web_app: { url: webAppUrl }
-        }]]
+        inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
       };
       
-      bot.sendMessage(chatId, promoMessage, {
-        parse_mode: 'HTML',
-        reply_markup: keyboard
-      });
+      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard });
     });
     
     bot.on('message', (msg) => {
@@ -858,24 +670,16 @@ app.listen(PORT, () => {
         const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
         bot.sendMessage(chatId, '👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑', {
           parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [[{
-              text: "⚙️ ABRIR PANEL ADMIN",
-              web_app: { url: webAppUrl }
-            }]]
-          }
+          reply_markup: { inline_keyboard: [[{ text: "⚙️ ABRIR PANEL ADMIN", web_app: { url: webAppUrl } }]] }
         });
       } else if (text === '/admin') {
-        bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', {
-          parse_mode: 'HTML'
-        });
+        bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', { parse_mode: 'HTML' });
       }
     });
     
     bot.on('web_app_data', (msg) => {
       const chatId = msg.chat.id;
       const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
-      
       if (data && data.command === 'new_order') {
         bot.sendMessage(chatId, '🎉 <b>¡PEDIDO CONFIRMADO!</b> 🎉', { parse_mode: 'HTML' });
       }
