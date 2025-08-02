@@ -302,16 +302,16 @@ const CheckoutSystem = {
           })
         });
         
+        const result = await response.json();
+        
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText);
+          throw new Error(result.error || 'Error en el servidor');
         }
         
-        const orderResult = await response.json();
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
         
-        Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + orderResult.orderId + ' ha sido creado');
+        Notifications.showNotification('🎉 ¡Compra realizada!', 'Tu pedido #' + result.orderId + ' ha sido creado');
       } catch (error) {
         console.error('Error confirmando compra:', error);
         alert('Error al confirmar la compra: ' + error.message);
