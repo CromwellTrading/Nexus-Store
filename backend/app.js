@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import TelegramBot from 'node-telegram-bot-api';
+import pg from 'pg';
 
 // =====================================================================
 // Configuración inicial
@@ -12,6 +13,12 @@ console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+// Configurar pool de PostgreSQL
+const pool = new pg.Pool({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 // =====================================================================
 // Configuración de Supabase
@@ -31,25 +38,33 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de administrador
-const isAdmin = (req, res, next) => {
-  let telegramId = req.headers['telegram-id'] || 
+// Middleware para extraer Telegram-ID y verificar admin
+app.use((req, res, next) => {
+  // Obtener Telegram-ID de donde sea que venga
+  req.telegramId = req.headers['telegram-id'] || 
                    req.query.tgid || 
                    req.body.telegramId;
   
+  // Verificar si es admin
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   
-  if (!telegramId) {
+  req.isAdmin = req.telegramId && adminIds.includes(req.telegramId.toString());
+  
+  next();
+});
+
+// Middleware de administrador
+const isAdmin = (req, res, next) => {
+  if (!req.telegramId) {
     return res.status(401).json({ error: 'Se requiere Telegram-ID' });
   }
   
-  if (!adminIds.includes(telegramId.toString())) {
+  if (!req.isAdmin) {
     return res.status(403).json({ error: 'Acceso no autorizado' });
   }
   
-  req.telegramId = telegramId;
   next();
 };
 
@@ -105,6 +120,7 @@ app.get('/api/products/:type', async (req, res) => {
     
     res.json(result);
   } catch (error) {
+    console.error('Error obteniendo productos:', error);
     res.status(500).json({ error: 'Error obteniendo productos' });
   }
 });
@@ -131,6 +147,7 @@ app.get('/api/products/:type/:id', async (req, res) => {
       res.status(404).json({ error: 'Producto no encontrado' });
     }
   } catch (error) {
+    console.error('Error obteniendo producto:', error);
     res.status(500).json({ error: 'Error obteniendo producto' });
   }
 });
@@ -140,6 +157,11 @@ app.get('/api/products/:type/:id', async (req, res) => {
 // =====================================================================
 app.get('/api/cart/:userId', async (req, res) => {
   const { userId } = req.params;
+  
+  // Verificar que el usuario accede a su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   try {
     const { data: cart, error } = await supabase
@@ -155,12 +177,18 @@ app.get('/api/cart/:userId', async (req, res) => {
       items: cart?.items || []
     });
   } catch (error) {
+    console.error('Error obteniendo carrito:', error);
     res.status(500).json({ error: 'Error obteniendo carrito' });
   }
 });
 
 app.post('/api/cart/add', async (req, res) => {
   const { userId, productId, tabType } = req.body;
+  
+  // Verificar que el usuario modifica su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   try {
     let { data: cart, error } = await supabase
@@ -208,12 +236,18 @@ app.post('/api/cart/add', async (req, res) => {
       res.json({ userId, items: newCart.items });
     }
   } catch (error) {
+    console.error('Error añadiendo al carrito:', error);
     res.status(500).json({ error: 'Error añadiendo al carrito' });
   }
 });
 
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, productId, tabType } = req.body;
+  
+  // Verificar que el usuario modifica su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   try {
     const { data: cart, error: cartError } = await supabase
@@ -249,12 +283,18 @@ app.post('/api/cart/remove', async (req, res) => {
     if (error) throw error;
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
+    console.error('Error removiendo del carrito:', error);
     res.status(500).json({ error: 'Error removiendo del carrito' });
   }
 });
 
 app.post('/api/cart/update', async (req, res) => {
   const { userId, productId, tabType, quantity } = req.body;
+  
+  // Verificar que el usuario modifica su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   if (quantity < 1) {
     return res.status(400).json({ error: 'Cantidad inválida' });
@@ -295,12 +335,18 @@ app.post('/api/cart/update', async (req, res) => {
     if (error) throw error;
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
+    console.error('Error actualizando carrito:', error);
     res.status(500).json({ error: 'Error actualizando carrito' });
   }
 });
 
 app.post('/api/cart/clear/:userId', async (req, res) => {
   const { userId } = req.params;
+  
+  // Verificar que el usuario modifica su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   try {
     const { error, count } = await supabase
@@ -316,6 +362,7 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
       res.status(404).json({ error: 'Carrito no encontrado' });
     }
   } catch (error) {
+    console.error('Error vaciando carrito:', error);
     res.status(500).json({ error: 'Error vaciando carrito' });
   }
 });
@@ -325,6 +372,11 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
   const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
+  
+  // Verificar que el usuario está haciendo checkout de su propio carrito
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   const client = await pool.connect();
   
@@ -449,6 +501,7 @@ app.get('/api/admin/categories', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json(categories);
   } catch (error) {
+    console.error('Error obteniendo categorías:', error);
     res.status(500).json({ error: 'Error obteniendo categorías' });
   }
 });
@@ -486,6 +539,7 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
     if (error) throw error;
     res.status(201).json(data);
   } catch (error) {
+    console.error('Error al crear categoría:', error);
     res.status(500).json({ error: 'Error al crear categoría' });
   }
 });
@@ -508,6 +562,7 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
+    console.error('Error eliminando categoría:', error);
     res.status(500).json({ error: 'Error eliminando categoría' });
   }
 });
@@ -555,6 +610,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       ...product
     });
   } catch (error) {
+    console.error('Error creando producto:', error);
     res.status(500).json({ error: 'Error creando producto' });
   }
 });
@@ -578,6 +634,7 @@ app.get('/api/admin/products', isAdmin, async (req, res) => {
     
     res.json(formattedProducts);
   } catch (error) {
+    console.error('Error obteniendo productos:', error);
     res.status(500).json({ error: 'Error obteniendo productos' });
   }
 });
@@ -600,6 +657,7 @@ app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
+    console.error('Error eliminando producto:', error);
     res.status(500).json({ error: 'Error eliminando producto' });
   }
 });
@@ -617,6 +675,7 @@ app.get('/api/categories/:type', async (req, res) => {
     if (error) throw error;
     res.json(categories);
   } catch (error) {
+    console.error('Error obteniendo categorías:', error);
     res.status(500).json({ error: 'Error obteniendo categorías' });
   }
 });
@@ -624,6 +683,11 @@ app.get('/api/categories/:type', async (req, res) => {
 // Obtener pedidos de usuario
 app.get('/api/orders/user/:userId', async (req, res) => {
   const { userId } = req.params;
+  
+  // Verificar que el usuario accede a sus propios pedidos
+  if (req.telegramId !== userId) {
+    return res.status(403).json({ error: 'No autorizado' });
+  }
   
   try {
     const { data: orders, error } = await supabase
@@ -634,8 +698,8 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         status,
         created_at,
         updated_at,
-        order_details:payment_method,transfer_data,recipient_data,required_fields,
-        order_items:product_name,quantity,price,image_url,tab_type
+        order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items (product_name, quantity, price, image_url, tab_type)
       `)
       .eq('user_id', userId);
     
@@ -649,16 +713,17 @@ app.get('/api/orders/user/:userId', async (req, res) => {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       payment: {
-        method: order.payment_method,
-        ...order.transfer_data
+        method: order.order_details[0]?.payment_method,
+        ...order.order_details[0]?.transfer_data
       },
-      recipient: order.recipient_data,
-      requiredFields: order.required_fields,
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
       items: order.order_items
     }));
     
     res.json(parsedOrders);
   } catch (error) {
+    console.error('Error obteniendo pedidos:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
   }
 });
@@ -675,8 +740,8 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         status,
         created_at,
         updated_at,
-        order_details:payment_method,transfer_data,recipient_data,required_fields,
-        order_items:product_name,quantity,price,image_url,tab_type
+        order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items (product_name, quantity, price, image_url, tab_type)
       `);
     
     if (error) throw error;
@@ -689,17 +754,17 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       payment: {
-        method: order.payment_method,
-        ...order.transfer_data
+        method: order.order_details[0]?.payment_method,
+        ...order.order_details[0]?.transfer_data
       },
-      recipient: order.recipient_data,
-      requiredFields: order.required_fields,
+      recipient: order.order_details[0]?.recipient_data,
+      requiredFields: order.order_details[0]?.required_fields,
       items: order.order_items
     }));
     
     res.json(parsedOrders);
   } catch (error) {
-    console.error('Error getting orders for admin:', error);
+    console.error('Error obteniendo pedidos para admin:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
   }
 });
@@ -723,6 +788,7 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json(updatedOrder);
   } catch (error) {
+    console.error('Error actualizando orden:', error);
     res.status(500).json({ error: 'Error actualizando orden' });
   }
 });
