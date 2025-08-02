@@ -318,7 +318,14 @@ const CheckoutSystem = {
             paymentMethod: method,
             transferData: transferData,
             recipient: recipientData,
-            requiredFields: requiredFieldsData
+            requiredFields: requiredFieldsData,
+            userData: {
+              fullName: document.getElementById('checkout-fullname').value,
+              ci: document.getElementById('checkout-ci').value,
+              phone: document.getElementById('checkout-phone').value,
+              address: document.getElementById('checkout-address').value,
+              province: document.getElementById('checkout-province').value
+            }
           })
         });
 
