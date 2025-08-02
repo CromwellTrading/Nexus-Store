@@ -38,30 +38,25 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware para extraer Telegram-ID y verificar admin
+// Middleware simplificado
 app.use((req, res, next) => {
-  // Obtener Telegram-ID de donde sea que venga
   req.telegramId = req.headers['telegram-id'] || 
                    req.query.tgid || 
                    req.body.telegramId;
-  
-  // Verificar si es admin
-  const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
-    : [];
-  
-  req.isAdmin = req.telegramId && adminIds.includes(req.telegramId.toString());
-  
   next();
 });
 
 // Middleware de administrador
 const isAdmin = (req, res, next) => {
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+    : [];
+  
   if (!req.telegramId) {
     return res.status(401).json({ error: 'Se requiere Telegram-ID' });
   }
   
-  if (!req.isAdmin) {
+  if (!adminIds.includes(req.telegramId.toString())) {
     return res.status(403).json({ error: 'Acceso no autorizado' });
   }
   
@@ -153,15 +148,10 @@ app.get('/api/products/:type/:id', async (req, res) => {
 });
 
 // =====================================================================
-// Rutas de carrito
+// Rutas de carrito (SIN VERIFICACIONES DE AUTORIZACIÓN)
 // =====================================================================
 app.get('/api/cart/:userId', async (req, res) => {
   const { userId } = req.params;
-  
-  // Verificar que el usuario accede a su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
   
   try {
     const { data: cart, error } = await supabase
@@ -185,45 +175,22 @@ app.get('/api/cart/:userId', async (req, res) => {
 app.post('/api/cart/add', async (req, res) => {
   const { userId, productId, tabType } = req.body;
   
-  // Verificar que el usuario modifica su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
-  
   try {
-    console.log(`[CART] Añadiendo producto: ${productId}, tipo: ${tabType} para usuario: ${userId}`);
-    
-    // Verificar que el producto existe
-    const { data: product, error: productError } = await supabase
-      .from('products')
-      .select('id')
-      .eq('id', productId)
-      .single();
-      
-    if (productError || !product) {
-      console.error(`[CART] Producto no encontrado: ${productId}`);
-      return res.status(404).json({ error: 'Producto no encontrado' });
-    }
-    
     let { data: cart, error } = await supabase
       .from('carts')
       .select('items')
       .eq('user_id', userId)
       .single();
     
-    if (error && error.code !== 'PGRST116') {
-      console.error('[CART] Error obteniendo carrito:', error);
-      throw error;
-    }
+    if (error && error.code !== 'PGRST116') throw error;
     
     let items = cart?.items || [];
     const existingItemIndex = items.findIndex(item => 
-      item.productId === productId && item.tabType === tabType
+      item.productId == productId && item.tabType === tabType
     );
     
     if (existingItemIndex !== -1) {
       items[existingItemIndex].quantity += 1;
-      console.log(`[CART] Incrementado cantidad: ${items[existingItemIndex].quantity}`);
     } else {
       items.push({ 
         productId, 
@@ -231,7 +198,6 @@ app.post('/api/cart/add', async (req, res) => {
         quantity: 1,
         addedAt: new Date().toISOString()
       });
-      console.log(`[CART] Nuevo item añadido`);
     }
     
     const upsertData = {
@@ -246,29 +212,17 @@ app.post('/api/cart/add', async (req, res) => {
       .select()
       .single();
     
-    if (upsertError) {
-      console.error('[CART] Error upserting cart:', upsertError);
-      throw upsertError;
-    }
+    if (upsertError) throw upsertError;
     
-    console.log('[CART] Carrito actualizado exitosamente');
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
-    console.error('[CART] Error añadiendo al carrito:', error);
-    res.status(500).json({ 
-      error: 'Error añadiendo al carrito',
-      details: error.message 
-    });
+    console.error('Error añadiendo al carrito:', error);
+    res.status(500).json({ error: 'Error añadiendo al carrito' });
   }
 });
 
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, productId, tabType } = req.body;
-  
-  // Verificar que el usuario modifica su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
   
   try {
     const { data: cart, error: cartError } = await supabase
@@ -311,11 +265,6 @@ app.post('/api/cart/remove', async (req, res) => {
 
 app.post('/api/cart/update', async (req, res) => {
   const { userId, productId, tabType, quantity } = req.body;
-  
-  // Verificar que el usuario modifica su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
   
   if (quantity < 1) {
     return res.status(400).json({ error: 'Cantidad inválida' });
@@ -364,11 +313,6 @@ app.post('/api/cart/update', async (req, res) => {
 app.post('/api/cart/clear/:userId', async (req, res) => {
   const { userId } = req.params;
   
-  // Verificar que el usuario modifica su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
-  
   try {
     const { error, count } = await supabase
       .from('carts')
@@ -393,11 +337,6 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
 // =====================================================================
 app.post('/api/checkout', async (req, res) => {
   const { userId, paymentMethod, transferData, recipient, requiredFields } = req.body;
-  
-  // Verificar que el usuario está haciendo checkout de su propio carrito
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
   
   const client = await pool.connect();
   
@@ -704,11 +643,6 @@ app.get('/api/categories/:type', async (req, res) => {
 // Obtener pedidos de usuario
 app.get('/api/orders/user/:userId', async (req, res) => {
   const { userId } = req.params;
-  
-  // Verificar que el usuario accede a sus propios pedidos
-  if (req.telegramId !== userId) {
-    return res.status(403).json({ error: 'No autorizado' });
-  }
   
   try {
     const { data: orders, error } = await supabase
