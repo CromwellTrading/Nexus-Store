@@ -373,7 +373,17 @@ const AdminSystem = {
       return;
     }
     
-    const product = { name, description, prices, details: details || '', date_created: new Date().toISOString() };
+    // Crear el objeto producto con los nombres de campos corregidos
+    const product = { 
+      name, 
+      description, 
+      prices, 
+      details: details || '', 
+      date_created: new Date().toISOString(),
+      has_color_variant: document.getElementById('has-color-variant').checked,
+      colors: [],
+      required_fields: [] // Campo corregido
+    };
     
     try {
       if (type === 'fisico') {
@@ -386,9 +396,7 @@ const AdminSystem = {
           }
         }
         
-        product.hasColorVariant = document.getElementById('has-color-variant').checked;
-        if (product.hasColorVariant) {
-          product.colors = [];
+        if (product.has_color_variant) {
           document.querySelectorAll('.color-variant').forEach(variant => {
             const color = variant.querySelector('.color-picker').value;
             const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
@@ -402,11 +410,10 @@ const AdminSystem = {
           product.images = [imageUrl];
         }
         
-        product.requiredFields = [];
         document.querySelectorAll('.required-field').forEach(field => {
           const fieldName = field.querySelector('.field-name').value.trim();
           const isRequired = field.querySelector('.field-required').checked;
-          if (fieldName) product.requiredFields.push({ name: fieldName, required: isRequired });
+          if (fieldName) product.required_fields.push({ name: fieldName, required: isRequired });
         });
       }
       
@@ -416,11 +423,19 @@ const AdminSystem = {
           'Content-Type': 'application/json',
           'Telegram-ID': this.telegramUserId.toString()
         },
-        body: JSON.stringify({ type: type, categoryId: categoryId, product: product })
+        body: JSON.stringify({ 
+          type: type, 
+          categoryId: categoryId, 
+          product: product 
+        })
       });
       
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Error ${response.status}: ${errorBody}`);
+      }
       
+      const result = await response.json();
       alert('✅ Producto creado correctamente!');
       this.renderProductsList();
       document.getElementById('product-form').style.display = 'none';
