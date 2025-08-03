@@ -406,29 +406,34 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     
     if (categoryError || !category) return res.status(400).json({ error: 'Categoría inválida' });
     
+    const productData = {
+      type,
+      category_id: categoryId,
+      name: product.name,
+      description: product.description,
+      details: product.details || null,
+      prices: product.prices,
+      images: product.images || [],
+      has_color_variant: product.has_color_variant || false,
+      colors: product.colors || null,
+      required_fields: product.required_fields || null, // Campo corregido
+      date_created: new Date().toISOString()
+    };
+
     const { data, error } = await supabase
       .from('products')
-      .insert([{
-        type,
-        category_id: categoryId,
-        name: product.name,
-        description: product.description,
-        details: product.details,
-        prices: product.prices,
-        images: product.images,
-        has_color_variant: product.hasColorVariant,
-        colors: product.colors,
-        required_fields: product.requiredFields,
-        date_created: new Date().toISOString()
-      }])
+      .insert([productData])
       .select()
       .single();
     
     if (error) throw error;
-    res.json({ id: data.id, ...product });
+    res.status(201).json({ id: data.id, ...product });
   } catch (error) {
     console.error('Error creando producto:', error);
-    res.status(500).json({ error: 'Error creando producto' });
+    res.status(500).json({ 
+      error: 'Error creando producto',
+      message: error.message 
+    });
   }
 });
 
