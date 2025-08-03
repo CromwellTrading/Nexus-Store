@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       console.log("SearchFilter inicializado");
     }
     
+    // Asegurar que OrdersSystem se inicialice
     if (typeof OrdersSystem !== 'undefined') {
       OrdersSystem.init();
       console.log("OrdersSystem inicializado");
