@@ -1,103 +1,97 @@
 const OrdersSystem = {
   orders: [],
+  isLoading: false,
   
-  init: function() {
-    this.loadOrders();
+  init: async function() {
+    console.log("Inicializando OrdersSystem...");
+    await this.loadOrders();
+    this.setupEventListeners();
   },
   
-  loadOrders: function() {
-    const userId = UserProfile.getTelegramUserId();
-    if (!userId) {
-      console.error("No se pudo obtener el ID de usuario");
-      return;
-    }
-    
-    fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-      })
-      .then(orders => {
-        this.orders = orders.map(order => ({
-          ...order,
-          createdAt: new Date(order.createdAt).toLocaleDateString(),
-          updatedAt: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString() : null,
-          isNew: true
-        }));
-      })
-      .catch(error => {
-        console.error('Error cargando pedidos:', error);
-        Notifications.showNotification('❌ Error', 'No se pudieron cargar los pedidos');
-      });
+  setupEventListeners: function() {
+    // Eventos adicionales si son necesarios
   },
   
-  openOrdersModal: function() {
-    const modal = document.getElementById('product-modal');
-    
-    if (this.orders.length === 0) {
-      modal.innerHTML = `
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>📋 Mis Pedidos</h2>
-            <button class="close-modal">&times;</button>
-          </div>
-          <div class="orders-container">
-            <p>No tienes pedidos registrados</p>
-            <button id="retry-load-orders">🔄 Reintentar</button>
-          </div>
-        </div>
-      `;
+  loadOrders: async function() {
+    try {
+      if (this.isLoading) return;
+      this.isLoading = true;
       
-      const retryBtn = modal.querySelector('#retry-load-orders');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', () => {
-          this.loadOrders();
-          setTimeout(() => this.openOrdersModal(), 500);
-        });
-      }
-    } else {
-      modal.innerHTML = `
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>📋 Mis Pedidos</h2>
-            <button class="close-modal">&times;</button>
-          </div>
-          ${this.getFilterControls()}
-          <div class="orders-container" id="orders-container">
-            ${this.getOrdersHTML()}
-          </div>
-        </div>
-      `;
-      
-      const statusFilter = document.getElementById('client-status-filter');
-      const sortBy = document.getElementById('client-sort-by');
-      
-      if (statusFilter) {
-        statusFilter.addEventListener('change', (e) => {
-          this.renderOrdersForClient(e.target.value);
-        });
+      const userId = UserProfile.getTelegramUserId();
+      if (!userId) {
+        throw new Error("No se pudo obtener el ID de usuario");
       }
       
-      if (sortBy) {
-        sortBy.addEventListener('change', () => {
-          this.renderOrdersForClient(document.getElementById('client-status-filter').value);
-        });
+      const response = await fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`);
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
+      
+      const orders = await response.json();
+      this.orders = orders.map(order => ({
+        ...order,
+        createdAt: new Date(order.createdAt).toLocaleDateString(),
+        updatedAt: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString() : null,
+        isNew: true
+      }));
+      
+      this.isLoading = false;
+      return true;
+    } catch (error) {
+      console.error('Error cargando pedidos:', error);
+      Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
+      this.isLoading = false;
+      return false;
     }
-    
-    modal.style.display = 'flex';
-    
-    const closeBtn = modal.querySelector('.close-modal');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        modal.style.display = 'none';
-      });
+  },
+  
+  openOrdersModal: async function() {
+    try {
+      const modal = document.getElementById('product-modal');
+      modal.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+      modal.style.display = 'flex';
+      
+      const loaded = await this.loadOrders();
+      if (!loaded) return;
+      
+      if (this.orders.length === 0) {
+        modal.innerHTML = `
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>📋 Mis Pedidos</h2>
+              <button class="close-modal">&times;</button>
+            </div>
+            <div class="orders-container">
+              <p>No tienes pedidos registrados</p>
+              <button id="retry-load-orders" class="btn-primary">🔄 Reintentar</button>
+            </div>
+          </div>
+        `;
+        
+        document.getElementById('retry-load-orders')?.addEventListener('click', async () => {
+          await this.loadOrders();
+          this.openOrdersModal();
+        });
+      } else {
+        modal.innerHTML = `
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>📋 Mis Pedidos</h2>
+              <button class="close-modal">&times;</button>
+            </div>
+            ${this.getFilterControls()}
+            <div class="orders-container" id="orders-container">
+              ${this.getOrdersHTML()}
+            </div>
+          </div>
+        `;
+        
+        this.setupOrdersModalEvents();
+      }
+    } catch (error) {
+      console.error('Error abriendo modal de pedidos:', error);
+      Notifications.showNotification('Error', 'Error al mostrar pedidos');
     }
-    
-    this.attachThumbnailEvents();
-    this.attachViewDetailsEvents();
   },
   
   getFilterControls: function() {
@@ -127,7 +121,7 @@ const OrdersSystem = {
   
   getOrdersHTML: function(orders = this.orders) {
     if (!orders || orders.length === 0) {
-      return '<p>No tienes pedidos registrados</p>';
+      return '<p class="no-orders">No tienes pedidos registrados</p>';
     }
     
     return orders.map(order => {
@@ -135,7 +129,7 @@ const OrdersSystem = {
         (new Date() - new Date(order.updatedAt)) < (24 * 60 * 60 * 1000);
       
       const thumbnails = order.items.slice(0, 5).map(item => {
-        const imageUrl = item.image_url || 'placeholder.jpg';
+        const imageUrl = item.image_url || 'https://via.placeholder.com/60';
         return `<img src="${imageUrl}" alt="${item.product_name}" class="order-thumb" data-src="${imageUrl}">`;
       }).join('');
       
@@ -157,12 +151,51 @@ const OrdersSystem = {
             ${thumbnails}
           </div>
           
-          <button class="view-order-details" data-id="${order.id}">
+          <button class="view-order-details btn-primary" data-id="${order.id}">
             👁️ Ver detalles
           </button>
         </div>
       `;
     }).join('');
+  },
+  
+  setupOrdersModalEvents: function() {
+    document.getElementById('client-status-filter')?.addEventListener('change', (e) => {
+      this.renderOrdersForClient(e.target.value);
+    });
+    
+    document.getElementById('client-sort-by')?.addEventListener('change', () => {
+      this.renderOrdersForClient(document.getElementById('client-status-filter').value);
+    });
+    
+    document.querySelectorAll('.view-order-details').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const orderId = e.target.getAttribute('data-id');
+        const order = this.orders.find(o => o.id === orderId);
+        if (order) {
+          order.isNew = false;
+          this.viewOrderDetails(order);
+        }
+      });
+    });
+    
+    document.querySelectorAll('.order-thumb').forEach(thumb => {
+      thumb.addEventListener('click', function(e) {
+        const src = this.getAttribute('data-src');
+        const modalImg = document.createElement('div');
+        modalImg.className = 'image-modal';
+        modalImg.innerHTML = `
+          <div class="image-modal-content">
+            <img src="${src}" alt="Imagen del producto">
+          </div>
+        `;
+        document.body.appendChild(modalImg);
+        
+        modalImg.addEventListener('click', function() {
+          document.body.removeChild(modalImg);
+        });
+      });
+    });
   },
   
   renderOrdersForClient: function(statusFilter = 'all') {
@@ -190,45 +223,8 @@ const OrdersSystem = {
     const ordersContainer = document.getElementById('orders-container');
     if (ordersContainer) {
       ordersContainer.innerHTML = this.getOrdersHTML(orders);
-      this.attachThumbnailEvents();
-      this.attachViewDetailsEvents();
+      this.setupOrdersModalEvents();
     }
-  },
-  
-  attachThumbnailEvents: function() {
-    const modal = document.getElementById('product-modal');
-    if (!modal) return;
-    
-    modal.querySelectorAll('.order-thumb').forEach(thumb => {
-      thumb.addEventListener('click', function(e) {
-        const src = this.getAttribute('data-src');
-        const modalImg = document.createElement('div');
-        modalImg.className = 'image-modal';
-        modalImg.innerHTML = `
-          <div class="image-modal-content">
-            <img src="${src}" alt="Imagen del producto">
-          </div>
-        `;
-        document.body.appendChild(modalImg);
-        
-        modalImg.addEventListener('click', function() {
-          document.body.removeChild(modalImg);
-        });
-      });
-    });
-  },
-  
-  attachViewDetailsEvents: function() {
-    document.querySelectorAll('.view-order-details').forEach(button => {
-      button.addEventListener('click', (e) => {
-        const orderId = e.target.getAttribute('data-id');
-        const order = this.orders.find(o => o.id === orderId);
-        if (order) {
-          order.isNew = false;
-          this.viewOrderDetails(order);
-        }
-      });
-    });
   },
   
   viewOrderDetails: function(order) {
@@ -310,15 +306,20 @@ const OrdersSystem = {
               `;
             }).join('')}
           </div>
+          
+          <div class="modal-footer">
+            <button class="btn-primary" id="back-to-orders">← Volver a pedidos</button>
+          </div>
         </div>
       </div>
     `;
     
-    const closeBtn = modal.querySelector('.close-modal');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.openOrdersModal();
-      });
-    }
+    document.getElementById('back-to-orders')?.addEventListener('click', () => {
+      this.openOrdersModal();
+    });
+    
+    document.querySelector('.close-modal')?.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
   }
 };
