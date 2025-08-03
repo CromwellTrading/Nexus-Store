@@ -33,7 +33,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 }));
 app.use(express.json());
-app.use(fileUpload());
+app.use(fileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  abortOnLimit: true
+}));
 
 app.use((req, res, next) => {
   req.telegramId = req.headers['telegram-id'] || 
@@ -101,6 +104,163 @@ app.post('/api/upload-image', isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Error subiendo imagen:', error);
     res.status(500).json({ error: 'Error subiendo imagen' });
+  }
+});
+
+// Checkout actualizado para manejar FormData
+app.post('/api/checkout', async (req, res) => {
+  console.log('[CHECKOUT] Iniciando proceso de checkout');
+  
+  try {
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ error: 'No se subió el comprobante de pago' });
+    }
+
+    const imageFile = req.files.image;
+    const { 
+      userId, 
+      paymentMethod, 
+      fullName,
+      ci,
+      phone,
+      address,
+      province,
+      recipientName,
+      recipientCi,
+      recipientPhone,
+      requiredFields
+    } = req.body;
+
+    if (!userId || !paymentMethod) {
+      return res.status(400).json({ error: 'Faltan parámetros requeridos' });
+    }
+
+    // 1. Subir comprobante de pago
+    console.log('[CHECKOUT] Subiendo comprobante de pago...');
+    const uploadResponse = await imagekit.upload({
+      file: imageFile.data,
+      fileName: `comprobante_${Date.now()}_${imageFile.name}`,
+      useUniqueFileName: true
+    });
+    const transferProofUrl = uploadResponse.url;
+
+    // 2. Preparar datos del pedido
+    const transferData = { 
+      transferProof: transferProofUrl, 
+      transferId: `TRF-${Date.now()}` 
+    };
+
+    const recipientData = {};
+    if (recipientName && recipientCi && recipientPhone) {
+      recipientData.fullName = recipientName;
+      recipientData.ci = recipientCi;
+      recipientData.phone = recipientPhone;
+    }
+
+    const userData = { fullName, ci, phone, address, province };
+    const parsedRequiredFields = requiredFields ? JSON.parse(requiredFields) : {};
+
+    // 3. Obtener carrito
+    console.log('[CHECKOUT] Obteniendo carrito...');
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError || !cart) {
+      console.error('[CHECKOUT] Error obteniendo carrito:', cartError);
+      return res.status(400).json({ error: 'Carrito no encontrado' });
+    }
+    
+    const items = cart.items;
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'Carrito vacío' });
+    }
+
+    // 4. Obtener productos
+    console.log('[CHECKOUT] Obteniendo productos...');
+    const productIds = items.map(item => item.productId);
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name, prices, images, tab_type')
+      .in('id', productIds);
+    
+    if (productsError) {
+      console.error('[CHECKOUT] Error obteniendo productos:', productsError);
+      return res.status(400).json({ error: 'Error obteniendo productos' });
+    }
+    
+    if (!products || products.length === 0) {
+      return res.status(400).json({ error: 'No se encontraron productos' });
+    }
+
+    // 5. Calcular total y preparar items
+    console.log('[CHECKOUT] Calculando total...');
+    let total = 0;
+    const orderItems = [];
+    const productMap = {};
+    products.forEach(product => productMap[product.id] = product);
+    
+    items.forEach(item => {
+      const product = productMap[item.productId];
+      if (product) {
+        const price = product.prices[paymentMethod] || 0;
+        total += price * item.quantity;
+        orderItems.push({
+          product_id: item.productId,
+          product_name: product.name,
+          quantity: item.quantity,
+          price: price,
+          tab_type: product.tab_type,
+          image_url: product.images?.[0] || null
+        });
+      }
+    });
+
+    // 6. Crear orden
+    console.log('[CHECKOUT] Creando orden...');
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const orderData = {
+      id: orderId,
+      user_id: userId,
+      total: total,
+      status: 'Pendiente',
+      user_data: userData
+    };
+    
+    await supabase.from('orders').insert([orderData]);
+
+    // 7. Guardar detalles
+    console.log('[CHECKOUT] Guardando detalles...');
+    await supabase.from('order_details').insert([{
+      order_id: orderId,
+      payment_method: paymentMethod,
+      transfer_data: transferData,
+      recipient_data: recipientData,
+      required_fields: parsedRequiredFields
+    }]);
+
+    // 8. Guardar items
+    console.log('[CHECKOUT] Guardando items...');
+    await supabase.from('order_items').insert(
+      orderItems.map(item => ({ ...item, order_id: orderId }))
+    );
+
+    // 9. Vaciar carrito
+    console.log('[CHECKOUT] Vaciando carrito...');
+    await supabase.from('carts').delete().eq('user_id', userId);
+
+    console.log(`[CHECKOUT] Orden ${orderId} creada exitosamente`);
+    res.json({ success: true, orderId, total });
+    
+  } catch (error) {
+    console.error('[CHECKOUT] Error crítico:', error);
+    res.status(500).json({ 
+      error: 'Error en checkout', 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -286,109 +446,6 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
   }
 });
 
-// Checkout
-app.post('/api/checkout', async (req, res) => {
-  console.log('[CHECKOUT] Iniciando proceso de checkout');
-  
-  const { userId, paymentMethod, transferData, recipient, requiredFields, userData } = req.body;
-  
-  if (!userId || !paymentMethod) {
-    return res.status(400).json({ error: 'Faltan parámetros requeridos: userId y paymentMethod' });
-  }
-  
-  try {
-    // 1. Obtener carrito
-    const { data: cart, error: cartError } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    if (cartError || !cart) {
-      console.error('[CHECKOUT] Error obteniendo carrito:', cartError);
-      return res.status(400).json({ error: 'Carrito no encontrado' });
-    }
-    
-    const items = cart.items;
-    if (!items || items.length === 0) return res.status(400).json({ error: 'Carrito vacío' });
-    
-    // 2. Obtener productos
-    const productIds = items.map(item => item.productId);
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, prices, images, tab_type')
-      .in('id', productIds);
-    
-    if (productsError) {
-      console.error('[CHECKOUT] Error obteniendo productos:', productsError);
-      return res.status(400).json({ error: 'Error obteniendo productos', details: productsError });
-    }
-    
-    if (!products || products.length === 0) {
-      console.error('[CHECKOUT] No se encontraron productos para IDs:', productIds);
-      return res.status(400).json({ error: 'No se encontraron productos' });
-    }
-    
-    // 3. Calcular total y preparar items
-    let total = 0;
-    const orderItems = [];
-    const productMap = {};
-    products.forEach(product => productMap[product.id] = product);
-    
-    items.forEach(item => {
-      const product = productMap[item.productId];
-      if (product) {
-        const price = product.prices[paymentMethod] || 0;
-        total += price * item.quantity;
-        orderItems.push({
-          product_id: item.productId,
-          product_name: product.name,
-          quantity: item.quantity,
-          price: price,
-          tab_type: product.tab_type,
-          image_url: product.images?.[0] || null
-        });
-      }
-    });
-    
-    // 4. Crear orden
-    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const orderData = {
-      id: orderId,
-      user_id: userId,
-      total: total,
-      status: 'Pendiente',
-      user_data: userData
-    };
-    
-    await supabase.from('orders').insert([orderData]);
-    
-    // 5. Guardar detalles
-    await supabase.from('order_details').insert([{
-      order_id: orderId,
-      payment_method: paymentMethod,
-      transfer_data: transferData || {},
-      recipient_data: recipient || {},
-      required_fields: requiredFields || {}
-    }]);
-    
-    // 6. Guardar items
-    await supabase.from('order_items').insert(
-      orderItems.map(item => ({ ...item, order_id: orderId }))
-    );
-    
-    // 7. Vaciar carrito
-    await supabase.from('carts').delete().eq('user_id', userId);
-    
-    console.log(`[CHECKOUT] Orden creada: ${orderId}`);
-    res.json({ success: true, orderId, total });
-    
-  } catch (error) {
-    console.error('[CHECKOUT] Error crítico:', error);
-    res.status(500).json({ error: 'Error en checkout', message: error.message });
-  }
-});
-
 // Rutas de administración
 app.get('/api/admin/categories', isAdmin, async (req, res) => {
   try {
@@ -461,7 +518,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     // Generar ID único para el producto
     const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
-    // Preparar datos para Supabase
+    // Preparar datos para Supabase - incluyendo tab_type
     const productData = {
       id: productId,
       type,
@@ -475,7 +532,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       colors: product.colors || null,
       required_fields: product.required_fields || null,
       date_created: new Date().toISOString(),
-      tab_type: type
+      tab_type: type  // Añadimos el campo tab_type
     };
 
     const { data, error } = await supabase
