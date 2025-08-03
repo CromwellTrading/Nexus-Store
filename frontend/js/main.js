@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // 1. Inicializar UserProfile (solo perfil)
     if (typeof UserProfile !== 'undefined') {
       console.log("Inicializando UserProfile...");
-      UserProfile.init();
+      await UserProfile.init();
       console.log("UserProfile inicializado");
     }
     
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     // Asegurar que OrdersSystem se inicialice
     if (typeof OrdersSystem !== 'undefined') {
-      OrdersSystem.init();
+      await OrdersSystem.init();
       console.log("OrdersSystem inicializado");
     }
     
@@ -73,38 +73,57 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 function setupEventListeners() {
+  // Botón de perfil
   document.getElementById('profile-button')?.addEventListener('click', function() {
-    if (typeof UserProfile !== 'undefined' && typeof UserProfile.openProfileModal === 'function') {
-      UserProfile.openProfileModal();
-    } else {
-      console.error("UserProfile no está definido o no tiene openProfileModal");
-    }
-  });
-  
-  // Nota: El botón de admin ahora es controlado por AdminSystem
-  // El evento se registra en AdminSystem.initializeAdmin() si es admin
-  
-  document.getElementById('orders-button')?.addEventListener('click', function() {
-    if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
-      OrdersSystem.openOrdersModal();
-      if (typeof Notifications !== 'undefined') {
-        Notifications.notifications.forEach(n => n.read = true);
-        Notifications.saveNotifications();
-        Notifications.renderNotificationCount();
+    try {
+      if (typeof UserProfile !== 'undefined' && typeof UserProfile.openProfileModal === 'function') {
+        UserProfile.openProfileModal();
+      } else {
+        console.error("UserProfile no está definido o no tiene openProfileModal");
+        Notifications.showNotification('Error', 'No se pudo abrir el perfil');
       }
-    } else {
-      console.error("OrdersSystem no está definido o no tiene openOrdersModal");
+    } catch (error) {
+      console.error("Error al abrir perfil:", error);
+      Notifications.showNotification('Error', 'Error al abrir el perfil');
     }
   });
   
+  // Botón de pedidos
+  document.getElementById('orders-button')?.addEventListener('click', async function() {
+    try {
+      if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
+        await OrdersSystem.openOrdersModal();
+        if (typeof Notifications !== 'undefined') {
+          Notifications.notifications.forEach(n => n.read = true);
+          Notifications.saveNotifications();
+          Notifications.renderNotificationCount();
+        }
+      } else {
+        console.error("OrdersSystem no está definido o no tiene openOrdersModal");
+        Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
+      }
+    } catch (error) {
+      console.error("Error al abrir pedidos:", error);
+      Notifications.showNotification('Error', 'Error al cargar pedidos');
+    }
+  });
+  
+  // Botón de carrito
   document.getElementById('cart-button')?.addEventListener('click', function() {
-    if (typeof CartSystem !== 'undefined' && typeof CartSystem.openCartModal === 'function') {
-      CartSystem.openCartModal();
-    } else {
-      console.error("CartSystem no está definido o no tiene openCartModal");
+    try {
+      if (typeof CartSystem !== 'undefined' && typeof CartSystem.openCartModal === 'function') {
+        CartSystem.openCartModal();
+      } else {
+        console.error("CartSystem no está definido o no tiene openCartModal");
+        Notifications.showNotification('Error', 'No se pudo abrir el carrito');
+      }
+    } catch (error) {
+      console.error("Error al abrir carrito:", error);
+      Notifications.showNotification('Error', 'Error al abrir el carrito');
     }
   });
   
+  // Cerrar modal al hacer clic fuera
   document.addEventListener('click', function(e) {
     const modal = document.getElementById('product-modal');
     if (e.target === modal) {
