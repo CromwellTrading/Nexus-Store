@@ -20,7 +20,6 @@ const OrdersSystem = {
         return response.json();
       })
       .then(orders => {
-        // CORRECCIÓN: Manejar correctamente las fechas
         this.orders = orders.map(order => ({
           ...order,
           createdAt: new Date(order.createdAt).toLocaleDateString(),
@@ -37,7 +36,6 @@ const OrdersSystem = {
   openOrdersModal: function() {
     const modal = document.getElementById('product-modal');
     
-    // CORRECCIÓN: Verificar si hay pedidos cargados
     if (this.orders.length === 0) {
       modal.innerHTML = `
         <div class="modal-content">
@@ -52,10 +50,13 @@ const OrdersSystem = {
         </div>
       `;
       
-      modal.querySelector('#retry-load-orders').addEventListener('click', () => {
-        this.loadOrders();
-        setTimeout(() => this.openOrdersModal(), 500);
-      });
+      const retryBtn = modal.querySelector('#retry-load-orders');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+          this.loadOrders();
+          setTimeout(() => this.openOrdersModal(), 500);
+        });
+      }
     } else {
       modal.innerHTML = `
         <div class="modal-content">
@@ -70,21 +71,30 @@ const OrdersSystem = {
         </div>
       `;
       
-      // Configurar eventos de filtro
-      document.getElementById('client-status-filter').addEventListener('change', (e) => {
-        this.renderOrdersForClient(e.target.value);
-      });
+      const statusFilter = document.getElementById('client-status-filter');
+      const sortBy = document.getElementById('client-sort-by');
       
-      document.getElementById('client-sort-by').addEventListener('change', () => {
-        this.renderOrdersForClient(document.getElementById('client-status-filter').value);
-      });
+      if (statusFilter) {
+        statusFilter.addEventListener('change', (e) => {
+          this.renderOrdersForClient(e.target.value);
+        });
+      }
+      
+      if (sortBy) {
+        sortBy.addEventListener('change', () => {
+          this.renderOrdersForClient(document.getElementById('client-status-filter').value);
+        });
+      }
     }
     
     modal.style.display = 'flex';
     
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
+    const closeBtn = modal.querySelector('.close-modal');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+      });
+    }
     
     this.attachThumbnailEvents();
     this.attachViewDetailsEvents();
@@ -124,15 +134,9 @@ const OrdersSystem = {
       const isUpdated = order.updatedAt && 
         (new Date() - new Date(order.updatedAt)) < (24 * 60 * 60 * 1000);
       
-      // CORRECCIÓN: Manejar productos sin imágenes
       const thumbnails = order.items.slice(0, 5).map(item => {
         const imageUrl = item.image_url || 'placeholder.jpg';
-        return `
-          <img src="${imageUrl}" 
-               alt="${item.product_name}" 
-               class="order-thumb"
-               data-src="${imageUrl}">
-        `;
+        return `<img src="${imageUrl}" alt="${item.product_name}" class="order-thumb" data-src="${imageUrl}">`;
       }).join('');
       
       return `
@@ -162,15 +166,13 @@ const OrdersSystem = {
   },
   
   renderOrdersForClient: function(statusFilter = 'all') {
-    const sortBy = document.getElementById('client-sort-by').value;
+    const sortBy = document.getElementById('client-sort-by')?.value || 'newest';
     let orders = [...this.orders];
     
-    // Filtrar por estado
     if (statusFilter !== 'all') {
       orders = orders.filter(order => order.status === statusFilter);
     }
     
-    // Ordenar
     if (sortBy === 'newest') {
       orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } else if (sortBy === 'oldest') {
@@ -186,10 +188,11 @@ const OrdersSystem = {
     }
     
     const ordersContainer = document.getElementById('orders-container');
-    ordersContainer.innerHTML = this.getOrdersHTML(orders);
-    
-    this.attachThumbnailEvents();
-    this.attachViewDetailsEvents();
+    if (ordersContainer) {
+      ordersContainer.innerHTML = this.getOrdersHTML(orders);
+      this.attachThumbnailEvents();
+      this.attachViewDetailsEvents();
+    }
   },
   
   attachThumbnailEvents: function() {
@@ -231,7 +234,6 @@ const OrdersSystem = {
   viewOrderDetails: function(order) {
     const modal = document.getElementById('product-modal');
     
-    // CORRECCIÓN: Manejar todos los campos posibles
     const recipientHTML = order.recipient ? `
       <h3>📦 Datos del Receptor</h3>
       <div class="recipient-info">
@@ -312,8 +314,11 @@ const OrdersSystem = {
       </div>
     `;
     
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-      this.openOrdersModal();
-    });
+    const closeBtn = modal.querySelector('.close-modal');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.openOrdersModal();
+      });
+    }
   }
 };
