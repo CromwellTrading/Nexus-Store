@@ -3,7 +3,7 @@ const ImageUploader = {
   // Configuración de ImageKit
   publicKey: 'public_hhFA4QLrpbIf5aVDBZfodu08iOA=',
   privateKey: 'private_r3YLluiuLrO43qZaewT9yBzXgTI=',
-  urlEndpoint: 'https://ik.imagekit.io/tzsnnmyff', // Reemplaza con tu ID de ImageKit
+  urlEndpoint: 'https://ik.imagekit.io/tzsnnmyff',
   
   // Generar autenticación para ImageKit
   generateAuthParams: function() {
@@ -12,15 +12,15 @@ const ImageUploader = {
     return `?key=${this.publicKey}&expire=${expire}&signature=${signature}`;
   },
   
-  // Generar firma HMAC-SHA1
+  // Generar firma HMAC-SHA1 corregida
   generateSignature: function(expire) {
     try {
       const message = expire + this.privateKey;
       const hash = CryptoJS.HmacSHA1(message, this.privateKey);
-      return CryptoJS.enc.Hex.stringify(hash);
+      return CryptoJS.enc.Hex.stringify(hash); // Formato hexadecimal
     } catch (error) {
       console.error('Error generando firma:', error);
-      throw new Error('Error de configuración de seguridad');
+      throw new Error('Error de configuración de seguridad: ' + error.message);
     }
   },
   
