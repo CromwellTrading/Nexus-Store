@@ -272,9 +272,14 @@ app.post('/api/checkout', async (req, res) => {
       .select('id, name, prices, images, tab_type')
       .in('id', productIds);
     
-    if (productsError || !products) {
+    if (productsError) {
       console.error('[CHECKOUT] Error obteniendo productos:', productsError);
-      return res.status(400).json({ error: 'Error obteniendo productos' });
+      return res.status(400).json({ error: 'Error obteniendo productos', details: productsError });
+    }
+    
+    if (!products || products.length === 0) {
+      console.error('[CHECKOUT] No se encontraron productos para IDs:', productIds);
+      return res.status(400).json({ error: 'No se encontraron productos' });
     }
     
     // 3. Calcular total y preparar items
@@ -409,7 +414,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     // Generar ID único para el producto
     const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
-    // Preparar datos para Supabase
+    // Preparar datos para Supabase - incluyendo tab_type
     const productData = {
       id: productId,
       type,
@@ -422,7 +427,8 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       has_color_variant: product.has_color_variant || false,
       colors: product.colors || null,
       required_fields: product.required_fields || null,
-      date_created: new Date().toISOString()
+      date_created: new Date().toISOString(),
+      tab_type: type  // Añadimos el campo tab_type
     };
 
     const { data, error } = await supabase
