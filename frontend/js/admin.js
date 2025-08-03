@@ -391,8 +391,21 @@ const AdminSystem = {
         if (imageFiles.length > 0) {
           product.images = [];
           for (let i = 0; i < imageFiles.length; i++) {
+            // Mostrar estado de carga para esta imagen
+            ImageUploader.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
+            
             const imageUrl = await ImageUploader.uploadImage(imageFiles[i]);
             product.images.push(imageUrl);
+            
+            // Actualizar vista previa con la imagen subida
+            const preview = document.getElementById('image-preview');
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.maxWidth = '100px';
+            img.style.maxHeight = '100px';
+            img.style.objectFit = 'contain';
+            img.style.margin = '5px';
+            preview.appendChild(img);
           }
         }
         
@@ -406,8 +419,10 @@ const AdminSystem = {
       } else {
         const imageFile = document.getElementById('digital-image').files[0];
         if (imageFile) {
+          ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
           const imageUrl = await ImageUploader.uploadImage(imageFile);
           product.images = [imageUrl];
+          ImageUploader.displayUploadedImage(imageUrl, 'digital-image-preview');
         }
         
         document.querySelectorAll('.required-field').forEach(field => {
