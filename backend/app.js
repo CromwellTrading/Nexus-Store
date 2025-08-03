@@ -406,7 +406,12 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     
     if (categoryError || !category) return res.status(400).json({ error: 'Categoría inválida' });
     
+    // Generar ID único para el producto
+    const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    
+    // Preparar datos para Supabase
     const productData = {
+      id: productId,
       type,
       category_id: categoryId,
       name: product.name,
@@ -416,7 +421,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       images: product.images || [],
       has_color_variant: product.has_color_variant || false,
       colors: product.colors || null,
-      required_fields: product.required_fields || null, // Campo corregido
+      required_fields: product.required_fields || null,
       date_created: new Date().toISOString()
     };
 
@@ -426,13 +431,18 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error Supabase:', error);
+      throw error;
+    }
+    
     res.status(201).json({ id: data.id, ...product });
   } catch (error) {
     console.error('Error creando producto:', error);
     res.status(500).json({ 
       error: 'Error creando producto',
-      message: error.message 
+      message: error.message,
+      details: error.details || null
     });
   }
 });
