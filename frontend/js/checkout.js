@@ -229,62 +229,44 @@ const CheckoutSystem = {
         const proofPreview = document.getElementById('transfer-proof-preview');
         proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
 
-        // 1. Subir comprobante
-        let transferProofUrl;
-        try {
-          transferProofUrl = await ImageUploader.uploadImage(proofFile);
-          proofPreview.innerHTML = `
-            <img src="${transferProofUrl}" alt="Comprobante de pago" 
-                 style="max-width: 200px; border: 1px solid #ddd; border-radius: 4px; margin-top: 10px;">
-            <p>✅ Comprobante subido correctamente</p>
-          `;
-        } catch (uploadError) {
-          console.error('Error subiendo comprobante:', uploadError);
-          proofPreview.innerHTML = `<div class="error">❌ Error subiendo comprobante: ${uploadError.message}</div>`;
-          confirmBtn.innerHTML = originalBtnText;
-          confirmBtn.disabled = false;
-          return;
-        }
-
-        // Preparar datos
-        const transferData = { transferProof: transferProofUrl, transferId: `TRF-${Date.now()}` };
-        const recipientData = {};
+        // 1. Crear FormData para enviar la imagen y los datos
+        const formData = new FormData();
+        formData.append('image', proofFile);
+        formData.append('userId', userId);
+        formData.append('paymentMethod', method);
+        
+        // Datos del usuario
+        formData.append('fullName', document.getElementById('checkout-fullname').value);
+        formData.append('ci', document.getElementById('checkout-ci').value);
+        formData.append('phone', document.getElementById('checkout-phone').value);
+        formData.append('address', document.getElementById('checkout-address').value);
+        formData.append('province', document.getElementById('checkout-province').value);
+        
+        // Datos del receptor si aplica
         if (document.getElementById('add-recipient')?.checked) {
-          recipientData.fullName = document.getElementById('recipient-name').value;
-          recipientData.ci = document.getElementById('recipient-ci').value;
-          recipientData.phone = document.getElementById('recipient-phone').value;
+          formData.append('recipientName', document.getElementById('recipient-name').value);
+          formData.append('recipientCi', document.getElementById('recipient-ci').value);
+          formData.append('recipientPhone', document.getElementById('recipient-phone').value);
         }
-
-        const requiredFieldsData = {};
+        
+        // Campos requeridos
+        const requiredFields = {};
         if (document.getElementById('required-fields-inputs')) {
           document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
             const input = group.querySelector('input');
             const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
-            requiredFieldsData[fieldName] = input.value;
+            requiredFields[fieldName] = input.value;
           });
+          formData.append('requiredFields', JSON.stringify(requiredFields));
         }
-
+        
         // 2. Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
           method: 'POST',
           headers: { 
-            'Content-Type': 'application/json',
             'Telegram-ID': userId.toString()
           },
-          body: JSON.stringify({
-            userId: userId,
-            paymentMethod: method,
-            transferData: transferData,
-            recipient: recipientData,
-            requiredFields: requiredFieldsData,
-            userData: {
-              fullName: document.getElementById('checkout-fullname').value,
-              ci: document.getElementById('checkout-ci').value,
-              phone: document.getElementById('checkout-phone').value,
-              address: document.getElementById('checkout-address').value,
-              province: document.getElementById('checkout-province').value
-            }
-          })
+          body: formData
         });
 
         // Manejar respuesta
