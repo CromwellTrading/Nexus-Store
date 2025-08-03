@@ -1,5 +1,3 @@
-
-
 /* styles.css */
 :root {
   /* Paleta base */
@@ -21,7 +19,7 @@
   /* Elementos UI */
   --border-color: #dee2e6;
   --card-bg: #ffffff;
-  --card-shadow: 0 8极速赛车开奖直播官网px 30px rgba(0, 0, 0, 0.12);
+  --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   
   /* Degradados metálicos */
   --metallic-primary: linear-gradient(145deg, #4a00e0, #6a11cb);
@@ -30,7 +28,7 @@
   
   /* Sombras */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 极速赛车开奖直播官网0.15);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
   --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.2);
   
   /* Transiciones */
@@ -216,7 +214,7 @@ body {
 }
 
 .theme-option.theme-light {
-  background: linear-gradient(145deg, #f8f9fa, #e9ece极速赛车开奖直播官网f);
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef);
 }
 
 .theme-option.theme-dark {
@@ -779,7 +777,7 @@ body {
   transition: var(--transition-fast);
   display: inline-flex;
   align-items: center;
-  gap: 8极速赛车开奖直播官网px;
+  gap: 8px;
 }
 
 .admin-btn:hover {
@@ -1043,6 +1041,7 @@ body {
   transform: perspective(1000px) translateZ(20px);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
+
 /* Estilos para el logo de la tienda */
 .store-logo {
     max-width: 150%;
@@ -1153,4 +1152,100 @@ body {
   font-weight: 500;
 }
 
- 
+/* Nuevos estilos para pedidos */
+.new-order {
+  border-left: 4px solid var(--success-color);
+}
+
+.updated-badge {
+  background: var(--primary-color);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  margin-left: 10px;
+}
+
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.image-modal-content {
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.image-modal-content img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Estilo para el botón de finalizar compra en el carrito */
+.checkout-btn {
+  padding: 12px 25px;
+  background: var(--metallic-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.checkout-btn:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-primary);
+}
+
+.checkout-btn:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Ordenar controles */
+.order-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.order-filter, .order-sort {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Estilos para el botón de reintentar */
+#retry-load-orders {
+  padding: 10px 20px;
+  background: var(--metallic-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  margin-top: 10px;
+}
+
+#retry-load-orders:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-primary);
+}
