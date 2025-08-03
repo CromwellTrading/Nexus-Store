@@ -12,8 +12,6 @@ const OrdersSystem = {
       return;
     }
     
-    console.log(`Cargando pedidos para usuario: ${userId}`); // Para depuración
-    
     fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`)
       .then(response => {
         if (!response.ok) {
@@ -22,19 +20,13 @@ const OrdersSystem = {
         return response.json();
       })
       .then(orders => {
-        console.log("Pedidos recibidos:", orders); // Para depuración
-        
+        // CORRECCIÓN: Manejar correctamente las fechas
         this.orders = orders.map(order => ({
           ...order,
-          // Convertir fechas a formato legible
           createdAt: new Date(order.createdAt).toLocaleDateString(),
           updatedAt: order.updatedAt ? new Date(order.updatedAt).toLocaleDateString() : null,
-          
-          // Agregar marca de nuevo pedido (primera vez que se ve)
           isNew: true
         }));
-        
-        console.log("Pedidos procesados:", this.orders); // Para depuración
       })
       .catch(error => {
         console.error('Error cargando pedidos:', error);
@@ -45,7 +37,7 @@ const OrdersSystem = {
   openOrdersModal: function() {
     const modal = document.getElementById('product-modal');
     
-    // Verificar si hay pedidos cargados
+    // CORRECCIÓN: Verificar si hay pedidos cargados
     if (this.orders.length === 0) {
       modal.innerHTML = `
         <div class="modal-content">
@@ -54,7 +46,7 @@ const OrdersSystem = {
             <button class="close-modal">&times;</button>
           </div>
           <div class="orders-container">
-            <p>Cargando pedidos...</p>
+            <p>No tienes pedidos registrados</p>
             <button id="retry-load-orders">🔄 Reintentar</button>
           </div>
         </div>
@@ -129,9 +121,19 @@ const OrdersSystem = {
     }
     
     return orders.map(order => {
-      // Verificar si el pedido fue actualizado recientemente
       const isUpdated = order.updatedAt && 
         (new Date() - new Date(order.updatedAt)) < (24 * 60 * 60 * 1000);
+      
+      // CORRECCIÓN: Manejar productos sin imágenes
+      const thumbnails = order.items.slice(0, 5).map(item => {
+        const imageUrl = item.image_url || 'placeholder.jpg';
+        return `
+          <img src="${imageUrl}" 
+               alt="${item.product_name}" 
+               class="order-thumb"
+               data-src="${imageUrl}">
+        `;
+      }).join('');
       
       return `
         <div class="order-item ${order.isNew ? 'new-order' : ''}">
@@ -148,12 +150,7 @@ const OrdersSystem = {
           </p>
           
           <div class="order-thumbnails">
-            ${order.items.slice(0, 5).map(item => `
-              <img src="${item.image_url || 'placeholder.jpg'}" 
-                   alt="${item.product_name}" 
-                   class="order-thumb"
-                   data-src="${item.image_url || 'placeholder.jpg'}">
-            `).join('')}
+            ${thumbnails}
           </div>
           
           <button class="view-order-details" data-id="${order.id}">
@@ -224,7 +221,7 @@ const OrdersSystem = {
         const orderId = e.target.getAttribute('data-id');
         const order = this.orders.find(o => o.id === orderId);
         if (order) {
-          order.isNew = false; // Marcar como visto
+          order.isNew = false;
           this.viewOrderDetails(order);
         }
       });
@@ -233,6 +230,26 @@ const OrdersSystem = {
   
   viewOrderDetails: function(order) {
     const modal = document.getElementById('product-modal');
+    
+    // CORRECCIÓN: Manejar todos los campos posibles
+    const recipientHTML = order.recipient ? `
+      <h3>📦 Datos del Receptor</h3>
+      <div class="recipient-info">
+        <div><strong>Nombre:</strong> ${order.recipient.fullName || 'N/A'}</div>
+        <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
+        <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
+      </div>
+    ` : '';
+    
+    const requiredFieldsHTML = order.requiredFields ? `
+      <h3>📝 Campos Requeridos</h3>
+      <div class="required-fields-info">
+        ${Object.entries(order.requiredFields).map(([key, value]) => `
+          <div><strong>${key}:</strong> ${value}</div>
+        `).join('')}
+      </div>
+    ` : '';
+    
     modal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
@@ -265,42 +282,31 @@ const OrdersSystem = {
             ` : ''}
           </div>
           
-          ${order.recipient && Object.keys(order.recipient).length > 0 ? `
-            <h3>📦 Datos del Receptor</h3>
-            <div class="recipient-info">
-              <div><strong>Nombre:</strong> ${order.recipient.fullName || 'N/A'}</div>
-              <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
-              <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
-            </div>
-          ` : ''}
-          
-          ${order.requiredFields && Object.keys(order.requiredFields).length > 0 ? `
-            <h3>📝 Campos Requeridos</h3>
-            <div class="required-fields-info">
-              ${Object.entries(order.requiredFields).map(([key, value]) => `
-                <div><strong>${key}:</strong> ${value}</div>
-              `).join('')}
-            </div>
-          ` : ''}
+          ${recipientHTML}
+          ${requiredFieldsHTML}
           
           <h3>🛒 Productos</h3>
           <div class="order-products">
-            ${order.items.map(item => `
-              <div class="order-product-item">
-                <div class="product-image">
-                  ${item.image_url ? `
-                    <img src="${item.image_url}" 
-                         alt="${item.product_name}" 
-                         style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;">
-                  ` : ''}
+            ${order.items.map(item => {
+              const imageHTML = item.image_url ? `
+                <img src="${item.image_url}" 
+                     alt="${item.product_name}" 
+                     style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;">
+              ` : '';
+              
+              return `
+                <div class="order-product-item">
+                  <div class="product-image">
+                    ${imageHTML}
+                  </div>
+                  <div class="product-details">
+                    <div><strong>${item.product_name}</strong></div>
+                    <div>${item.quantity} × $${item.price.toFixed(2)}</div>
+                    <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
+                  </div>
                 </div>
-                <div class="product-details">
-                  <div><strong>${item.product_name}</strong></div>
-                  <div>${item.quantity} × $${item.price.toFixed(2)}</div>
-                  <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
