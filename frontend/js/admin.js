@@ -306,7 +306,7 @@ const AdminSystem = {
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
         <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-          <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
+          <input type="text" placeholder="Nombre del campo" class="field-name" style="flex: 1;">
           <input type="checkbox" class="field-required" checked>
           <label>Requerido</label>
           <button class="remove-field">❌</button>
@@ -373,7 +373,7 @@ const AdminSystem = {
       return;
     }
     
-    // Crear el objeto producto con los nombres de campos corregidos
+    // Crear el objeto producto
     const product = { 
       name, 
       description, 
@@ -382,25 +382,41 @@ const AdminSystem = {
       date_created: new Date().toISOString(),
       has_color_variant: document.getElementById('has-color-variant').checked,
       colors: [],
-      required_fields: [] // Campo corregido
+      required_fields: []
     };
     
     try {
+      // Subir imágenes al backend
       if (type === 'fisico') {
         const imageFiles = document.getElementById('product-images').files;
         if (imageFiles.length > 0) {
           product.images = [];
           for (let i = 0; i < imageFiles.length; i++) {
-            // Mostrar estado de carga para esta imagen
-            ImageUploader.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
+            // Mostrar estado de carga
+            this.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
             
-            const imageUrl = await ImageUploader.uploadImage(imageFiles[i]);
-            product.images.push(imageUrl);
+            // Subir la imagen al backend
+            const formData = new FormData();
+            formData.append('image', imageFiles[i]);
             
-            // Actualizar vista previa con la imagen subida
+            const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
+              method: 'POST',
+              headers: { 'Telegram-ID': this.telegramUserId.toString() },
+              body: formData
+            });
+            
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              throw new Error(`Error subiendo imagen: ${uploadResponse.status} - ${errorText}`);
+            }
+            
+            const { url } = await uploadResponse.json();
+            product.images.push(url);
+            
+            // Actualizar vista previa
             const preview = document.getElementById('image-preview');
             const img = document.createElement('img');
-            img.src = imageUrl;
+            img.src = url;
             img.style.maxWidth = '100px';
             img.style.maxHeight = '100px';
             img.style.objectFit = 'contain';
@@ -409,6 +425,7 @@ const AdminSystem = {
           }
         }
         
+        // Manejar variantes de color
         if (product.has_color_variant) {
           document.querySelectorAll('.color-variant').forEach(variant => {
             const color = variant.querySelector('.color-picker').value;
@@ -417,14 +434,40 @@ const AdminSystem = {
           });
         }
       } else {
+        // Producto digital
         const imageFile = document.getElementById('digital-image').files[0];
         if (imageFile) {
-          ImageUploader.showLoading('digital-image-preview', 'Subiendo imagen...');
-          const imageUrl = await ImageUploader.uploadImage(imageFile);
-          product.images = [imageUrl];
-          ImageUploader.displayUploadedImage(imageUrl, 'digital-image-preview');
+          this.showLoading('digital-image-preview', 'Subiendo imagen...');
+          
+          const formData = new FormData();
+          formData.append('image', imageFile);
+          
+          const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
+            method: 'POST',
+            headers: { 'Telegram-ID': this.telegramUserId.toString() },
+            body: formData
+          });
+          
+          if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text();
+            throw new Error(`Error subiendo imagen: ${uploadResponse.status} - ${errorText}`);
+          }
+          
+          const { url } = await uploadResponse.json();
+          product.images = [url];
+          
+          // Mostrar imagen subida
+          const preview = document.getElementById('digital-image-preview');
+          preview.innerHTML = '';
+          const img = document.createElement('img');
+          img.src = url;
+          img.style.maxWidth = '200px';
+          img.style.maxHeight = '200px';
+          img.style.objectFit = 'contain';
+          preview.appendChild(img);
         }
         
+        // Campos requeridos
         document.querySelectorAll('.required-field').forEach(field => {
           const fieldName = field.querySelector('.field-name').value.trim();
           const isRequired = field.querySelector('.field-required').checked;
@@ -432,6 +475,7 @@ const AdminSystem = {
         });
       }
       
+      // Guardar el producto
       const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
         method: 'POST',
         headers: { 
@@ -450,7 +494,6 @@ const AdminSystem = {
         throw new Error(`Error ${response.status}: ${errorBody}`);
       }
       
-      const result = await response.json();
       alert('✅ Producto creado correctamente!');
       this.renderProductsList();
       document.getElementById('product-form').style.display = 'none';
@@ -458,6 +501,40 @@ const AdminSystem = {
     } catch (error) {
       alert('Error al guardar el producto: ' + error.message);
     }
+  },
+  
+  showLoading: function(previewId, message) {
+    const preview = document.getElementById(previewId);
+    if (!preview) return;
+    
+    preview.innerHTML = `
+      <div class="upload-loading">
+        <div class="upload-spinner"></div>
+        <p>${message}</p>
+      </div>
+      <style>
+        .upload-loading {
+          padding: 20px;
+          text-align: center;
+          background: #f8f9fa;
+          border-radius: 8px;
+          color: #0d47a1;
+        }
+        .upload-spinner {
+          border: 4px solid rgba(0,0,0,0.1);
+          border-top: 4px solid #2575fc;
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 15px;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    `;
   },
   
   renderProductsList: function() {
