@@ -14,14 +14,14 @@ const OrdersSystem = {
       .then(orders => {
         this.orders = orders.map(order => ({
           ...order,
-          date: new Date(order.created_at).toLocaleDateString(),
-          data: {
-            items: order.items, // Ya es un array (JSONB)
-            payment: order.payment, // Objeto directo
-            recipient: order.recipient, // Objeto directo
-            total: order.total
-          }
+          date: new Date(order.createdAt).toLocaleDateString(),
+          // Aquí estaba el error principal: no necesitamos anidar en "data"
+          // Los campos ya vienen directamente en el objeto order
         }));
+        // Si estamos en la modal de pedidos, actualizamos
+        if (document.getElementById('orders-container')) {
+          this.renderOrdersForClient('all');
+        }
       })
       .catch(error => {
         console.error('Error cargando pedidos:', error);
@@ -91,7 +91,7 @@ const OrdersSystem = {
     }
     
     return orders.map(order => {
-      const isUpdated = order.updated_at && (new Date() - new Date(order.updated_at)) < (24 * 60 * 60 * 1000);
+      const isUpdated = order.updatedAt && (new Date() - new Date(order.updatedAt)) < (24 * 60 * 60 * 1000);
       return `
         <div class="order-item ${order.isNew ? 'new-order' : ''}">
           <h3>📦 Pedido #${order.id} 
@@ -99,11 +99,11 @@ const OrdersSystem = {
             ${isUpdated ? '<span class="updated-badge">ACTUALIZADO</span>' : ''}
           </h3>
           <p>📅 Fecha: ${order.date}</p>
-          <p>💰 Total: $${order.data.total.toFixed(2)}</p>
+          <p>💰 Total: $${order.total.toFixed(2)}</p>
           <p class="order-status">🔄 Estado: <span class="status-${order.status.toLowerCase().replace(/\s+/g, '-')}">${order.status}</span></p>
           
           <div class="order-thumbnails">
-            ${order.data.items.map(item => `
+            ${order.items.map(item => `
               <img src="${item.image_url || 'placeholder.jpg'}" 
                    alt="${item.product_name}" 
                    class="order-thumb"
@@ -126,9 +126,9 @@ const OrdersSystem = {
     }
     
     if (sortBy === 'newest') {
-      orders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     } else if (sortBy === 'oldest') {
-      orders.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     } else if (sortBy === 'status') {
       const statusOrder = {
         'Pendiente': 1,
@@ -192,34 +192,46 @@ const OrdersSystem = {
           <div class="order-info">
             <div><strong>📅 Fecha:</strong> ${order.date}</div>
             <div><strong>🔄 Estado:</strong> ${order.status}</div>
-            <div><strong>💰 Total:</strong> $${order.data.total.toFixed(2)}</div>
+            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
           </div>
           
-          <h3>👤 Datos del Cliente</h3>
+          <h3>👤 Tus Datos</h3>
           <div class="customer-info">
-            <div><strong>Nombre:</strong> ${order.data.recipient?.fullName || 'No especificado'}</div>
-            <div><strong>🆔 CI:</strong> ${order.data.recipient?.ci || 'No especificado'}</div>
-            <div><strong>📱 Teléfono:</strong> ${order.data.recipient?.phone || 'No especificado'}</div>
-            <div><strong>📍 Provincia:</strong> ${order.data.recipient?.province || 'No especificado'}</div>
+            <div><strong>Nombre:</strong> ${order.userData?.fullName || 'No especificado'}</div>
+            <div><strong>🆔 CI:</strong> ${order.userData?.ci || 'No especificado'}</div>
+            <div><strong>📱 Teléfono:</strong> ${order.userData?.phone || 'No especificado'}</div>
+            <div><strong>📍 Dirección:</strong> ${order.userData?.address || 'No especificado'}, ${order.userData?.province || ''}</div>
           </div>
           
           <h3>💳 Información de Pago</h3>
           <div class="payment-info">
-            <div><strong>Método:</strong> ${order.data.payment.method}</div>
-            <div><strong>🔑 ID Transferencia:</strong> ${order.data.payment.transferId || 'N/A'}</div>
-            ${order.data.payment.transferProof ? `
-              <div><strong>📸 Comprobante:</strong> <a href="${order.data.payment.transferProof}" target="_blank">Ver imagen</a></div>
+            <div><strong>Método:</strong> ${order.payment?.method || 'No especificado'}</div>
+            <div><strong>🔑 ID Transferencia:</strong> ${order.payment?.transferId || 'N/A'}</div>
+            ${order.payment?.transferProof ? `
+              <div><strong>📸 Comprobante:</strong> <a href="${order.payment.transferProof}" target="_blank">Ver imagen</a></div>
             ` : ''}
           </div>
           
+          ${order.recipient && Object.keys(order.recipient).length > 0 ? `
+            <h3>📦 Datos del Receptor</h3>
+            <div class="recipient-info">
+              <div><strong>Nombre:</strong> ${order.recipient.fullName || 'N/A'}</div>
+              <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
+              <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
+            </div>
+          ` : ''}
+          
           <h3>🛒 Productos</h3>
           <div class="order-products">
-            ${order.data.items.map(item => `
+            ${order.items.map(item => `
               <div class="order-product-item">
+                <div class="product-image">
+                  ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : ''}
+                </div>
                 <div class="product-details">
-                  <div>${item.product_name}</div>
+                  <div><strong>${item.product_name}</strong></div>
                   <div>${item.quantity} x $${item.price.toFixed(2)}</div>
-                  <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                  <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
                 </div>
               </div>
             `).join('')}
