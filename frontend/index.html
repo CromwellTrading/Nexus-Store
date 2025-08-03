@@ -7,72 +7,103 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Carga temprana de CryptoJS -->
-    <script 
-        src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"
-        integrity="sha512-E8QSvWZ0eCLGk4km3hxSsNmGWbLtSCSUcewDQPQWZF6pEU8GlT8a5fFv4FbVimqHRQ9fd6p0CqigcG/Xluhw=="
-        crossorigin="anonymous">
-    </script>
-    
     <style>
-        .admin-indicator {
+        /* Estilos para el logger de depuración */
+        #debug-logger {
             position: fixed;
-            top: 10px;
+            bottom: 10px;
             right: 10px;
-            background: #4caf50;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 15px;
+            width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
             font-size: 12px;
-            z-index: 10000;
+            z-index: 9999;
             display: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         
-        #admin-button.admin-active {
-            background-color: #4caf50;
-            animation: pulse 2s infinite;
+        #debug-logger.active {
+            display: block;
         }
         
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        .log-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #444;
         }
         
-        /* Nuevos estilos para la subida de imágenes */
-        .image-upload-status {
-            text-align: center;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 4px;
-            margin: 10px 0;
+        .log-error {
+            color: #ff6b6b;
         }
         
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #4a6fa5;
+        .log-success {
+            color: #51cf66;
+        }
+        
+        .log-warning {
+            color: #fcc419;
+        }
+        
+        #debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 320px;
+            background: #333;
+            color: white;
+            border: none;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        /* Estilos para el modal de carga */
+        #loading-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9998;
         }
         
-        .image-upload-error {
-            color: #c53030;
-            background-color: #fed7d7;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
+        .loading-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 80%;
+            max-height: 80%;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body>
+    <!-- Modal de carga inicial -->
+    <div id="loading-modal">
+        <div class="loading-content">
+            <h2>🔍 Cargando Nexus Store...</h2>
+            <div id="loading-status">
+                <p>Inicializando sistema...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Logger de depuración -->
+    <div id="debug-logger"></div>
+    <button id="debug-toggle" title="Mostrar/Ocultar logs">🐞</button>
+    
     <div id="admin-indicator" class="admin-indicator">
         <i class="fas fa-user-shield"></i> Modo Administrador
     </div>
@@ -132,31 +163,182 @@
     <div id="product-modal" style="display: none;"></div>
 
     <script>
+        // Sistema de logging mejorado
+        const DebugLogger = {
+            init: function() {
+                this.logger = document.getElementById('debug-logger');
+                this.toggleBtn = document.getElementById('debug-toggle');
+                this.loadingModal = document.getElementById('loading-modal');
+                this.loadingStatus = document.getElementById('loading-status');
+                
+                this.toggleBtn.addEventListener('click', () => {
+                    this.logger.classList.toggle('active');
+                });
+                
+                this.log('Sistema de logging inicializado', 'success');
+            },
+            
+            log: function(message, type = 'info') {
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+                this.logger.appendChild(entry);
+                this.logger.scrollTop = this.logger.scrollHeight;
+                
+                // También mostrar en consola
+                const consoleMethod = type === 'error' ? 'error' : 
+                                     type === 'warning' ? 'warn' : 'log';
+                console[consoleMethod](message);
+            },
+            
+            updateLoadingStatus: function(message, type = 'info') {
+                if (this.loadingStatus) {
+                    const entry = document.createElement('p');
+                    entry.className = type === 'error' ? 'error' : type;
+                    entry.textContent = `• ${message}`;
+                    this.loadingStatus.appendChild(entry);
+                }
+                this.log(message, type);
+            },
+            
+            hideLoading: function() {
+                if (this.loadingModal) {
+                    setTimeout(() => {
+                        this.loadingModal.style.display = 'none';
+                    }, 500);
+                }
+            }
+        };
+        
+        // Inicializar logger inmediatamente
+        DebugLogger.init();
+        DebugLogger.updateLoadingStatus('Preparando entorno...');
+        
+        // Configuración global
         window.API_BASE_URL = 'https://nexus-store-86r8.onrender.com';
         window.API_URL = window.API_BASE_URL;
-        console.log(`[Global] URL de API configurada: ${window.API_BASE_URL}`);
+        DebugLogger.updateLoadingStatus(`Configurada URL de API: ${window.API_BASE_URL}`);
         
         window.ADMIN_IDS = [];
+        
+        // Verificar carga de scripts
+        function checkScriptLoaded(name) {
+            if (typeof window[name] === 'undefined') {
+                DebugLogger.updateLoadingStatus(`❌ Error: ${name} no se cargó correctamente`, 'error');
+                return false;
+            }
+            DebugLogger.updateLoadingStatus(`✅ ${name} cargado correctamente`, 'success');
+            return true;
+        }
     </script>
 
-    <script src="js/themes.js"></script>
-    <script src="js/tabs.js"></script>
-    <script src="js/userProfile.js"></script>
-    <script src="js/notifications.js"></script>
-    <script src="js/productView.js"></script>
-    <script src="js/productModal.js"></script>
-    <script src="js/cart.js"></script>
-    <script src="js/searchFilter.js"></script>
-    <script src="js/orders.js"></script>
-    <script src="js/checkout.js"></script>
-    <script src="js/Imagenup.js"></script>
-    <script src="js/admin.js"></script>
-    <script src="js/main.js"></script>
+    <!-- Cargar scripts con verificación -->
+    <script src="js/themes.js" onload="checkScriptLoaded('Themes')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando themes.js', 'error')"></script>
+    <script src="js/tabs.js" onload="checkScriptLoaded('Tabs')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando tabs.js', 'error')"></script>
+    <script src="js/userProfile.js" onload="checkScriptLoaded('UserProfile')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando userProfile.js', 'error')"></script>
+    <script src="js/notifications.js" onload="checkScriptLoaded('Notifications')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando notifications.js', 'error')"></script>
+    <script src="js/productView.js" onload="checkScriptLoaded('ProductView')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando productView.js', 'error')"></script>
+    <script src="js/productModal.js" onload="checkScriptLoaded('ProductModal')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando productModal.js', 'error')"></script>
+    <script src="js/cart.js" onload="checkScriptLoaded('CartSystem')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando cart.js', 'error')"></script>
+    <script src="js/searchFilter.js" onload="checkScriptLoaded('SearchFilter')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando searchFilter.js', 'error')"></script>
+    <script src="js/orders.js" onload="checkScriptLoaded('OrdersSystem')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando orders.js', 'error')"></script>
+    <script src="js/checkout.js" onload="checkScriptLoaded('CheckoutSystem')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando checkout.js', 'error')"></script>
+    <script src="js/Imagenup.js" onload="checkScriptLoaded('ImageUploader')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando Imagenup.js', 'error')"></script>
+    <script src="js/admin.js" onload="checkScriptLoaded('AdminSystem')" onerror="DebugLogger.updateLoadingStatus('❌ Error cargando admin.js', 'error')"></script>
     
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('[Main] Documento completamente cargado');
-            AdminSystem.init();
+        // Main.js integrado directamente para mejor control
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                DebugLogger.updateLoadingStatus('Iniciando inicialización controlada...');
+                
+                // 1. Inicializar UserProfile
+                if (checkScriptLoaded('UserProfile')) {
+                    DebugLogger.updateLoadingStatus('Inicializando UserProfile...');
+                    await UserProfile.init();
+                    DebugLogger.updateLoadingStatus('UserProfile inicializado', 'success');
+                    
+                    // Verificar botón de perfil
+                    const profileBtn = document.getElementById('profile-button');
+                    if (profileBtn) {
+                        profileBtn.addEventListener('click', () => {
+                            DebugLogger.log('Botón de perfil clickeado');
+                            if (typeof UserProfile.openProfileModal === 'function') {
+                                UserProfile.openProfileModal();
+                            } else {
+                                DebugLogger.log('UserProfile.openProfileModal no es una función', 'error');
+                            }
+                        });
+                        DebugLogger.updateLoadingStatus('Evento de perfil configurado', 'success');
+                    } else {
+                        DebugLogger.updateLoadingStatus('❌ No se encontró el botón de perfil', 'error');
+                    }
+                }
+                
+                // 2. Inicializar OrdersSystem
+                if (checkScriptLoaded('OrdersSystem')) {
+                    DebugLogger.updateLoadingStatus('Inicializando OrdersSystem...');
+                    await OrdersSystem.init();
+                    DebugLogger.updateLoadingStatus('OrdersSystem inicializado', 'success');
+                    
+                    // Verificar botón de pedidos
+                    const ordersBtn = document.getElementById('orders-button');
+                    if (ordersBtn) {
+                        ordersBtn.addEventListener('click', () => {
+                            DebugLogger.log('Botón de pedidos clickeado');
+                            if (typeof OrdersSystem.openOrdersModal === 'function') {
+                                OrdersSystem.openOrdersModal();
+                            } else {
+                                DebugLogger.log('OrdersSystem.openOrdersModal no es una función', 'error');
+                            }
+                        });
+                        DebugLogger.updateLoadingStatus('Evento de pedidos configurado', 'success');
+                    } else {
+                        DebugLogger.updateLoadingStatus('❌ No se encontró el botón de pedidos', 'error');
+                    }
+                }
+                
+                // 3. Inicializar el resto de componentes
+                const systems = {
+                    'Notifications': 'Notificaciones',
+                    'Themes': 'Temas',
+                    'Tabs': 'Pestañas',
+                    'ProductView': 'Vista de Productos',
+                    'ProductModal': 'Modal de Productos',
+                    'CartSystem': 'Carrito',
+                    'SearchFilter': 'Búsqueda',
+                    'CheckoutSystem': 'Checkout',
+                    'AdminSystem': 'Administración'
+                };
+                
+                for (const [system, name] of Object.entries(systems)) {
+                    if (checkScriptLoaded(system)) {
+                        DebugLogger.updateLoadingStatus(`Inicializando ${name}...`);
+                        try {
+                            if (typeof window[system].init === 'function') {
+                                await window[system].init();
+                                DebugLogger.updateLoadingStatus(`${name} inicializado`, 'success');
+                            } else {
+                                DebugLogger.updateLoadingStatus(`⚠️ ${name} no tiene método init()`, 'warning');
+                            }
+                        } catch (error) {
+                            DebugLogger.updateLoadingStatus(`❌ Error inicializando ${name}: ${error.message}`, 'error');
+                        }
+                    }
+                }
+                
+                DebugLogger.updateLoadingStatus('Todos los módulos inicializados correctamente', 'success');
+                DebugLogger.hideLoading();
+                
+            } catch (error) {
+                DebugLogger.updateLoadingStatus(`❌ Error crítico durante inicialización: ${error.message}`, 'error');
+                DebugLogger.hideLoading();
+                
+                // Mostrar error al usuario
+                if (typeof Notifications !== 'undefined') {
+                    Notifications.showNotification('Error', 'Hubo un problema al cargar la aplicación');
+                }
+            }
         });
     </script>
 </body>
