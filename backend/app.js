@@ -4,6 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import TelegramBot from 'node-telegram-bot-api';
+import fileUpload from 'express-fileupload';
+import ImageKit from 'imagekit';
 
 // Configuración inicial
 console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
@@ -17,6 +19,13 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
+// Configuración de ImageKit
+const imagekit = new ImageKit({
+  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+});
+
 // Middlewares
 app.use(cors({
   origin: '*',
@@ -24,6 +33,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 }));
 app.use(express.json());
+app.use(fileUpload());
 
 app.use((req, res, next) => {
   req.telegramId = req.headers['telegram-id'] || 
@@ -55,6 +65,43 @@ app.get('/api/admin/ids', (req, res) => {
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   res.json(adminIds);
+});
+
+// Ruta para subir imágenes
+app.post('/api/upload-image', isAdmin, async (req, res) => {
+  try {
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ error: 'No se subió ninguna imagen' });
+    }
+
+    const imageFile = req.files.image;
+    
+    // Validar tipo y tamaño de imagen
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
+    if (!validTypes.includes(imageFile.mimetype)) {
+      return res.status(400).json({ error: 'Formato inválido. Use JPG, PNG o WEBP' });
+    }
+    
+    if (imageFile.size > maxSize) {
+      return res.status(400).json({ 
+        error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB). Máx: 5MB` 
+      });
+    }
+
+    // Subir a ImageKit
+    const uploadResponse = await imagekit.upload({
+      file: imageFile.data,
+      fileName: imageFile.name,
+      useUniqueFileName: true
+    });
+
+    res.json({ url: uploadResponse.url });
+  } catch (error) {
+    console.error('Error subiendo imagen:', error);
+    res.status(500).json({ error: 'Error subiendo imagen' });
+  }
 });
 
 // Rutas de productos
@@ -414,7 +461,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     // Generar ID único para el producto
     const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
-    // Preparar datos para Supabase - incluyendo tab_type
+    // Preparar datos para Supabase
     const productData = {
       id: productId,
       type,
@@ -428,7 +475,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       colors: product.colors || null,
       required_fields: product.required_fields || null,
       date_created: new Date().toISOString(),
-      tab_type: type  // Añadimos el campo tab_type
+      tab_type: type
     };
 
     const { data, error } = await supabase
