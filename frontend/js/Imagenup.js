@@ -1,12 +1,14 @@
-// Imagenup.js - Módulo para subir imágenes a ImgBB
+// Imagenup.js - Módulo para subir imágenes a Freeimage.host
 const ImageUploader = {
   uploadImage: async function(file) {
     const formData = new FormData();
-    formData.append('key', 'f0f757f1c4af7bdb6aea6fa59bd1d718');  // API key de ImgBB
-    formData.append('image', file);
+    formData.append('key', '6d207e02198a847aa98d0a2a901485a5');  // API key de Freeimage.host
+    formData.append('action', 'upload');
+    formData.append('source', file);  // Campo modificado a 'source'
+    formData.append('format', 'json'); // Asegurar formato de respuesta JSON
 
     try {
-      const response = await fetch('https://api.imgbb.com/1/upload', {
+      const response = await fetch('https://freeimage.host/api/1/upload', {
         method: 'POST',
         body: formData
       });
@@ -17,19 +19,20 @@ const ImageUploader = {
       }
 
       const data = await response.json();
-      console.log('Respuesta de ImgBB:', data);
+      console.log('Respuesta de Freeimage.host:', data);
       
       // Extraemos la URL directa de la respuesta JSON
-      if (data && data.data && data.data.url) {
-        const imageUrl = data.data.url;
+      if (data && data.image && data.image.url) {
+        const imageUrl = data.image.url;
         console.log('URL de imagen obtenida:', imageUrl);
         return imageUrl;
-      } else if (data && data.data && data.data.image && data.data.image.url) {
-        const imageUrl = data.data.image.url;
-        console.log('URL de imagen obtenida (alternativa):', imageUrl);
+      } else if (data && data.image && data.image.display_url) {
+        // En caso de que la estructura sea ligeramente diferente
+        const imageUrl = data.image.display_url;
+        console.log('URL de imagen obtenida (display_url):', imageUrl);
         return imageUrl;
       } else {
-        throw new Error('No se encontró la URL en la respuesta de ImgBB');
+        throw new Error('No se encontró la URL en la respuesta de Freeimage.host');
       }
     } catch (error) {
       console.error('Error subiendo imagen:', error);
