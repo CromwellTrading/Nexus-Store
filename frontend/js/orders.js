@@ -14,8 +14,15 @@ const OrdersSystem = {
   
   loadOrders: async function() {
     try {
+      console.log("[ORDERS] Cargando pedidos...");
+      
       if (this.isLoading) return;
       this.isLoading = true;
+      
+      // Verificar si UserProfile está disponible
+      if (typeof UserProfile === 'undefined') {
+        throw new Error("UserProfile no está disponible");
+      }
       
       const userId = UserProfile.getTelegramUserId();
       if (!userId) {
@@ -38,8 +45,10 @@ const OrdersSystem = {
       this.isLoading = false;
       return true;
     } catch (error) {
-      console.error('Error cargando pedidos:', error);
-      Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
+      console.error('Error crítico en loadOrders:', error);
+      if (typeof Notifications !== 'undefined') {
+        Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
+      }
       this.isLoading = false;
       return false;
     }
@@ -47,6 +56,8 @@ const OrdersSystem = {
   
   openOrdersModal: async function() {
     try {
+      console.log("[ORDERS] Abriendo modal de pedidos");
+      
       const modal = document.getElementById('product-modal');
       modal.innerHTML = '<div class="loading">Cargando pedidos...</div>';
       modal.style.display = 'flex';
@@ -89,8 +100,10 @@ const OrdersSystem = {
         this.setupOrdersModalEvents();
       }
     } catch (error) {
-      console.error('Error abriendo modal de pedidos:', error);
-      Notifications.showNotification('Error', 'Error al mostrar pedidos');
+      console.error('Error crítico en openOrdersModal:', error);
+      if (typeof Notifications !== 'undefined') {
+        Notifications.showNotification('Error', 'Error al mostrar pedidos');
+      }
     }
   },
   
