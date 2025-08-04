@@ -1,12 +1,16 @@
 const CheckoutSystem = {
   selectedMethodPrices: {},
+  cartItemsWithDetails: [],
     
-  openCheckout: function(cart, totalByCurrency) {
+  async openCheckout(cart, totalByCurrency) {
     this.selectedMethodPrices = totalByCurrency;
     const userData = UserProfile.getUserData();
     const modal = document.getElementById('product-modal');
     const isProfileComplete = userData.fullName && userData.ci && userData.phone && userData.address && userData.province;
     const startingStep = isProfileComplete ? 2 : 1;
+    
+    // Obtener detalles de los productos del carrito
+    this.cartItemsWithDetails = await this.getCartItemsDetails(cart.items);
     
     modal.innerHTML = `
       <div class="modal-content">
@@ -81,23 +85,8 @@ const CheckoutSystem = {
           <div class="checkout-step" id="step-2" style="display: ${startingStep === 2 ? 'block' : 'none'};">
             <h3>💳 Método de Pago</h3>
             
-            <div class="payment-methods">
-              <div class="payment-method">
-                <input type="radio" name="payment-method" id="payment-bpa" value="BPA">
-                <label for="payment-bpa">💳 Transferencia BPA</label>
-              </div>
-              <div class="payment-method">
-                <input type="radio" name="payment-method" id="payment-bandec" value="BANDEC">
-                <label for="payment-bandec">💳 Transferencia BANDEC</label>
-              </div>
-              <div class="payment-method">
-                <input type="radio" name="payment-method" id="payment-mlc" value="MLC">
-                <label for="payment-mlc">💳 Transferencia MLC</label>
-              </div>
-              <div class="payment-method">
-                <input type="radio" name="payment-method" id="payment-mobile" value="Saldo Móvil" checked>
-                <label for="payment-mobile">📱 Saldo Móvil</label>
-              </div>
+            <div class="payment-methods" id="payment-methods-container">
+              <!-- Los métodos de pago se generarán dinámicamente -->
             </div>
             
             <div class="admin-info">
@@ -154,6 +143,140 @@ const CheckoutSystem = {
     
     modal.style.display = 'flex';
     this.setupCheckoutEvents(cart);
+    
+    // Generar métodos de pago disponibles basados en los precios de los productos
+    this.generatePaymentMethods();
+    
+    // Mostrar los productos en el resumen
+    this.updateOrderSummary();
+  },
+  
+  async getCartItemsDetails(cartItems) {
+    const itemsWithDetails = [];
+    
+    for (const item of cartItems) {
+      try {
+        const product = await ProductView.getProductById(item.productId, item.tabType);
+        if (product) {
+          itemsWithDetails.push({
+            ...item,
+            name: product.name,
+            prices: product.prices // Guardamos todos los precios
+          });
+        }
+      } catch (error) {
+        console.error('Error obteniendo detalles del producto:', error);
+      }
+    }
+    
+    return itemsWithDetails;
+  },
+  
+  generatePaymentMethods() {
+    const container = document.getElementById('payment-methods-container');
+    if (!container) return;
+    
+    // Determinar qué métodos de pago están disponibles basados en los precios de los productos
+    const availableCurrencies = this.getAvailableCurrencies();
+    
+    container.innerHTML = '';
+    
+    // BPA y BANDEC siempre disponibles para CUP
+    if (availableCurrencies.includes('CUP')) {
+      container.innerHTML += `
+        <div class="payment-method">
+          <input type="radio" name="payment-method" id="payment-bpa" value="BPA">
+          <label for="payment-bpa">💳 Transferencia BPA (CUP)</label>
+        </div>
+        <div class="payment-method">
+          <input type="radio" name="payment-method" id="payment-bandec" value="BANDEC">
+          <label for="payment-bandec">💳 Transferencia BANDEC (CUP)</label>
+        </div>
+      `;
+    }
+    
+    // MLC solo disponible si hay productos con precio en MLC
+    if (availableCurrencies.includes('MLC')) {
+      container.innerHTML += `
+        <div class="payment-method">
+          <input type="radio" name="payment-method" id="payment-mlc" value="MLC">
+          <label for="payment-mlc">💳 Transferencia MLC</label>
+        </div>
+      `;
+    }
+    
+    // Saldo Móvil solo disponible si hay productos con precio en Saldo Móvil
+    if (availableCurrencies.includes('Saldo Móvil')) {
+      container.innerHTML += `
+        <div class="payment-method">
+          <input type="radio" name="payment-method" id="payment-mobile" value="Saldo Móvil" checked>
+          <label for="payment-mobile">📱 Saldo Móvil</label>
+        </div>
+      `;
+    }
+    
+    // Si solo hay un método disponible, seleccionarlo automáticamente
+    const methods = container.querySelectorAll('input[type="radio"]');
+    if (methods.length === 1) {
+      methods[0].checked = true;
+    } else {
+      // Seleccionar Saldo Móvil por defecto si está disponible
+      const mobilePayment = document.getElementById('payment-mobile');
+      if (mobilePayment) mobilePayment.checked = true;
+    }
+    
+    // Actualizar la información de pago
+    this.updatePaymentInfo();
+  },
+  
+  getAvailableCurrencies() {
+    const currencies = new Set();
+    
+    this.cartItemsWithDetails.forEach(item => {
+      if (item.prices) {
+        Object.keys(item.prices).forEach(currency => {
+          // Solo considerar monedas con precio definido y mayor a 0
+          if (item.prices[currency] && parseFloat(item.prices[currency]) > 0) {
+            currencies.add(currency);
+          }
+        });
+      }
+    });
+    
+    return Array.from(currencies);
+  },
+  
+  updateOrderSummary() {
+    const itemsList = document.getElementById('order-items-list');
+    if (!itemsList) return;
+    
+    itemsList.innerHTML = '';
+    
+    this.cartItemsWithDetails.forEach(item => {
+      const itemElement = document.createElement('div');
+      itemElement.className = 'order-item';
+      itemElement.innerHTML = `
+        <div>${item.name || 'Producto'} x ${item.quantity}</div>
+        <div>${this.getPriceForDisplay(item)}</div>
+      `;
+      itemsList.appendChild(itemElement);
+    });
+    
+    this.updatePaymentInfo();
+  },
+  
+  getPriceForDisplay(item) {
+    // Mostrar todos los precios disponibles para el producto
+    if (!item.prices) return 'Precio no disponible';
+    
+    let display = '';
+    Object.entries(item.prices).forEach(([currency, price]) => {
+      if (price && parseFloat(price) > 0) {
+        display += `${price} ${currency} `;
+      }
+    });
+    
+    return display || 'Precio no disponible';
   },
   
   setupCheckoutEvents: function(cart) {
@@ -193,21 +316,22 @@ const CheckoutSystem = {
       radio.addEventListener('change', () => this.updatePaymentInfo());
     });
     
-    this.updatePaymentInfo();
-    
-    const itemsList = document.getElementById('order-items-list');
-    if (itemsList) {
-      itemsList.innerHTML = '';
-      cart.items.forEach(item => {
-        const itemElement = document.createElement('div');
-        itemElement.className = 'order-item';
-        itemElement.innerHTML = `
-          <div>${item.name || 'Producto'} x ${item.quantity}</div>
-          <div>$${(item.price * item.quantity).toFixed(2)}</div>
-        `;
-        itemsList.appendChild(itemElement);
-      });
-    }
+    document.getElementById('transfer-proof')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const preview = document.getElementById('transfer-proof-preview');
+        preview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = event.target.result;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '200px';
+        preview.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
     
     document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
       try {
@@ -259,6 +383,24 @@ const CheckoutSystem = {
           });
           formData.append('requiredFields', JSON.stringify(requiredFields));
         }
+        
+        // Calcular el total basado en el método de pago seleccionado
+        let total = 0;
+        this.cartItemsWithDetails.forEach(item => {
+          // Usar el precio correspondiente al método de pago seleccionado
+          let price = 0;
+          if (method === 'BPA' || method === 'BANDEC') {
+            price = item.prices['CUP'] || 0;
+          } else if (method === 'MLC') {
+            price = item.prices['MLC'] || 0;
+          } else if (method === 'Saldo Móvil') {
+            price = item.prices['Saldo Móvil'] || 0;
+          }
+          
+          total += price * item.quantity;
+        });
+        
+        formData.append('total', total.toString());
         
         // 2. Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
@@ -389,11 +531,17 @@ const CheckoutSystem = {
     if (method === 'MLC') currency = 'MLC';
     else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
     
+    // Calcular el total basado en los precios de los productos para la moneda seleccionada
+    let total = 0;
+    this.cartItemsWithDetails.forEach(item => {
+      if (item.prices && item.prices[currency]) {
+        total += item.prices[currency] * item.quantity;
+      }
+    });
+    
     const totalDisplay = document.getElementById('order-total-display');
     if (totalDisplay) {
-      const total = this.selectedMethodPrices[currency];
-      totalDisplay.textContent = total !== undefined ? 
-        `Total: ${total.toFixed(2)} ${currency}` : 'Total no disponible';
+      totalDisplay.textContent = `Total: ${total.toFixed(2)} ${currency}`;
     }
   }
 };
