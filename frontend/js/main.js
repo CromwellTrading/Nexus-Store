@@ -2,25 +2,17 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
     console.log("===== INICIO DE INICIALIZACIÓN CONTROLADA =====");
     
-    // Lista de módulos esperados
+    // Lista de módulos esperados (solo para verificación en consola)
     const expectedModules = [
       'UserProfile', 'OrdersSystem', 'AdminSystem', 'Notifications',
       'Themes', 'Tabs', 'ProductView', 'ProductModal',
       'CartSystem', 'SearchFilter', 'CheckoutSystem'
     ];
     
-    // Verificación detallada de módulos
-    console.log("[DEBUG] Módulos disponibles:");
+    // Verificación silenciosa de módulos (solo log en consola)
+    console.log("[DEBUG] Estado de módulos:");
     expectedModules.forEach(module => {
-      const exists = typeof window[module] !== 'undefined';
-      console.log(`- ${module}: ${exists ? 'Sí' : 'No'}`);
-      
-      if (!exists) {
-        console.error(`CRÍTICO: El módulo ${module} no está definido`);
-        if (typeof Notifications !== 'undefined') {
-          Notifications.showNotification('Error', `Falta el módulo: ${module}`);
-        }
-      }
+      console.log(`- ${module}: ${typeof window[module] !== 'undefined' ? '✅' : '❌'}`);
     });
     
     // 1. Inicializar UserProfile PRIMERO
@@ -167,6 +159,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     console.log("===== INICIALIZACIÓN COMPLETADA =====");
   } catch (error) {
     console.error("ERROR DURANTE LA INICIALIZACIÓN:", error);
+    // Esta notificación se mantiene porque es un error crítico real
     if (typeof Notifications !== 'undefined') {
       Notifications.showNotification('Error Crítico', 'Falló la inicialización de la aplicación');
     }
@@ -188,11 +181,7 @@ function setupEventListeners() {
           UserProfile.openProfileModal();
         } else {
           console.error("ERROR: UserProfile no está definido o no tiene openProfileModal");
-          if (typeof Notifications !== 'undefined') {
-            Notifications.showNotification('Error', 'No se pudo abrir el perfil');
-          } else {
-            alert('No se pudo abrir el perfil');
-          }
+          alert('No se pudo abrir el perfil');
         }
       } catch (error) {
         console.error("ERROR CRÍTICO en perfil:", error);
@@ -220,11 +209,7 @@ function setupEventListeners() {
           }
         } else {
           console.error("ERROR: OrdersSystem no está definido o no tiene openOrdersModal");
-          if (typeof Notifications !== 'undefined') {
-            Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
-          } else {
-            alert('No se pudieron cargar los pedidos');
-          }
+          alert('No se pudieron cargar los pedidos');
         }
       } catch (error) {
         console.error("ERROR CRÍTICO en pedidos:", error);
@@ -246,11 +231,7 @@ function setupEventListeners() {
           CartSystem.openCartModal();
         } else {
           console.error("ERROR: CartSystem no está definido o no tiene openCartModal");
-          if (typeof Notifications !== 'undefined') {
-            Notifications.showNotification('Error', 'No se pudo abrir el carrito');
-          } else {
-            alert('No se pudo abrir el carrito');
-          }
+          alert('No se pudo abrir el carrito');
         }
       } catch (error) {
         console.error("ERROR al abrir carrito:", error);
