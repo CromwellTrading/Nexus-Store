@@ -6,14 +6,12 @@ const AdminSystem = {
   
   init: function() {
     try {
-      console.groupCollapsed('[AdminSystem] Iniciando');
+      console.log("[AdminSystem] Iniciando inicialización...");
       this.telegramUserId = this.getTelegramUserId();
+      console.log(`[AdminSystem] Telegram User ID: ${this.telegramUserId}`);
       this.checkAdminStatus().then(() => this.initializeAdmin());
-      console.log('✅ AdminSystem inicializado');
     } catch (error) {
-      console.error('[AdminSystem] ❌ Init failed:', error);
-    } finally {
-      console.groupEnd();
+      console.error("[AdminSystem] Error en init:", error);
     }
   },
   
@@ -23,7 +21,7 @@ const AdminSystem = {
     
     if (!tgid && window.location.hostname === 'localhost') {
       tgid = '5376388604'; // ID de desarrollo
-      console.warn('⚠️ Usando ID de Telegram de desarrollo');
+      console.warn('[AdminSystem] ⚠️ Usando ID de Telegram de desarrollo');
     }
     
     if (tgid) {
@@ -31,51 +29,59 @@ const AdminSystem = {
       return tgid;
     }
     
-    console.error('[Admin] ERROR: No se encontró ID de Telegram');
+    console.error('[AdminSystem] ERROR: No se encontró ID de Telegram');
     return null;
   },
   
   checkAdminStatus: async function() {
+    console.log("[AdminSystem] Verificando estado de administrador...");
     if (!this.telegramUserId) {
+      console.warn("[AdminSystem] No hay telegramUserId, isAdmin = false");
       this.isAdmin = false;
       return;
     }
     
     try {
-      console.log(`[AdminSystem] Verificando estado de admin para ID: ${this.telegramUserId}`);
+      console.log("[AdminSystem] Obteniendo lista de administradores...");
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       if (!response.ok) throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       
       const adminIds = await response.json();
       this.isAdmin = adminIds.includes(this.telegramUserId.toString());
-      console.log(`[AdminSystem] Usuario es admin: ${this.isAdmin}`);
+      
+      console.log(`[AdminSystem] Estado de administrador: ${this.isAdmin}`);
     } catch (error) {
-      console.error('[Admin] Error verificando estado de admin:', error);
+      console.error('[AdminSystem] Error verificando estado de admin:', error);
       this.isAdmin = false;
     }
   },
   
   initializeAdmin: function() {
+    console.log("[AdminSystem] Inicializando panel de administración...");
     const adminButton = document.getElementById('admin-button');
     if (!adminButton) {
-      console.warn('[AdminSystem] No se encontró el botón de admin');
+      console.warn("[AdminSystem] No se encontró el botón de admin");
       return;
     }
     
     if (this.isAdmin) {
+      console.log("[AdminSystem] Mostrando botón de admin");
       adminButton.style.display = 'block';
       adminButton.classList.add('admin-active');
       adminButton.addEventListener('click', () => this.openAdminPanel());
-      console.log('[AdminSystem] Botón de admin activado');
     } else {
+      console.log("[AdminSystem] Ocultando botón de admin (no es admin)");
       adminButton.style.display = 'none';
     }
   },
 
   openAdminPanel: function() {
-    if (!this.isAdmin) return;
+    if (!this.isAdmin) {
+      console.warn("[AdminSystem] Intento de abrir panel sin permisos");
+      return;
+    }
     
-    console.log('[AdminSystem] Abriendo panel de administración');
+    console.log("[AdminSystem] Abriendo panel de administración");
     const modal = document.getElementById('product-modal');
     modal.innerHTML = this.getAdminPanelHTML();
     modal.style.display = 'flex';
@@ -255,11 +261,13 @@ const AdminSystem = {
   },
   
   setupAdminEvents: function() {
-    console.log('[AdminSystem] Configurando eventos del panel');
+    console.log("[AdminSystem] Configurando eventos del panel...");
     
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const tabType = tab.dataset.tab;
+        console.log(`[AdminSystem] Cambiando a pestaña: ${tabType}`);
+        
         document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         
@@ -273,6 +281,7 @@ const AdminSystem = {
     });
     
     document.getElementById('add-product-btn').addEventListener('click', () => {
+      console.log("[AdminSystem] Mostrando formulario de producto");
       document.getElementById('product-form').style.display = 'block';
       document.getElementById('add-product-btn').style.display = 'none';
       this.resetProductForm();
@@ -281,6 +290,7 @@ const AdminSystem = {
     document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
       tab.addEventListener('click', (e) => {
         const type = e.target.dataset.type;
+        console.log(`[AdminSystem] Cambiando tipo de producto a: ${type}`);
         this.productType = type;
         document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
         e.target.classList.add('active');
@@ -296,15 +306,18 @@ const AdminSystem = {
     document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
       tab.addEventListener('click', (e) => {
         this.categoryType = e.target.dataset.type;
+        console.log(`[AdminSystem] Cambiando tipo de categoría a: ${this.categoryType}`);
         this.renderCategoriesList();
       });
     });
     
     document.getElementById('has-color-variant').addEventListener('change', (e) => {
+      console.log(`[AdminSystem] Variante de color: ${e.target.checked ? 'activada' : 'desactivada'}`);
       document.getElementById('color-variant-section').style.display = e.target.checked ? 'block' : 'none';
     });
     
     document.getElementById('add-color-btn').addEventListener('click', () => {
+      console.log("[AdminSystem] Añadiendo variante de color");
       const container = document.getElementById('color-variants-container');
       container.innerHTML += `
         <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -315,11 +328,15 @@ const AdminSystem = {
       `;
       
       container.querySelectorAll('.remove-color').forEach(btn => {
-        btn.addEventListener('click', (e) => e.target.closest('.color-variant').remove());
+        btn.addEventListener('click', (e) => {
+          console.log("[AdminSystem] Eliminando variante de color");
+          e.target.closest('.color-variant').remove();
+        });
       });
     });
     
     document.getElementById('add-field-btn').addEventListener('click', () => {
+      console.log("[AdminSystem] Añadiendo campo requerido");
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
         <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -331,35 +348,57 @@ const AdminSystem = {
       `;
       
       container.querySelectorAll('.remove-field').forEach(btn => {
-        btn.addEventListener('click', (e) => e.target.closest('.required-field').remove());
+        btn.addEventListener('click', (e) => {
+          console.log("[AdminSystem] Eliminando campo requerido");
+          e.target.closest('.required-field').remove();
+        });
       });
     });
     
-    document.getElementById('save-product').addEventListener('click', () => this.saveProduct());
+    document.getElementById('save-product').addEventListener('click', () => {
+      console.log("[AdminSystem] Guardando producto...");
+      this.saveProduct();
+    });
+    
     document.getElementById('cancel-product').addEventListener('click', () => {
+      console.log("[AdminSystem] Cancelando creación de producto");
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
     });
-    document.getElementById('add-category-btn').addEventListener('click', () => this.addCategory());
-    document.getElementById('order-status-filter')?.addEventListener('change', (e) => this.loadOrders(e.target.value));
-    document.getElementById('product-images')?.addEventListener('change', (e) => this.previewImages(e.target, 'image-preview'));
-    document.getElementById('digital-image')?.addEventListener('change', (e) => this.previewImages(e.target, 'digital-image-preview', false));
+    
+    document.getElementById('add-category-btn').addEventListener('click', () => {
+      console.log("[AdminSystem] Añadiendo categoría...");
+      this.addCategory();
+    });
+    
+    document.getElementById('order-status-filter')?.addEventListener('change', (e) => {
+      console.log(`[AdminSystem] Filtrando pedidos por estado: ${e.target.value}`);
+      this.loadOrders(e.target.value);
+    });
+    
+    document.getElementById('product-images')?.addEventListener('change', (e) => {
+      console.log("[AdminSystem] Vista previa de imágenes físicas");
+      this.previewImages(e.target, 'image-preview');
+    });
+    
+    document.getElementById('digital-image')?.addEventListener('change', (e) => {
+      console.log("[AdminSystem] Vista previa de imagen digital");
+      this.previewImages(e.target, 'digital-image-preview', false);
+    });
     
     this.renderProductsList();
     this.renderCategoriesList();
     this.loadOrders('all');
   },
   
-  // Función para previsualizar imágenes (antes en Imagenup.js)
-  previewImages: function(input, previewId, allowMultiple = true) {
+  previewImages: function(input, previewId) {
+    console.log(`[AdminSystem] Generando vista previa para ${previewId}`);
     const preview = document.getElementById(previewId);
     preview.innerHTML = '';
     
     if (!input.files || input.files.length === 0) return;
     
-    const files = allowMultiple ? input.files : [input.files[0]];
-    
-    Array.from(files).forEach(file => {
+    Array.from(input.files).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = document.createElement('img');
@@ -377,6 +416,7 @@ const AdminSystem = {
   },
   
   saveProduct: async function() {
+    console.log("[AdminSystem] Iniciando guardado de producto...");
     const type = this.productType;
     const name = document.getElementById('product-name').value;
     const description = document.getElementById('product-description').value;
@@ -389,6 +429,7 @@ const AdminSystem = {
     });
     
     if (!name || !description || !categoryId) {
+      console.error("[AdminSystem] Faltan campos requeridos para el producto");
       alert('Por favor complete todos los campos requeridos');
       return;
     }
@@ -413,6 +454,7 @@ const AdminSystem = {
           product.images = [];
           for (let i = 0; i < imageFiles.length; i++) {
             // Mostrar estado de carga
+            console.log(`[AdminSystem] Subiendo imagen ${i+1}/${imageFiles.length}`);
             this.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
             
             // Subir la imagen al backend
@@ -457,6 +499,7 @@ const AdminSystem = {
         // Producto digital
         const imageFile = document.getElementById('digital-image').files[0];
         if (imageFile) {
+          console.log("[AdminSystem] Subiendo imagen digital");
           this.showLoading('digital-image-preview', 'Subiendo imagen...');
           
           const formData = new FormData();
@@ -496,6 +539,7 @@ const AdminSystem = {
       }
       
       // Guardar el producto
+      console.log("[AdminSystem] Enviando datos del producto al backend...");
       const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
         method: 'POST',
         headers: { 
@@ -514,16 +558,19 @@ const AdminSystem = {
         throw new Error(`Error ${response.status}: ${errorBody}`);
       }
       
+      console.log("[AdminSystem] Producto creado exitosamente");
       alert('✅ Producto creado correctamente!');
       this.renderProductsList();
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
     } catch (error) {
+      console.error('[AdminSystem] Error al guardar el producto:', error);
       alert('Error al guardar el producto: ' + error.message);
     }
   },
   
   showLoading: function(previewId, message) {
+    console.log(`[AdminSystem] Mostrando estado de carga: ${message}`);
     const preview = document.getElementById(previewId);
     if (!preview) return;
     
@@ -558,6 +605,7 @@ const AdminSystem = {
   },
   
   renderProductsList: function() {
+    console.log("[AdminSystem] Cargando lista de productos...");
     const container = document.getElementById('products-list');
     container.innerHTML = '<div class="loading">Cargando productos...</div>';
     
@@ -567,10 +615,12 @@ const AdminSystem = {
       .then(response => response.json())
       .then(products => {
         if (!products || products.length === 0) {
+          console.log("[AdminSystem] No hay productos disponibles");
           container.innerHTML = '<p>No hay productos disponibles</p>';
           return;
         }
         
+        console.log(`[AdminSystem] Mostrando ${products.length} productos`);
         container.innerHTML = `
           <h4>📦 Productos Existentes</h4>
           <div class="admin-items-list">
@@ -600,21 +650,29 @@ const AdminSystem = {
         `;
         
         container.querySelectorAll('.edit-product').forEach(btn => {
-          btn.addEventListener('click', (e) => this.editProduct(e.target.dataset.id));
+          btn.addEventListener('click', (e) => {
+            console.log(`[AdminSystem] Editando producto: ${e.target.dataset.id}`);
+            this.editProduct(e.target.dataset.id);
+          });
         });
         
         container.querySelectorAll('.delete-product').forEach(btn => {
           btn.addEventListener('click', (e) => {
-            if (confirm('¿Estás seguro de eliminar este producto?')) this.deleteProduct(e.target.dataset.id);
+            if (confirm('¿Estás seguro de eliminar este producto?')) {
+              console.log(`[AdminSystem] Eliminando producto: ${e.target.dataset.id}`);
+              this.deleteProduct(e.target.dataset.id);
+            }
           });
         });
       })
       .catch(error => {
+        console.error('[AdminSystem] Error cargando productos:', error);
         container.innerHTML = `<div class="error"><p>Error cargando productos</p><p><small>${error.message}</small></p></div>`;
       });
   },
   
   editProduct: function(id) {
+    console.log(`[AdminSystem] Cargando producto para edición: ${id}`);
     fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
@@ -719,23 +777,31 @@ const AdminSystem = {
         
         document.getElementById('save-product').onclick = () => this.saveProduct();
       })
-      .catch(() => alert('Error al cargar el producto para edición'));
+      .catch(() => {
+        console.error('[AdminSystem] Error cargando producto para edición');
+        alert('Error al cargar el producto para edición');
+      });
   },
   
   deleteProduct: function(id) {
     if (!confirm('¿Estás seguro de eliminar este producto?')) return;
     
+    console.log(`[AdminSystem] Eliminando producto: ${id}`);
     fetch(`${window.API_BASE_URL}/api/admin/products/${id}`, {
       method: 'DELETE',
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
     .then(response => {
       if (response.ok) {
+        console.log("[AdminSystem] Producto eliminado exitosamente");
         this.renderProductsList();
         alert('✅ Producto eliminado correctamente');
       } else throw new Error('Error del servidor');
     })
-    .catch(error => alert('Error al eliminar el producto: ' + error.message));
+    .catch(error => {
+      console.error('[AdminSystem] Error eliminando producto:', error);
+      alert('Error al eliminar el producto: ' + error.message);
+    });
   },
   
   addCategory: function() {
@@ -743,8 +809,12 @@ const AdminSystem = {
     const nameInput = document.getElementById('new-category-name');
     const name = nameInput.value.trim();
     
-    if (!name) return alert('Por favor ingrese un nombre para la categoría');
+    if (!name) {
+      console.error("[AdminSystem] Nombre de categoría vacío");
+      return alert('Por favor ingrese un nombre para la categoría');
+    }
     
+    console.log(`[AdminSystem] Creando categoría: ${name} (Tipo: ${type})`);
     const btn = document.getElementById('add-category-btn');
     const originalText = btn.innerHTML;
     btn.innerHTML = '<div class="spinner"></div> Creando...';
@@ -764,12 +834,16 @@ const AdminSystem = {
       else throw new Error(`Error ${response.status}`);
     })
     .then(() => {
+      console.log("[AdminSystem] Categoría creada exitosamente");
       alert(`✅ Categoría "${name}" creada correctamente!`);
       nameInput.value = '';
       this.renderCategoriesList();
       this.renderCategoryOptions();
     })
-    .catch(error => alert(`❌ Error: ${error.message}`))
+    .catch(error => {
+      console.error('[AdminSystem] Error creando categoría:', error);
+      alert(`❌ Error: ${error.message}`);
+    })
     .finally(() => {
       btn.innerHTML = originalText;
       btn.disabled = false;
@@ -778,6 +852,7 @@ const AdminSystem = {
   
   renderCategoriesList: function() {
     const type = this.categoryType;
+    console.log(`[AdminSystem] Cargando categorías de tipo: ${type}`);
     const container = document.getElementById('categories-list');
     container.innerHTML = '<div class="loading">Cargando categorías...</div>';
     
@@ -789,10 +864,12 @@ const AdminSystem = {
       const filtered = categories.filter(cat => cat.type === type);
       
       if (filtered.length === 0) {
+        console.log(`[AdminSystem] No hay categorías de tipo ${type}`);
         container.innerHTML = '<p>No hay categorías definidas</p>';
         return;
       }
       
+      console.log(`[AdminSystem] Mostrando ${filtered.length} categorías`);
       container.innerHTML = `
         <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
         <div class="admin-items-list">
@@ -811,10 +888,14 @@ const AdminSystem = {
       `;
       
       container.querySelectorAll('.delete-category').forEach(btn => {
-        btn.addEventListener('click', (e) => this.deleteCategory(e.target.dataset.id));
+        btn.addEventListener('click', (e) => {
+          console.log(`[AdminSystem] Eliminando categoría: ${e.target.dataset.id}`);
+          this.deleteCategory(e.target.dataset.id);
+        });
       });
     })
     .catch(error => {
+      console.error('[AdminSystem] Error cargando categorías:', error);
       container.innerHTML = `<div class="error"><p>Error cargando categorías</p><p><small>${error.message}</small></p></div>`;
     });
   },
@@ -822,21 +903,27 @@ const AdminSystem = {
   deleteCategory: function(id) {
     if (!confirm('¿Estás seguro de eliminar esta categoría? Todos los productos en ella serán eliminados.')) return;
     
+    console.log(`[AdminSystem] Eliminando categoría: ${id}`);
     fetch(`${window.API_BASE_URL}/api/admin/categories/${id}`, {
       method: 'DELETE',
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
     .then(response => {
       if (response.ok) {
+        console.log("[AdminSystem] Categoría eliminada exitosamente");
         this.renderCategoriesList();
         this.renderProductsList();
         alert('✅ Categoría eliminada correctamente');
       } else throw new Error('Error al eliminar categoría');
     })
-    .catch(error => alert('Error al eliminar categoría: ' + error.message));
+    .catch(error => {
+      console.error('[AdminSystem] Error eliminando categoría:', error);
+      alert('Error al eliminar categoría: ' + error.message);
+    });
   },
   
   loadOrders: function(filter = 'all') {
+    console.log(`[AdminSystem] Cargando pedidos con filtro: ${filter}`);
     const ordersList = document.getElementById('admin-orders-list');
     ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
     
@@ -851,6 +938,7 @@ const AdminSystem = {
       let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
       
       if (filteredOrders.length === 0) {
+        console.log(`[AdminSystem] No hay pedidos con filtro: ${filter}`);
         ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
         return;
       }
@@ -859,6 +947,7 @@ const AdminSystem = {
       const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
       filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
       
+      console.log(`[AdminSystem] Mostrando ${filteredOrders.length} pedidos`);
       ordersList.innerHTML = '';
       filteredOrders.forEach(order => {
         const orderElement = document.createElement('div');
@@ -888,19 +977,27 @@ const AdminSystem = {
       });
       
       document.querySelectorAll('.btn-view').forEach(btn => {
-        btn.addEventListener('click', (e) => this.viewOrderDetails(e.target.dataset.id));
+        btn.addEventListener('click', (e) => {
+          console.log(`[AdminSystem] Viendo detalles del pedido: ${e.target.dataset.id}`);
+          this.viewOrderDetails(e.target.dataset.id);
+        });
       });
       
       document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', (e) => this.updateOrderStatus(e.target.dataset.id, e.target.value));
+        select.addEventListener('change', (e) => {
+          console.log(`[AdminSystem] Actualizando estado del pedido ${e.target.dataset.id} a ${e.target.value}`);
+          this.updateOrderStatus(e.target.dataset.id, e.target.value);
+        });
       });
     })
     .catch(error => {
+      console.error('[AdminSystem] Error cargando pedidos:', error);
       ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
     });
   },
   
   updateOrderStatus: function(orderId, newStatus) {
+    console.log(`[AdminSystem] Actualizando estado del pedido ${orderId} a ${newStatus}`);
     fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
       method: 'PUT',
       headers: { 
@@ -910,13 +1007,18 @@ const AdminSystem = {
       body: JSON.stringify({ status: newStatus })
     })
     .then(() => {
+      console.log("[AdminSystem] Estado actualizado exitosamente");
       this.loadOrders(document.getElementById('order-status-filter').value);
       alert('✅ Estado actualizado correctamente');
     })
-    .catch(error => alert('Error actualizando estado: ' + error.message));
+    .catch(error => {
+      console.error('[AdminSystem] Error actualizando estado:', error);
+      alert('Error actualizando estado: ' + error.message);
+    });
   },
   
   viewOrderDetails: function(orderId) {
+    console.log(`[AdminSystem] Cargando detalles del pedido: ${orderId}`);
     fetch(`${window.API_BASE_URL}/api/admin/orders/${orderId}`, {
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
@@ -992,14 +1094,19 @@ const AdminSystem = {
         </div>
       `;
       
-      modal.querySelector('.close-modal').addEventListener('click', () => this.openAdminPanel());
+      modal.querySelector('.close-modal').addEventListener('click', () => {
+        console.log("[AdminSystem] Volviendo al panel de administración");
+        this.openAdminPanel();
+      });
     })
     .catch(error => {
+      console.error('[AdminSystem] Error cargando detalles del pedido:', error);
       alert(`Error cargando detalles del pedido: ${error.message}`);
     });
   },
   
   renderCategoryOptions: function(type = this.productType) {
+    console.log(`[AdminSystem] Cargando opciones de categoría para tipo: ${type}`);
     const categorySelect = document.getElementById('product-category');
     if (!categorySelect) return;
     
@@ -1016,11 +1123,15 @@ const AdminSystem = {
         option.textContent = category.name;
         categorySelect.appendChild(option);
       });
+      console.log(`[AdminSystem] ${categories.length} categorías cargadas`);
     })
-    .catch(error => console.error('Error cargando categorías:', error));
+    .catch(error => {
+      console.error('[AdminSystem] Error cargando categorías:', error);
+    });
   },
   
   resetProductForm: function() {
+    console.log("[AdminSystem] Reseteando formulario de producto");
     document.getElementById('product-name').value = '';
     document.getElementById('product-description').value = '';
     document.getElementById('product-details').value = '';
