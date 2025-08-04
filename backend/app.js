@@ -128,10 +128,11 @@ app.post('/api/checkout', async (req, res) => {
       recipientName,
       recipientCi,
       recipientPhone,
-      requiredFields
+      requiredFields,
+      total // Total calculado desde el frontend
     } = req.body;
 
-    if (!userId || !paymentMethod) {
+    if (!userId || !paymentMethod || !total) {
       return res.status(400).json({ error: 'Faltan parámetros requeridos' });
     }
 
@@ -195,9 +196,8 @@ app.post('/api/checkout', async (req, res) => {
       return res.status(400).json({ error: 'No se encontraron productos' });
     }
 
-    // 5. Calcular total y preparar items
-    console.log('[CHECKOUT] Calculando total...');
-    let total = 0;
+    // 5. Preparar items del pedido con precios correctos
+    console.log('[CHECKOUT] Preparando items del pedido...');
     const orderItems = [];
     const productMap = {};
     products.forEach(product => productMap[product.id] = product);
@@ -205,8 +205,16 @@ app.post('/api/checkout', async (req, res) => {
     items.forEach(item => {
       const product = productMap[item.productId];
       if (product) {
-        const price = product.prices[paymentMethod] || 0;
-        total += price * item.quantity;
+        // Usar el precio correspondiente al método de pago
+        let price = 0;
+        if (paymentMethod === 'BPA' || paymentMethod === 'BANDEC') {
+          price = product.prices['CUP'] || 0;
+        } else if (paymentMethod === 'MLC') {
+          price = product.prices['MLC'] || 0;
+        } else if (paymentMethod === 'Saldo Móvil') {
+          price = product.prices['Saldo Móvil'] || 0;
+        }
+        
         orderItems.push({
           product_id: item.productId,
           product_name: product.name,
@@ -218,13 +226,13 @@ app.post('/api/checkout', async (req, res) => {
       }
     });
 
-    // 6. Crear orden
+    // 6. Crear orden con el total real
     console.log('[CHECKOUT] Creando orden...');
     const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const orderData = {
       id: orderId,
       user_id: userId,
-      total: total,
+      total: parseFloat(total), // Usamos el total real
       status: 'Pendiente',
       user_data: userData
     };
