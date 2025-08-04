@@ -4,8 +4,8 @@ const OrdersSystem = {
   
   init: async function() {
     console.log("Inicializando OrdersSystem...");
-    await this.loadOrders();
     this.setupEventListeners();
+    return true;
   },
   
   setupEventListeners: function() {
