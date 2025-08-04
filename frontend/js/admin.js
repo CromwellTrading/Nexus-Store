@@ -5,8 +5,16 @@ const AdminSystem = {
   telegramUserId: null,
   
   init: function() {
-    this.telegramUserId = this.getTelegramUserId();
-    this.checkAdminStatus().then(() => this.initializeAdmin());
+    try {
+      console.groupCollapsed('[AdminSystem] Iniciando');
+      this.telegramUserId = this.getTelegramUserId();
+      this.checkAdminStatus().then(() => this.initializeAdmin());
+      console.log('✅ AdminSystem inicializado');
+    } catch (error) {
+      console.error('[AdminSystem] ❌ Init failed:', error);
+    } finally {
+      console.groupEnd();
+    }
   },
   
   getTelegramUserId: function() {
@@ -34,11 +42,13 @@ const AdminSystem = {
     }
     
     try {
+      console.log(`[AdminSystem] Verificando estado de admin para ID: ${this.telegramUserId}`);
       const response = await fetch(`${window.API_BASE_URL}/api/admin/ids`);
       if (!response.ok) throw new Error(`Error en respuesta: ${response.status} ${response.statusText}`);
       
       const adminIds = await response.json();
       this.isAdmin = adminIds.includes(this.telegramUserId.toString());
+      console.log(`[AdminSystem] Usuario es admin: ${this.isAdmin}`);
     } catch (error) {
       console.error('[Admin] Error verificando estado de admin:', error);
       this.isAdmin = false;
@@ -47,12 +57,16 @@ const AdminSystem = {
   
   initializeAdmin: function() {
     const adminButton = document.getElementById('admin-button');
-    if (!adminButton) return;
+    if (!adminButton) {
+      console.warn('[AdminSystem] No se encontró el botón de admin');
+      return;
+    }
     
     if (this.isAdmin) {
       adminButton.style.display = 'block';
       adminButton.classList.add('admin-active');
       adminButton.addEventListener('click', () => this.openAdminPanel());
+      console.log('[AdminSystem] Botón de admin activado');
     } else {
       adminButton.style.display = 'none';
     }
@@ -61,6 +75,7 @@ const AdminSystem = {
   openAdminPanel: function() {
     if (!this.isAdmin) return;
     
+    console.log('[AdminSystem] Abriendo panel de administración');
     const modal = document.getElementById('product-modal');
     modal.innerHTML = this.getAdminPanelHTML();
     modal.style.display = 'flex';
@@ -240,6 +255,8 @@ const AdminSystem = {
   },
   
   setupAdminEvents: function() {
+    console.log('[AdminSystem] Configurando eventos del panel');
+    
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const tabType = tab.dataset.tab;
@@ -333,13 +350,16 @@ const AdminSystem = {
     this.loadOrders('all');
   },
   
-  previewImages: function(input, previewId) {
+  // Función para previsualizar imágenes (antes en Imagenup.js)
+  previewImages: function(input, previewId, allowMultiple = true) {
     const preview = document.getElementById(previewId);
     preview.innerHTML = '';
     
     if (!input.files || input.files.length === 0) return;
     
-    Array.from(input.files).forEach(file => {
+    const files = allowMultiple ? input.files : [input.files[0]];
+    
+    Array.from(files).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = document.createElement('img');
