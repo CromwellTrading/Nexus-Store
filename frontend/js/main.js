@@ -2,17 +2,18 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
     console.log("Iniciando inicialización controlada...");
     
-    // 1. Inicializar UserProfile (solo perfil)
+    // 1. Inicializar AdminSystem PRIMERO (contiene verificación de admin)
+    if (typeof AdminSystem !== 'undefined') {
+      console.log("Inicializando AdminSystem...");
+      await AdminSystem.init();
+      console.log("AdminSystem inicializado");
+    }
+    
+    // 2. Inicializar UserProfile (requiere AdminSystem ya inicializado)
     if (typeof UserProfile !== 'undefined') {
       console.log("Inicializando UserProfile...");
       await UserProfile.init();
       console.log("UserProfile inicializado");
-    }
-    
-    // 2. Inicializar AdminSystem (contiene verificación de admin)
-    if (typeof AdminSystem !== 'undefined') {
-      console.log("Inicializando AdminSystem...");
-      await AdminSystem.init();
     }
     
     // 3. Inicializar el resto de componentes
@@ -52,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       console.log("SearchFilter inicializado");
     }
     
-    // Asegurar que OrdersSystem se inicialice
+    // 4. Inicializar OrdersSystem (requiere UserProfile ya inicializado)
     if (typeof OrdersSystem !== 'undefined') {
       await OrdersSystem.init();
       console.log("OrdersSystem inicializado");
@@ -63,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       console.log("CheckoutSystem inicializado");
     }
     
-    // 4. Configurar eventos
+    // 5. Configurar eventos
     setupEventListeners();
     
     console.log("Todos los módulos inicializados correctamente");
