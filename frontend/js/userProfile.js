@@ -89,6 +89,19 @@ const UserProfile = {
   
   openProfileModal: function() {
     try {
+      console.log("[PROFILE] Intentando abrir modal de perfil");
+      
+      const userId = this.getTelegramUserId();
+      if (!userId) {
+        console.error("No se pudo obtener ID de usuario");
+        if (typeof Notifications !== 'undefined') {
+          Notifications.showNotification('Error', 'Debes iniciar sesión primero');
+        } else {
+          alert('Debes iniciar sesión primero');
+        }
+        return;
+      }
+      
       const modal = document.getElementById('product-modal');
       
       modal.innerHTML = `
@@ -147,10 +160,14 @@ const UserProfile = {
         try {
           await this.saveProfile();
           modal.style.display = 'none';
-          Notifications.showNotification('Éxito', 'Perfil guardado correctamente');
+          if (typeof Notifications !== 'undefined') {
+            Notifications.showNotification('Éxito', 'Perfil guardado correctamente');
+          }
         } catch (error) {
           console.error("Error guardando perfil:", error);
-          Notifications.showNotification('Error', 'Error al guardar perfil');
+          if (typeof Notifications !== 'undefined') {
+            Notifications.showNotification('Error', 'Error al guardar perfil');
+          }
         }
       });
       
@@ -162,8 +179,8 @@ const UserProfile = {
         modal.style.display = 'none';
       });
     } catch (error) {
-      console.error("Error abriendo modal de perfil:", error);
-      Notifications.showNotification('Error', 'Error al abrir perfil');
+      console.error("Error crítico en openProfileModal:", error);
+      alert(`Error abriendo perfil: ${error.message}`);
     }
   },
   
