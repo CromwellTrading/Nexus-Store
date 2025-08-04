@@ -1,200 +1,274 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        log("===== INICIALIZACIÓN DEL SISTEMA =====", 'debug');
-        log("Iniciando inicialización controlada...");
-        
-        // Verificación detallada de módulos
-        log("Módulos disponibles:");
-        log(`- UserProfile: ${typeof UserProfile !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- OrdersSystem: ${typeof OrdersSystem !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- AdminSystem: ${typeof AdminSystem !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- Notifications: ${typeof Notifications !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- Themes: ${typeof Themes !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- Tabs: ${typeof Tabs !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- ProductView: ${typeof ProductView !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- ProductModal: ${typeof ProductModal !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- CartSystem: ${typeof CartSystem !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- SearchFilter: ${typeof SearchFilter !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        log(`- CheckoutSystem: ${typeof CheckoutSystem !== 'undefined' ? "Sí" : "No"}`, 'debug');
-        
-        // 1. Inicializar UserProfile PRIMERO
-        if (typeof UserProfile !== 'undefined') {
-            log("Inicializando UserProfile...");
-            await UserProfile.init();
-            log("UserProfile inicializado");
-        } else {
-            log("ERROR: UserProfile no está definido", 'error');
-        }
-        
-        // 2. Inicializar AdminSystem (requiere UserProfile)
-        if (typeof AdminSystem !== 'undefined') {
-            log("Inicializando AdminSystem...");
-            await AdminSystem.init();
-            log("AdminSystem inicializado");
-        } else {
-            log("ERROR: AdminSystem no está definido", 'error');
-        }
-        
-        // 3. Inicializar el resto de componentes
+  try {
+    console.log("===== INICIO DE INICIALIZACIÓN CONTROLADA =====");
+    
+    // Lista de módulos esperados
+    const expectedModules = [
+      'UserProfile', 'OrdersSystem', 'AdminSystem', 'Notifications',
+      'Themes', 'Tabs', 'ProductView', 'ProductModal',
+      'CartSystem', 'SearchFilter', 'CheckoutSystem'
+    ];
+    
+    // Verificación detallada de módulos
+    console.log("[DEBUG] Módulos disponibles:");
+    expectedModules.forEach(module => {
+      const exists = typeof window[module] !== 'undefined';
+      console.log(`- ${module}: ${exists ? 'Sí' : 'No'}`);
+      
+      if (!exists) {
+        console.error(`CRÍTICO: El módulo ${module} no está definido`);
         if (typeof Notifications !== 'undefined') {
-            Notifications.init();
-            log("Notifications inicializado");
+          Notifications.showNotification('Error', `Falta el módulo: ${module}`);
         }
-        
-        if (typeof Themes !== 'undefined') {
-            Themes.init();
-            log("Themes inicializado");
-        }
-        
-        if (typeof Tabs !== 'undefined') {
-            Tabs.init();
-            log("Tabs inicializado");
-        }
-        
-        if (typeof ProductView !== 'undefined') {
-            ProductView.init();
-            ProductView.loadProducts(Tabs.currentTab);
-            log("ProductView inicializado");
-        }
-        
-        if (typeof ProductModal !== 'undefined') {
-            ProductModal.init();
-            log("ProductModal inicializado");
-        }
-        
-        if (typeof CartSystem !== 'undefined') {
-            CartSystem.init();
-            log("CartSystem inicializado");
-        }
-        
-        if (typeof SearchFilter !== 'undefined') {
-            SearchFilter.init();
-            log("SearchFilter inicializado");
-        }
-        
-        // 4. Inicializar OrdersSystem (requiere UserProfile ya inicializado)
-        if (typeof OrdersSystem !== 'undefined') {
-            log("Inicializando OrdersSystem...");
-            await OrdersSystem.init();
-            log("OrdersSystem inicializado");
-        } else {
-            log("ERROR: OrdersSystem no está definido", 'error');
-        }
-        
-        if (typeof CheckoutSystem !== 'undefined') {
-            CheckoutSystem.init();
-            log("CheckoutSystem inicializado");
-        }
-        
-        // 5. Configurar eventos
-        setupEventListeners();
-        
-        log("Todos los módulos inicializados correctamente");
-    } catch (error) {
-        log(`Error durante la inicialización: ${error.message}`, 'error');
-        log(error.stack, 'debug');
+      }
+    });
+    
+    // 1. Inicializar UserProfile PRIMERO
+    if (typeof UserProfile !== 'undefined') {
+      console.log("Inicializando UserProfile...");
+      try {
+        await UserProfile.init();
+        console.log("UserProfile inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en UserProfile.init():", error);
+      }
+    } else {
+      console.error("ERROR: UserProfile no está definido");
     }
+    
+    // 2. Inicializar AdminSystem (requiere UserProfile)
+    if (typeof AdminSystem !== 'undefined') {
+      console.log("Inicializando AdminSystem...");
+      try {
+        await AdminSystem.init();
+        console.log("AdminSystem inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en AdminSystem.init():", error);
+      }
+    } else {
+      console.error("ERROR: AdminSystem no está definido");
+    }
+    
+    // 3. Inicializar el resto de componentes
+    if (typeof Notifications !== 'undefined') {
+      console.log("Inicializando Notifications...");
+      try {
+        Notifications.init();
+        console.log("Notifications inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en Notifications.init():", error);
+      }
+    } else {
+      console.error("ERROR: Notifications no está definido");
+    }
+    
+    if (typeof Themes !== 'undefined') {
+      console.log("Inicializando Themes...");
+      try {
+        Themes.init();
+        console.log("Themes inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en Themes.init():", error);
+      }
+    } else {
+      console.error("ERROR: Themes no está definido");
+    }
+    
+    if (typeof Tabs !== 'undefined') {
+      console.log("Inicializando Tabs...");
+      try {
+        Tabs.init();
+        console.log("Tabs inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en Tabs.init():", error);
+      }
+    } else {
+      console.error("ERROR: Tabs no está definido");
+    }
+    
+    if (typeof ProductView !== 'undefined') {
+      console.log("Inicializando ProductView...");
+      try {
+        ProductView.init();
+        ProductView.loadProducts(Tabs.currentTab);
+        console.log("ProductView inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en ProductView.init():", error);
+      }
+    } else {
+      console.error("ERROR: ProductView no está definido");
+    }
+    
+    if (typeof ProductModal !== 'undefined') {
+      console.log("Inicializando ProductModal...");
+      try {
+        ProductModal.init();
+        console.log("ProductModal inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en ProductModal.init():", error);
+      }
+    } else {
+      console.error("ERROR: ProductModal no está definido");
+    }
+    
+    if (typeof CartSystem !== 'undefined') {
+      console.log("Inicializando CartSystem...");
+      try {
+        CartSystem.init();
+        console.log("CartSystem inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en CartSystem.init():", error);
+      }
+    } else {
+      console.error("ERROR: CartSystem no está definido");
+    }
+    
+    if (typeof SearchFilter !== 'undefined') {
+      console.log("Inicializando SearchFilter...");
+      try {
+        SearchFilter.init();
+        console.log("SearchFilter inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en SearchFilter.init():", error);
+      }
+    } else {
+      console.error("ERROR: SearchFilter no está definido");
+    }
+    
+    // 4. Inicializar OrdersSystem (requiere UserProfile ya inicializado)
+    if (typeof OrdersSystem !== 'undefined') {
+      console.log("Inicializando OrdersSystem...");
+      try {
+        await OrdersSystem.init();
+        console.log("OrdersSystem inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en OrdersSystem.init():", error);
+      }
+    } else {
+      console.error("ERROR: OrdersSystem no está definido");
+    }
+    
+    if (typeof CheckoutSystem !== 'undefined') {
+      console.log("Inicializando CheckoutSystem...");
+      try {
+        CheckoutSystem.init();
+        console.log("CheckoutSystem inicializado correctamente");
+      } catch (error) {
+        console.error("ERROR en CheckoutSystem.init():", error);
+      }
+    } else {
+      console.error("ERROR: CheckoutSystem no está definido");
+    }
+    
+    // 5. Configurar eventos
+    console.log("Configurando event listeners...");
+    setupEventListeners();
+    
+    console.log("===== INICIALIZACIÓN COMPLETADA =====");
+  } catch (error) {
+    console.error("ERROR DURANTE LA INICIALIZACIÓN:", error);
+    if (typeof Notifications !== 'undefined') {
+      Notifications.showNotification('Error Crítico', 'Falló la inicialización de la aplicación');
+    }
+  }
 });
 
 function setupEventListeners() {
-    log("Configurando event listeners...");
-    
-    // Botón de perfil
-    const profileButton = document.getElementById('profile-button');
-    if (profileButton) {
-        log("Botón de perfil encontrado");
-        profileButton.addEventListener('click', function() {
-            try {
-                log("[CLICK] Botón perfil pulsado");
-                
-                if (typeof UserProfile !== 'undefined' && typeof UserProfile.openProfileModal === 'function') {
-                    UserProfile.openProfileModal();
-                } else {
-                    log("UserProfile no está definido o no tiene openProfileModal", 'error');
-                    if (typeof Notifications !== 'undefined') {
-                        Notifications.showNotification('Error', 'No se pudo abrir el perfil');
-                    } else {
-                        alert('No se pudo abrir el perfil');
-                    }
-                }
-            } catch (error) {
-                log(`Error crítico en perfil: ${error.message}`, 'error');
-                alert(`Error abriendo perfil: ${error.message}`);
-            }
-        });
-    } else {
-        log("ERROR: No se encontró el botón de perfil", 'error');
-    }
-    
-    // Botón de pedidos
-    const ordersButton = document.getElementById('orders-button');
-    if (ordersButton) {
-        log("Botón de pedidos encontrado");
-        ordersButton.addEventListener('click', async function() {
-            try {
-                log("[CLICK] Botón pedidos pulsado");
-                
-                if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
-                    await OrdersSystem.openOrdersModal();
-                    if (typeof Notifications !== 'undefined') {
-                        Notifications.notifications.forEach(n => n.read = true);
-                        Notifications.saveNotifications();
-                        Notifications.renderNotificationCount();
-                    }
-                } else {
-                    log("OrdersSystem no está definido o no tiene openOrdersModal", 'error');
-                    if (typeof Notifications !== 'undefined') {
-                        Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
-                    } else {
-                        alert('No se pudieron cargar los pedidos');
-                    }
-                }
-            } catch (error) {
-                log(`Error crítico en pedidos: ${error.message}`, 'error');
-                alert(`Error abriendo pedidos: ${error.message}`);
-            }
-        });
-    } else {
-        log("ERROR: No se encontró el botón de pedidos", 'error');
-    }
-    
-    // Botón de carrito
-    const cartButton = document.getElementById('cart-button');
-    if (cartButton) {
-        log("Botón de carrito encontrado");
-        cartButton.addEventListener('click', function() {
-            try {
-                log("[CLICK] Botón carrito pulsado");
-                if (typeof CartSystem !== 'undefined' && typeof CartSystem.openCartModal === 'function') {
-                    CartSystem.openCartModal();
-                } else {
-                    log("CartSystem no está definido o no tiene openCartModal", 'error');
-                    if (typeof Notifications !== 'undefined') {
-                        Notifications.showNotification('Error', 'No se pudo abrir el carrito');
-                    } else {
-                        alert('No se pudo abrir el carrito');
-                    }
-                }
-            } catch (error) {
-                log(`Error al abrir carrito: ${error.message}`, 'error');
-                alert(`Error abriendo carrito: ${error.message}`);
-            }
-        });
-    } else {
-        log("ERROR: No se encontró el botón de carrito", 'error');
-    }
-    
-    // Cerrar modal al hacer clic fuera
-    document.addEventListener('click', function(e) {
-        const modal = document.getElementById('product-modal');
-        if (e.target === modal) {
-            log("Cerrando modal al hacer clic fuera");
-            modal.style.display = 'none';
-            if (typeof CartSystem !== 'undefined') {
-                CartSystem.isCartModalOpen = false;
-            }
+  console.log("[SETUP] Configurando event listeners...");
+  
+  // Botón de perfil
+  const profileButton = document.getElementById('profile-button');
+  if (profileButton) {
+    console.log("[SETUP] Botón de perfil encontrado");
+    profileButton.addEventListener('click', function() {
+      try {
+        console.log("[CLICK] Botón perfil pulsado");
+        
+        if (typeof UserProfile !== 'undefined' && typeof UserProfile.openProfileModal === 'function') {
+          UserProfile.openProfileModal();
+        } else {
+          console.error("ERROR: UserProfile no está definido o no tiene openProfileModal");
+          if (typeof Notifications !== 'undefined') {
+            Notifications.showNotification('Error', 'No se pudo abrir el perfil');
+          } else {
+            alert('No se pudo abrir el perfil');
+          }
         }
+      } catch (error) {
+        console.error("ERROR CRÍTICO en perfil:", error);
+        alert(`Error abriendo perfil: ${error.message}`);
+      }
     });
-    
-    log("Event listeners configurados correctamente");
+  } else {
+    console.error("ERROR: No se encontró el botón de perfil");
+  }
+  
+  // Botón de pedidos
+  const ordersButton = document.getElementById('orders-button');
+  if (ordersButton) {
+    console.log("[SETUP] Botón de pedidos encontrado");
+    ordersButton.addEventListener('click', async function() {
+      try {
+        console.log("[CLICK] Botón pedidos pulsado");
+        
+        if (typeof OrdersSystem !== 'undefined' && typeof OrdersSystem.openOrdersModal === 'function') {
+          await OrdersSystem.openOrdersModal();
+          if (typeof Notifications !== 'undefined') {
+            Notifications.notifications.forEach(n => n.read = true);
+            Notifications.saveNotifications();
+            Notifications.renderNotificationCount();
+          }
+        } else {
+          console.error("ERROR: OrdersSystem no está definido o no tiene openOrdersModal");
+          if (typeof Notifications !== 'undefined') {
+            Notifications.showNotification('Error', 'No se pudieron cargar los pedidos');
+          } else {
+            alert('No se pudieron cargar los pedidos');
+          }
+        }
+      } catch (error) {
+        console.error("ERROR CRÍTICO en pedidos:", error);
+        alert(`Error abriendo pedidos: ${error.message}`);
+      }
+    });
+  } else {
+    console.error("ERROR: No se encontró el botón de pedidos");
+  }
+  
+  // Botón de carrito
+  const cartButton = document.getElementById('cart-button');
+  if (cartButton) {
+    console.log("[SETUP] Botón de carrito encontrado");
+    cartButton.addEventListener('click', function() {
+      try {
+        console.log("[CLICK] Botón carrito pulsado");
+        if (typeof CartSystem !== 'undefined' && typeof CartSystem.openCartModal === 'function') {
+          CartSystem.openCartModal();
+        } else {
+          console.error("ERROR: CartSystem no está definido o no tiene openCartModal");
+          if (typeof Notifications !== 'undefined') {
+            Notifications.showNotification('Error', 'No se pudo abrir el carrito');
+          } else {
+            alert('No se pudo abrir el carrito');
+          }
+        }
+      } catch (error) {
+        console.error("ERROR al abrir carrito:", error);
+        alert(`Error abriendo carrito: ${error.message}`);
+      }
+    });
+  } else {
+    console.error("ERROR: No se encontró el botón de carrito");
+  }
+  
+  // Cerrar modal al hacer clic fuera
+  document.addEventListener('click', function(e) {
+    const modal = document.getElementById('product-modal');
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      if (typeof CartSystem !== 'undefined') {
+        CartSystem.isCartModalOpen = false;
+      }
+    }
+  });
 }
