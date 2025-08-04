@@ -24,28 +24,28 @@ const UserProfile = {
   
   async loadUserData() {
     const userId = this.getTelegramUserId();
-    if (!userId) {
-      console.warn("No se encontró ID de usuario, cargando de localStorage");
-      this.loadFromLocalStorage();
-      return;
-    }
     
-    try {
-      const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`);
-      if (response.ok) {
-        const user = await response.json();
-        this.userData = {
-          ...this.userData,
-          ...(user.profile_data || {})
-        };
-        console.log("Datos de usuario cargados desde API");
-      } else {
-        console.warn("No se pudo cargar perfil desde API, usando localStorage");
-        this.loadFromLocalStorage();
+    // Primero intentar cargar desde localStorage
+    this.loadFromLocalStorage();
+    
+    // Luego intentar cargar desde API si hay userId
+    if (userId) {
+      try {
+        const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`);
+        if (response.ok) {
+          const user = await response.json();
+          this.userData = {
+            ...this.userData,
+            ...(user.profile_data || {})
+          };
+          console.log("Datos de usuario cargados desde API");
+          
+          // Guardar en localStorage después de cargar desde API
+          localStorage.setItem('userProfile', JSON.stringify(this.userData));
+        }
+      } catch (error) {
+        console.error('Error cargando perfil desde API:', error);
       }
-    } catch (error) {
-      console.error('Error cargando perfil:', error);
-      this.loadFromLocalStorage();
     }
   },
   
@@ -195,8 +195,7 @@ const UserProfile = {
   },
   
   isAdmin: function() {
-    const userId = this.getTelegramUserId();
-    return AdminSystem.isAdmin && AdminSystem.telegramUserId === userId;
+    return AdminSystem.isAdmin;
   },
   
   async saveProfile() {
