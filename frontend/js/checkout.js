@@ -127,8 +127,7 @@ const CheckoutSystem = {
               </div>
             </div>
             
-            <!-- Sección de campos requeridos - SIEMPRE presente -->
-            <div id="required-fields-section" style="margin-top: 20px;">
+            <div id="required-fields-section" style="margin-top: 20px; display: none;">
               <h4>📝 Datos Requeridos</h4>
               <div id="required-fields-inputs"></div>
             </div>
@@ -349,6 +348,30 @@ const CheckoutSystem = {
         const proofFile = document.getElementById('transfer-proof')?.files[0];
         if (!proofFile) return alert('Por favor suba la captura de pantalla de la transferencia');
 
+        // Validar campos requeridos antes de continuar
+        let requiredFieldsValid = true;
+        const requiredFields = {};
+        const requiredInputs = document.querySelectorAll('#required-fields-inputs input[required]');
+        
+        requiredInputs.forEach(input => {
+          if (!input.value.trim()) {
+            requiredFieldsValid = false;
+            input.style.border = '1px solid red';
+            input.placeholder = 'Campo obligatorio';
+          } else {
+            input.style.border = '';
+            const fieldName = input.previousElementSibling?.textContent?.replace(':', '').trim();
+            if (fieldName) {
+              requiredFields[fieldName] = input.value;
+            }
+          }
+        });
+        
+        if (!requiredFieldsValid) {
+          Notifications.showNotification('Error', 'Por favor complete todos los campos requeridos');
+          return;
+        }
+
         // Mostrar estado de carga
         const confirmBtn = document.getElementById('confirm-purchase');
         const originalBtnText = confirmBtn.innerHTML;
@@ -379,15 +402,6 @@ const CheckoutSystem = {
         }
         
         // Campos requeridos
-        const requiredFields = {};
-        document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
-          const input = group.querySelector('input');
-          const label = group.querySelector('label');
-          if (input && label) {
-            const fieldName = label.textContent.replace(':', '').trim();
-            requiredFields[fieldName] = input.value;
-          }
-        });
         formData.append('requiredFields', JSON.stringify(requiredFields));
         
         // Calcular el total basado en el método de pago seleccionado
@@ -469,22 +483,20 @@ const CheckoutSystem = {
     const fields = new Map(); // Usar Map para evitar duplicados
     
     cartItems.forEach(item => {
-      if (item.tabType === 'digital') {
-        const product = ProductView.getProductById(item.productId, 'digital');
-        
-        if (product && product.required_fields) {
-          product.required_fields.forEach(field => {
-            if (field.required) {
-              // Agregar solo si no existe
-              if (!fields.has(field.name)) {
-                fields.set(field.name, {
-                  name: field.name,
-                  required: field.required
-                });
-              }
+      const product = ProductView.getProductById(item.productId, item.tabType);
+      
+      if (product && product.required_fields) {
+        product.required_fields.forEach(field => {
+          if (field.required && field.name) {
+            // Agregar solo si no existe
+            if (!fields.has(field.name)) {
+              fields.set(field.name, {
+                name: field.name,
+                required: field.required
+              });
             }
-          });
-        }
+          }
+        });
       }
     });
     
@@ -493,23 +505,32 @@ const CheckoutSystem = {
   
   showRequiredFields: function(fields) {
     const container = document.getElementById('required-fields-inputs');
-    if (container) {
-      container.innerHTML = '';
-      
-      fields.forEach(field => {
-        const fieldId = `field-${field.name.replace(/\s+/g, '-')}`;
-        container.innerHTML += `
-          <div class="form-group">
-            <label for="${fieldId}">${field.name}:</label>
-            <input type="text" 
-                   id="${fieldId}" 
-                   required 
-                   class="modern-input"
-                   placeholder="Ingrese ${field.name.toLowerCase()}">
-          </div>
-        `;
-      });
+    const section = document.getElementById('required-fields-section');
+    
+    if (!container || !section) return;
+    
+    container.innerHTML = '';
+    
+    if (fields.length === 0) {
+      section.style.display = 'none';
+      return;
     }
+    
+    fields.forEach(field => {
+      const fieldId = `field-${field.name.replace(/\s+/g, '-')}`;
+      container.innerHTML += `
+        <div class="form-group">
+          <label for="${fieldId}">${field.name}:</label>
+          <input type="text" 
+                 id="${fieldId}" 
+                 ${field.required ? 'required' : ''}
+                 class="modern-input"
+                 placeholder="Ingrese ${field.name.toLowerCase()}">
+        </div>
+      `;
+    });
+    
+    section.style.display = 'block';
   },
   
   goToStep: function(step) {
