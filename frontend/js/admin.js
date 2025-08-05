@@ -340,10 +340,13 @@ const AdminSystem = {
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
         <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-          <input type="text" placeholder="Nombre del campo" class="field-name" style="flex: 1;">
-          <input type="checkbox" class="field-required" checked>
-          <label>Requerido</label>
-          <button class="remove-field">❌</button>
+          <input type="text" placeholder="Nombre del campo" class="field-name modern-input" style="flex: 1;">
+          <label class="checkbox-label">
+            <input type="checkbox" class="field-required" checked>
+            <span class="checkmark"></span>
+            Requerido
+          </label>
+          <button class="remove-field small-btn">🗑️</button>
         </div>
       `;
       
@@ -751,21 +754,27 @@ const AdminSystem = {
           if (product.required_fields?.length > 0) {
             product.required_fields.forEach(field => {
               container.innerHTML += `
-                <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="text" value="${field.name}" class="field-name" style="flex: 1;">
-                  <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
-                  <label>Requerido</label>
-                  <button class="remove-field">❌</button>
+                <div class="required-field">
+                  <input type="text" value="${field.name}" class="field-name modern-input" style="flex: 1;">
+                  <label class="checkbox-label">
+                    <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
+                    <span class="checkmark"></span>
+                    Requerido
+                  </label>
+                  <button class="remove-field small-btn">🗑️</button>
                 </div>
               `;
             });
           } else {
             container.innerHTML = `
-              <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
-                <input type="checkbox" class="field-required" checked>
-                <label>Requerido</label>
-                <button class="remove-field">❌</button>
+              <div class="required-field">
+                <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name modern-input" style="flex: 1;">
+                <label class="checkbox-label">
+                  <input type="checkbox" class="field-required" checked>
+                  <span class="checkmark"></span>
+                  Requerido
+                </label>
+                <button class="remove-field small-btn">🗑️</button>
               </div>
             `;
           }
@@ -1152,11 +1161,14 @@ const AdminSystem = {
     document.getElementById('image-preview').innerHTML = '';
     document.getElementById('digital-image-preview').innerHTML = '';
     document.getElementById('required-fields-container').innerHTML = `
-      <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-        <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name" style="flex: 1;">
-        <input type="checkbox" class="field-required" checked>
-        <label>Requerido</label>
-        <button class="remove-field">❌</button>
+      <div class="required-field">
+        <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name modern-input" style="flex: 1;">
+        <label class="checkbox-label">
+          <input type="checkbox" class="field-required" checked>
+          <span class="checkmark"></span>
+          Requerido
+        </label>
+        <button class="remove-field small-btn">🗑️</button>
       </div>
     `;
     
