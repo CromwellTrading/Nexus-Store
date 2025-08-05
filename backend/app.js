@@ -196,7 +196,7 @@ app.post('/api/checkout', async (req, res) => {
     const productIds = items.map(item => item.productId);
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, name, prices, images, tab_type')
+      .select('id, name, prices, images, tab_type, required_fields')
       .in('id', productIds);
     
     if (productsError) {
