@@ -766,6 +766,25 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   }
 });
 
+// ===== Keep-Alive: Ping automático cada 5 minutos (solo si hay token de Telegram) =====
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+
+  // Ping automático para mantener activo el bot y el servidor
+  setInterval(() => {
+    const date = new Date();
+    console.log(`[Keep-Alive] Ping realizado a las ${date.toLocaleTimeString()}`);
+    
+    // Opcional: Enviar un mensaje a un chat de admin (para verificar que el bot sigue vivo)
+    const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID; // Añade esta variable a tu .env si quieres notificaciones
+    if (ADMIN_CHAT_ID) {
+      bot.sendMessage(ADMIN_CHAT_ID, `🔄 Bot activo (${date.toLocaleTimeString()})`).catch(console.error);
+    }
+  }, 5 * 60 * 1000); // 5 minutos
+
+  console.log('⏳ Keep-Alive configurado para el bot de Telegram');
+}
+
 // Bot de Telegram
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
