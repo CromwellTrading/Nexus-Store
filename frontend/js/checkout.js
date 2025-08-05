@@ -375,14 +375,14 @@ const CheckoutSystem = {
         
         // Campos requeridos
         const requiredFields = {};
-        if (document.getElementById('required-fields-inputs')) {
-          document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
-            const input = group.querySelector('input');
-            const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+        document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
+          const input = group.querySelector('input');
+          const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
+          if (input.value) {
             requiredFields[fieldName] = input.value;
-          });
-          formData.append('requiredFields', JSON.stringify(requiredFields));
-        }
+          }
+        });
+        formData.append('requiredFields', JSON.stringify(requiredFields));
         
         // Calcular el total basado en el método de pago seleccionado
         let total = 0;
