@@ -1,3 +1,5 @@
+// checkout.js
+
 const CheckoutSystem = {
   selectedMethodPrices: {},
   cartItemsWithDetails: [],
@@ -127,7 +129,8 @@ const CheckoutSystem = {
               </div>
             </div>
             
-            <div id="required-fields-section" style="display: none; margin-top: 20px;">
+            <!-- Sección de campos requeridos - SIEMPRE presente, pero oculta si no hay campos -->
+            <div id="required-fields-section" style="margin-top: 20px; display: none;">
               <h4>📝 Datos Requeridos</h4>
               <div id="required-fields-inputs"></div>
             </div>
@@ -149,6 +152,12 @@ const CheckoutSystem = {
     
     // Mostrar los productos en el resumen
     this.updateOrderSummary();
+    
+    // Verificar si hay campos requeridos y mostrarlos
+    const requiredFields = this.getRequiredFields(cart.items);
+    if (requiredFields.length > 0) {
+      this.showRequiredFields(requiredFields);
+    }
   },
   
   async getCartItemsDetails(cartItems) {
@@ -304,8 +313,6 @@ const CheckoutSystem = {
     document.getElementById('back-to-info')?.addEventListener('click', () => this.goToStep(1));
     document.getElementById('next-to-confirm')?.addEventListener('click', () => {
       this.goToStep(3);
-      const requiredFields = this.getRequiredFields(cart.items);
-      if (requiredFields.length > 0) this.showRequiredFields(requiredFields);
     });
     document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
     document.getElementById('cancel-checkout')?.addEventListener('click', () => {
@@ -377,8 +384,9 @@ const CheckoutSystem = {
         const requiredFields = {};
         document.querySelectorAll('#required-fields-inputs .form-group').forEach(group => {
           const input = group.querySelector('input');
-          const fieldName = group.querySelector('label').textContent.replace(':', '').trim();
-          if (input.value) {
+          const label = group.querySelector('label');
+          if (input && label) {
+            const fieldName = label.textContent.replace(':', '').trim();
             requiredFields[fieldName] = input.value;
           }
         });
@@ -460,34 +468,55 @@ const CheckoutSystem = {
   },
   
   getRequiredFields: function(cartItems) {
-    const fields = new Set();
+    const fields = new Map(); // Usar Map para evitar duplicados
+    
     cartItems.forEach(item => {
       if (item.tabType === 'digital') {
         const product = ProductView.getProductById(item.productId, 'digital');
+        
         if (product && product.required_fields) {
           product.required_fields.forEach(field => {
-            if (field.required) fields.add(field.name);
+            if (field.required) {
+              // Agregar solo si no existe
+              if (!fields.has(field.name)) {
+                fields.set(field.name, {
+                  name: field.name,
+                  required: field.required
+                });
+              }
+            }
           });
         }
       }
     });
-    return Array.from(fields);
+    
+    return Array.from(fields.values());
   },
   
   showRequiredFields: function(fields) {
     const container = document.getElementById('required-fields-inputs');
     if (container) {
       container.innerHTML = '';
+      
       fields.forEach(field => {
-        const fieldId = `field-${field.replace(/\s+/g, '-')}`;
+        const fieldId = `field-${field.name.replace(/\s+/g, '-')}`;
         container.innerHTML += `
           <div class="form-group">
-            <label>${field}:</label>
-            <input type="text" id="${fieldId}" required class="modern-input">
+            <label for="${fieldId}">${field.name}:</label>
+            <input type="text" 
+                   id="${fieldId}" 
+                   required 
+                   class="modern-input"
+                   placeholder="Ingrese ${field.name.toLowerCase()}">
           </div>
         `;
       });
-      document.getElementById('required-fields-section').style.display = 'block';
+      
+      // Mostrar la sección solo si hay campos
+      const section = document.getElementById('required-fields-section');
+      if (section) {
+        section.style.display = fields.length > 0 ? 'block' : 'none';
+      }
     }
   },
   
