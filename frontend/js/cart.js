@@ -3,62 +3,81 @@ const CartSystem = {
   isCartModalOpen: false,
   
   init: function() {
-    console.log('[Cart] Inicializando sistema de carrito');
-    this.loadCart();
-    this.updateCartIcon();
+    console.log('[CartSystem] Inicializando sistema de carrito...');
     
-    const cartButton = document.getElementById('cart-button');
-    if (!cartButton) {
-      console.error('[Cart] Error: No se encontró el botón del carrito con ID "cart-button"');
+    // Verificar elementos del DOM
+    this.cartButton = document.getElementById('cart-button');
+    if (!this.cartButton) {
+      console.error('[CartSystem] ERROR: No se encontró el botón con ID "cart-button"');
       return;
     }
-    
-    console.log('[Cart] Añadiendo event listener al botón del carrito');
-    cartButton.addEventListener('click', () => {
-      console.log('[Cart] Botón del carrito clickeado');
+    console.log('[CartSystem] Botón del carrito encontrado:', this.cartButton);
+
+    this.modal = document.getElementById('product-modal');
+    if (!this.modal) {
+      console.error('[CartSystem] ERROR: No se encontró el modal con ID "product-modal"');
+      return;
+    }
+    console.log('[CartSystem] Modal encontrado:', this.modal);
+
+    // Añadir event listeners
+    this.cartButton.addEventListener('click', () => {
+      console.log('[CartSystem] Click en botón del carrito detectado');
       this.openCartModal();
     });
+
+    // Cargar carrito inicial
+    this.loadCart()
+      .then(() => {
+        console.log('[CartSystem] Carrito inicial cargado:', this.cart);
+        this.updateCartIcon();
+      })
+      .catch(error => {
+        console.error('[CartSystem] Error cargando carrito inicial:', error);
+      });
+
+    console.log('[CartSystem] Sistema de carrito inicializado correctamente');
   },
   
   async loadCart() {
-    console.log('[Cart] Cargando carrito...');
+    console.log('[CartSystem] Cargando carrito...');
     const userId = UserProfile.getTelegramUserId();
     
     if (!userId) {
-      console.log('[Cart] No hay usuario identificado, no se puede cargar el carrito');
+      console.log('[CartSystem] No hay usuario identificado, no se puede cargar el carrito');
       return;
     }
     
     try {
-      console.log(`[Cart] Haciendo petición para cargar carrito del usuario ${userId}`);
+      console.log(`[CartSystem] Obteniendo carrito para usuario ${userId}`);
       const response = await fetch(`${window.API_BASE_URL}/api/cart/${userId}`);
       
       if (!response.ok) {
-        console.error(`[Cart] Error en la respuesta al cargar carrito: ${response.status}`);
+        console.error(`[CartSystem] Error en la respuesta: ${response.status}`);
         throw new Error('Error al cargar el carrito');
       }
       
       const cartData = await response.json();
-      console.log('[Cart] Datos del carrito recibidos:', cartData);
+      console.log('[CartSystem] Datos del carrito recibidos:', cartData);
       
       this.cart = cartData;
       this.updateCartIcon();
     } catch (error) {
-      console.error('[Cart] Error cargando carrito:', error);
+      console.error('[CartSystem] Error cargando carrito:', error);
     }
   },
   
   async addToCart(productId, tabType) {
-    console.log(`[Cart] ADD producto al carrito - Producto: ${productId}, Tab: ${tabType}`);
+    console.log(`[CartSystem] Añadiendo al carrito - Producto: ${productId}, Tipo: ${tabType}`);
     const userId = UserProfile.getTelegramUserId();
     if (!userId) {
-      console.log('[Cart] Usuario no identificado al intentar añadir al carrito');
+      console.log('[CartSystem] Usuario no identificado');
       alert('Por favor inicia sesión primero');
       return;
     }
     
     try {
-      console.log('[Cart] Enviando petición para añadir al carrito');
+      console.log('[CartSystem] Enviando petición para añadir al carrito...');
       const response = await fetch(`${window.API_BASE_URL}/api/cart/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,25 +87,25 @@ const CartSystem = {
       const result = await response.json();
       
       if (!response.ok) {
-        console.error('[Cart] Error en la respuesta del servidor:', result.error);
+        console.error('[CartSystem] Error en la respuesta:', result.error);
         throw new Error(result.error || 'Error desconocido');
       }
       
-      console.log('[Cart] Producto añadido correctamente al carrito');
+      console.log('[CartSystem] Producto añadido correctamente:', result);
       this.cart = result;
       this.updateCartIcon();
       Notifications.showNotification('🛒 Producto añadido', `¡Producto añadido al carrito!`);
     } catch (error) {
-      console.error('[Cart] Error añadiendo al carrito:', error);
+      console.error('[CartSystem] Error añadiendo al carrito:', error);
       Notifications.showNotification('❌ Error', error.message || 'No se pudo añadir al carrito');
     }
   },
   
   async removeFromCart(productId, tabType) {
-    console.log(`[Cart] REMOVE producto del carrito - Producto: ${productId}, Tab: ${tabType}`);
+    console.log(`[CartSystem] Eliminando del carrito - Producto: ${productId}, Tipo: ${tabType}`);
     const userId = UserProfile.getTelegramUserId();
     try {
-      console.log('[Cart] Enviando petición para eliminar del carrito');
+      console.log('[CartSystem] Enviando petición para eliminar...');
       const response = await fetch(`${window.API_BASE_URL}/api/cart/remove`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,24 +113,24 @@ const CartSystem = {
       });
       
       if (!response.ok) {
-        console.error('[Cart] Error en la respuesta del servidor');
+        console.error('[CartSystem] Error en la respuesta');
         throw new Error('Error al eliminar del carrito');
       }
       
-      console.log('[Cart] Producto eliminado correctamente del carrito');
+      console.log('[CartSystem] Producto eliminado correctamente');
       this.cart = await response.json();
       this.updateCartIcon();
       if (this.isCartModalOpen) this.openCartModal();
     } catch (error) {
-      console.error('[Cart] Error eliminando del carrito:', error);
+      console.error('[CartSystem] Error eliminando del carrito:', error);
     }
   },
   
   async updateCartItemQuantity(productId, tabType, newQuantity) {
-    console.log(`[Cart] UPDATE cantidad producto - Producto: ${productId}, Nueva cantidad: ${newQuantity}`);
+    console.log(`[CartSystem] Actualizando cantidad - Producto: ${productId}, Cantidad: ${newQuantity}`);
     const userId = UserProfile.getTelegramUserId();
     try {
-      console.log('[Cart] Enviando petición para actualizar cantidad');
+      console.log('[CartSystem] Enviando petición para actualizar cantidad...');
       const response = await fetch(`${window.API_BASE_URL}/api/cart/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,46 +143,45 @@ const CartSystem = {
       });
       
       if (!response.ok) {
-        console.error('[Cart] Error en la respuesta del servidor');
+        console.error('[CartSystem] Error en la respuesta');
         throw new Error('Error actualizando cantidad');
       }
       
-      console.log('[Cart] Cantidad actualizada correctamente');
+      console.log('[CartSystem] Cantidad actualizada correctamente');
       this.cart = await response.json();
       this.updateCartIcon();
       if (this.isCartModalOpen) this.openCartModal();
     } catch (error) {
-      console.error('[Cart] Error actualizando cantidad:', error);
+      console.error('[CartSystem] Error actualizando cantidad:', error);
     }
   },
   
   async openCartModal() {
-    console.log('[Cart] Abriendo modal del carrito...');
-    console.log('[Cart] Estado actual del modal:', this.isCartModalOpen);
+    console.log('[CartSystem] Abriendo modal del carrito...');
+    console.log('[CartSystem] Estado actual del modal:', this.isCartModalOpen);
     
     await this.loadCart();
     this.isCartModalOpen = true;
-    console.log('[Cart] Modal marcado como abierto');
+    console.log('[CartSystem] Modal marcado como abierto');
     
-    const modal = document.getElementById('product-modal');
-    if (!modal) {
-      console.error('[Cart] Error: No se encontró el modal con ID "product-modal"');
+    if (!this.modal) {
+      console.error('[CartSystem] ERROR: Modal no encontrado');
       return;
     }
-    
-    console.log('[Cart] Preparando contenido del carrito...');
+
+    console.log('[CartSystem] Preparando contenido del carrito...');
     let cartContent = '<p>Tu carrito está vacío</p>';
     let totalByCurrency = {};
     
     if (this.cart.items && this.cart.items.length > 0) {
-      console.log(`[Cart] Hay ${this.cart.items.length} items en el carrito`);
+      console.log(`[CartSystem] ${this.cart.items.length} items en el carrito`);
       
       cartContent = await Promise.all(this.cart.items.map(async item => {
-        console.log(`[Cart] Procesando item: ${item.productId} (${item.tabType})`);
+        console.log(`[CartSystem] Procesando item: ${item.productId} (${item.tabType})`);
         
         const product = await ProductView.getProductById(item.productId, item.tabType);
         if (!product) {
-          console.warn(`[Cart] Producto ${item.productId} no encontrado`);
+          console.warn(`[CartSystem] Producto ${item.productId} no encontrado`);
           return '';
         }
         
@@ -202,7 +220,7 @@ const CartSystem = {
         `;
       })).then(items => items.join(''));
     } else {
-      console.log('[Cart] El carrito está vacío');
+      console.log('[CartSystem] El carrito está vacío');
     }
     
     let totalDisplay = '';
@@ -214,7 +232,7 @@ const CartSystem = {
         .join('');
     }
     
-    modal.innerHTML = `
+    this.modal.innerHTML = `
       <div class="modal-content">
         <div class="modal-header">
           <h2>🛒 Carrito de Compras</h2>
@@ -232,108 +250,107 @@ const CartSystem = {
       </div>
     `;
     
-    modal.style.display = 'flex';
-    console.log('[Cart] Modal mostrado en pantalla');
+    this.modal.style.display = 'flex';
+    console.log('[CartSystem] Modal mostrado en pantalla');
     
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-      console.log('[Cart] Botón cerrar modal clickeado');
+    this.modal.querySelector('.close-modal').addEventListener('click', () => {
+      console.log('[CartSystem] Botón cerrar modal clickeado');
       this.isCartModalOpen = false;
-      modal.style.display = 'none';
+      this.modal.style.display = 'none';
     });
     
     if (this.cart.items.length > 0) {
-      console.log('[Cart] Añadiendo listeners para botones de items');
+      console.log('[CartSystem] Añadiendo listeners para botones de items...');
       
-      modal.querySelectorAll('.remove-item').forEach(button => {
+      this.modal.querySelectorAll('.remove-item').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
-          console.log(`[Cart] Eliminando item: ${productId} (${tabType})`);
+          console.log(`[CartSystem] Eliminando item: ${productId} (${tabType})`);
           this.removeFromCart(productId, tabType);
         });
       });
       
-      modal.querySelectorAll('.increase-quantity').forEach(button => {
+      this.modal.querySelectorAll('.increase-quantity').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
           const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
           if (item) {
-            console.log(`[Cart] Incrementando cantidad de ${productId} a ${item.quantity + 1}`);
+            console.log(`[CartSystem] Incrementando cantidad de ${productId} a ${item.quantity + 1}`);
             this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
           }
         });
       });
       
-      modal.querySelectorAll('.decrease-quantity').forEach(button => {
+      this.modal.querySelectorAll('.decrease-quantity').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
           const tabType = e.target.getAttribute('data-tab');
           const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
           if (item && item.quantity > 1) {
-            console.log(`[Cart] Reduciendo cantidad de ${productId} a ${item.quantity - 1}`);
+            console.log(`[CartSystem] Reduciendo cantidad de ${productId} a ${item.quantity - 1}`);
             this.updateCartItemQuantity(productId, tabType, item.quantity - 1);
           }
         });
       });
       
-      const checkoutButton = modal.querySelector('#checkout-button');
+      const checkoutButton = this.modal.querySelector('#checkout-button');
       if (checkoutButton) {
         checkoutButton.addEventListener('click', () => {
-          console.log('[Cart] Botón checkout clickeado');
+          console.log('[CartSystem] Botón checkout clickeado');
           CheckoutSystem.openCheckout(this.cart, totalByCurrency);
         });
       } else {
-        console.warn('[Cart] No se encontró el botón de checkout');
+        console.warn('[CartSystem] No se encontró el botón de checkout');
       }
     }
   },
   
   updateCartIcon: function() {
-    console.log('[Cart] Actualizando icono del carrito');
-    const cartButton = document.getElementById('cart-button');
-    if (!cartButton) {
-      console.error('[Cart] Error: No se encontró el botón del carrito');
+    console.log('[CartSystem] Actualizando icono del carrito...');
+    if (!this.cartButton) {
+      console.error('[CartSystem] ERROR: Botón del carrito no encontrado');
       return;
     }
     
     let itemCount = this.cart.items.reduce((count, item) => count + item.quantity, 0);
-    console.log(`[Cart] Total de items en el carrito: ${itemCount}`);
+    console.log(`[CartSystem] Total items en el carrito: ${itemCount}`);
     
-    let counter = cartButton.querySelector('.cart-counter');
+    let counter = this.cartButton.querySelector('.cart-counter');
     if (!counter) {
-      console.log('[Cart] Creando contador del carrito');
+      console.log('[CartSystem] Creando contador del carrito');
       counter = document.createElement('span');
       counter.className = 'cart-counter';
-      cartButton.appendChild(counter);
+      this.cartButton.appendChild(counter);
     }
     
     counter.textContent = itemCount;
     counter.style.display = itemCount > 0 ? 'flex' : 'none';
-    console.log('[Cart] Icono del carrito actualizado');
+    console.log('[CartSystem] Icono del carrito actualizado');
   },
   
   clearCart: function() {
-    console.log('[Cart] Limpiando carrito');
+    console.log('[CartSystem] Limpiando carrito...');
     const userId = UserProfile.getTelegramUserId();
     if (!userId) {
-      console.log('[Cart] Usuario no identificado al intentar limpiar carrito');
+      console.log('[CartSystem] Usuario no identificado');
       return;
     }
     
-    console.log(`[Cart] Enviando petición para limpiar carrito de usuario ${userId}`);
+    console.log(`[CartSystem] Enviando petición para limpiar carrito de usuario ${userId}`);
     fetch(`${window.API_BASE_URL}/api/cart/clear/${userId}`, {
       method: 'POST'
     })
     .then(response => {
       if (response.ok) {
-        console.log('[Cart] Carrito limpiado con éxito');
+        console.log('[CartSystem] Carrito limpiado con éxito');
         this.cart = { items: [] };
         this.updateCartIcon();
       } else {
-        console.error('[Cart] Error al limpiar carrito');
+        console.error('[CartSystem] Error al limpiar carrito');
       }
     })
-    .catch(error => console.error('[Cart] Error vaciando carrito:', error));
+    .catch(error => console.error('[CartSystem] Error vaciando carrito:', error));
   }
 };
