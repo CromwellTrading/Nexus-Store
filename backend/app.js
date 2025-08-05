@@ -1,614 +1,1209 @@
-const CheckoutSystem = {
-  selectedMethodPrices: {},
-  cartItemsWithDetails: [],
-  selectedPaymentMethod: null,
-    
-  async openCheckout(cart, totalByCurrency) {
-    this.selectedMethodPrices = totalByCurrency;
-    const userData = UserProfile.getUserData();
-    const modal = document.getElementById('product-modal');
-    const isProfileComplete = userData.fullName && userData.ci && userData.phone && userData.address && userData.province;
-    const startingStep = isProfileComplete ? 2 : 1;
-    
-    // Obtener detalles de los productos del carrito
-    this.cartItemsWithDetails = await this.getCartItemsDetails(cart.items);
-    
-    modal.innerHTML = `
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>🚀 Finalizar Compra</h2>
-          <button class="close-modal">&times;</button>
-        </div>
-        
-        <div class="checkout-steps">
-          <div class="step ${startingStep >= 1 ? 'active' : ''}" data-step="1">👤 Datos</div>
-          <div class="step ${startingStep >= 2 ? 'active' : ''}" data-step="2">💳 Pago</div>
-          <div class="step" data-step="3">✅ Confirmar</div>
-        </div>
-        
-        <div class="checkout-content" id="checkout-content">
-          <div class="checkout-step" id="step-1" style="display: ${startingStep === 1 ? 'block' : 'none'};">
-            <h3>👤 Tus Datos Personales</h3>
-            <div class="form-group">
-              <label>Nombre y Apellidos:</label>
-              <input type="text" id="checkout-fullname" value="${userData.fullName || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Carnet de Identidad:</label>
-              <input type="text" id="checkout-ci" value="${userData.ci || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Teléfono:</label>
-              <input type="text" id="checkout-phone" value="${userData.phone || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Dirección:</label>
-              <input type="text" id="checkout-address" value="${userData.address || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Provincia:</label>
-              <select id="checkout-province" required class="modern-select">
-                <option value="">Seleccionar provincia</option>
-                ${['Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas', 'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila', 'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba', 'Guantánamo', 'Isla de la Juventud']
-                  .map(prov => `<option value="${prov}" ${userData.province === prov ? 'selected' : ''}>${prov}</option>`).join('')}
-              </select>
-            </div>
-            
-            <div class="optional-recipient">
-              <label class="checkbox-label">
-                <input type="checkbox" id="add-recipient"> 
-                <span class="checkmark"></span>
-                📦 ¿Entregar a otra persona?
-              </label>
-              
-              <div id="recipient-fields" style="display: none; margin-top: 15px;">
-                <div class="form-group">
-                  <label>Nombre y Apellidos del Receptor:</label>
-                  <input type="text" id="recipient-name" class="modern-input">
-                </div>
-                <div class="form-group">
-                  <label>CI del Receptor:</label>
-                  <input type="text" id="recipient-ci" class="modern-input">
-                </div>
-                <div class="form-group">
-                  <label>Teléfono del Receptor:</label>
-                  <input type="text" id="recipient-phone" class="modern-input">
-                </div>
-              </div>
-            </div>
-            
-            <div class="checkout-buttons">
-              <button class="btn-cancel" id="cancel-checkout">❌ Cancelar</button>
-              <button class="btn-next" id="next-to-payment">👉 Siguiente</button>
-            </div>
-          </div>
-          
-          <div class="checkout-step" id="step-2" style="display: ${startingStep === 2 ? 'block' : 'none'};">
-            <h3>💳 Método de Pago</h3>
-            
-            <div class="payment-methods" id="payment-methods-container">
-              <!-- Los métodos de pago se generarán dinámicamente -->
-            </div>
-            
-            <div class="admin-info">
-              <p><strong>📌 Realizar transferencia a:</strong></p>
-              <div class="account-info">
-                <!-- Aquí se mostrarán los datos de pago -->
-              </div>
-              <p class="warning-note">⚠️ Importante: Debe incluir la prueba de transferencia en el siguiente paso</p>
-            </div>
-            
-            <div class="checkout-buttons">
-              <button class="btn-back" id="back-to-info">👈 Atrás</button>
-              <button class="btn-next" id="next-to-confirm">👉 Siguiente</button>
-            </div>
-          </div>
-          
-          <div class="checkout-step" id="step-3" style="display: none;">
-            <h3>✅ Confirmar Pedido</h3>
-            
-            <div class="order-summary">
-              <h4>📦 Resumen del Pedido</h4>
-              <div id="order-items-list"></div>
-              <div class="order-total" id="order-total-display"></div>
-            </div>
-            
-            <div class="transfer-info">
-              <div class="form-group">
-                <label>📸 Captura de pantalla de la transferencia:</label>
-                <input type="file" id="transfer-proof" accept="image/*" required>
-                <div id="transfer-proof-preview" style="margin-top: 10px;"></div>
-                <p class="info-note">Por favor, suba una imagen que muestre claramente:</p>
-                <ul class="info-note">
-                  <li>ID de la transferencia</li>
-                  <li>Monto transferido</li>
-                  <li>Fecha y hora</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div id="required-fields-section" style="margin-top: 20px; display: none;">
-              <h4>📝 Datos Requeridos</h4>
-              <div id="required-fields-inputs"></div>
-            </div>
-            
-            <div class="checkout-buttons">
-              <button class="btn-back" id="back-to-payment">👈 Atrás</button>
-              <button class="btn-confirm" id="confirm-purchase">✅ Confirmar Compra</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    modal.style.display = 'flex';
-    this.setupCheckoutEvents(cart);
-    
-    // Generar métodos de pago disponibles basados en los precios de los productos
-    this.generatePaymentMethods();
-    
-    // Mostrar los productos en el resumen
-    this.updateOrderSummary();
-    
-    // Verificar si hay campos requeridos y mostrarlos
-    const requiredFields = this.getRequiredFields();
-    if (requiredFields.length > 0) {
-      this.showRequiredFields(requiredFields);
-    } else {
-      document.getElementById('required-fields-section').style.display = 'none';
-    }
-  },
-  
-  async getCartItemsDetails(cartItems) {
-    const itemsWithDetails = [];
-    
-    for (const item of cartItems) {
-      try {
-        const product = await ProductView.getProductById(item.productId, item.tabType);
-        if (product) {
-          itemsWithDetails.push({
-            ...item,
-            name: product.name,
-            prices: product.prices,
-            required_fields: product.required_fields || [] // Añadimos los campos requeridos
-          });
-        }
-      } catch (error) {
-        console.error('Error obteniendo detalles del producto:', error);
-      }
-    }
-    
-    return itemsWithDetails;
-  },
-  
-  generatePaymentMethods() {
-    const container = document.getElementById('payment-methods-container');
-    if (!container) return;
-    
-    // Determinar qué métodos de pago están disponibles basados en los precios de los productos
-    const availableCurrencies = this.getAvailableCurrencies();
-    
-    container.innerHTML = '';
-    
-    // BPA y BANDEC siempre disponibles para CUP
-    if (availableCurrencies.includes('CUP')) {
-      container.innerHTML += `
-        <div class="payment-method">
-          <input type="radio" name="payment-method" id="payment-bpa" value="BPA">
-          <label for="payment-bpa">💳 Transferencia BPA (CUP)</label>
-        </div>
-        <div class="payment-method">
-          <input type="radio" name="payment-method" id="payment-bandec" value="BANDEC">
-          <label for="payment-bandec">💳 Transferencia BANDEC (CUP)</label>
-        </div>
-      `;
-    }
-    
-    // MLC solo disponible si hay productos con precio en MLC
-    if (availableCurrencies.includes('MLC')) {
-      container.innerHTML += `
-        <div class="payment-method">
-          <input type="radio" name="payment-method" id="payment-mlc" value="MLC">
-          <label for="payment-mlc">💳 Transferencia MLC</label>
-        </div>
-      `;
-    }
-    
-    // Saldo Móvil solo disponible si hay productos con precio en Saldo Móvil
-    if (availableCurrencies.includes('Saldo Móvil')) {
-      container.innerHTML += `
-        <div class="payment-method">
-          <input type="radio" name="payment-method" id="payment-mobile" value="Saldo Móvil">
-          <label for="payment-mobile">📱 Saldo Móvil</label>
-        </div>
-      `;
-    }
-    
-    // Si solo hay un método disponible, seleccionarlo automáticamente
-    const methods = container.querySelectorAll('input[type="radio"]');
-    if (methods.length === 1) {
-      methods[0].checked = true;
-      this.selectedPaymentMethod = methods[0].value;
-    } else {
-      // Seleccionar Saldo Móvil por defecto si está disponible
-      const mobilePayment = document.getElementById('payment-mobile');
-      if (mobilePayment) {
-        mobilePayment.checked = true;
-        this.selectedPaymentMethod = 'Saldo Móvil';
-      }
-    }
-    
-    // Actualizar la información de pago
-    this.updatePaymentInfo();
-  },
-  
-  getAvailableCurrencies() {
-    const currencies = new Set();
-    
-    this.cartItemsWithDetails.forEach(item => {
-      if (item.prices) {
-        Object.keys(item.prices).forEach(currency => {
-          // Solo considerar monedas con precio definido y mayor a 0
-          if (item.prices[currency] && parseFloat(item.prices[currency]) > 0) {
-            currencies.add(currency);
-          }
-        });
-      }
-    });
-    
-    return Array.from(currencies);
-  },
-  
-  updateOrderSummary() {
-    const itemsList = document.getElementById('order-items-list');
-    if (!itemsList) return;
-    
-    itemsList.innerHTML = '';
-    
-    this.cartItemsWithDetails.forEach(item => {
-      const itemElement = document.createElement('div');
-      itemElement.className = 'order-item';
-      itemElement.innerHTML = `
-        <div>${item.name || 'Producto'} x ${item.quantity}</div>
-        <div>${this.getPriceForDisplay(item)}</div>
-      `;
-      itemsList.appendChild(itemElement);
-    });
-    
-    this.updatePaymentInfo();
-  },
-  
-  getPriceForDisplay(item) {
-    // Mostrar todos los precios disponibles para el producto
-    if (!item.prices) return 'Precio no disponible';
-    
-    let display = '';
-    Object.entries(item.prices).forEach(([currency, price]) => {
-      if (price && parseFloat(price) > 0) {
-        display += `${price} ${currency} `;
-      }
-    });
-    
-    return display || 'Precio no disponible';
-  },
-  
-  setupCheckoutEvents: function(cart) {
-    document.getElementById('add-recipient')?.addEventListener('change', function() {
-      document.getElementById('recipient-fields').style.display = this.checked ? 'block' : 'none';
-    });
-    
-    document.getElementById('next-to-payment')?.addEventListener('click', () => {
-      const fullName = document.getElementById('checkout-fullname').value;
-      const ci = document.getElementById('checkout-ci').value;
-      const phone = document.getElementById('checkout-phone').value;
-      const address = document.getElementById('checkout-address').value;
-      const province = document.getElementById('checkout-province').value;
-      
-      if (!fullName || !ci || !phone || !address || !province) {
-        alert('Por favor complete todos los campos obligatorios');
-        return;
-      }
-      
-      UserProfile.userData = { fullName, ci, phone, address, province };
-      UserProfile.saveUserData();
-      this.goToStep(2);
-    });
-    
-    document.getElementById('back-to-info')?.addEventListener('click', () => this.goToStep(1));
-    document.getElementById('next-to-confirm')?.addEventListener('click', () => {
-      this.goToStep(3);
-    });
-    document.getElementById('back-to-payment')?.addEventListener('click', () => this.goToStep(2));
-    document.getElementById('cancel-checkout')?.addEventListener('click', () => {
-      document.getElementById('product-modal').style.display = 'none';
-    });
-    
-    // Evento para cambio de método de pago
-    document.getElementById('payment-methods-container')?.addEventListener('change', (e) => {
-      if (e.target && e.target.name === 'payment-method') {
-        this.selectedPaymentMethod = e.target.value;
-        this.updatePaymentInfo();
-      }
-    });
-    
-    document.getElementById('transfer-proof')?.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const preview = document.getElementById('transfer-proof-preview');
-        preview.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = event.target.result;
-        img.style.maxWidth = '100%';
-        img.style.maxHeight = '200px';
-        preview.appendChild(img);
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
-      try {
-        const method = this.selectedPaymentMethod;
-        const userId = UserProfile.getTelegramUserId();
-        
-        if (!method) return alert('Por favor seleccione un método de pago');
-        if (!userId) return alert('No se pudo identificar su usuario');
-        
-        const proofFile = document.getElementById('transfer-proof')?.files[0];
-        if (!proofFile) return alert('Por favor suba la captura de pantalla de la transferencia');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
+import TelegramBot from 'node-telegram-bot-api';
+import fileUpload from 'express-fileupload';
+import ImageKit from 'imagekit';
 
-        // Validar campos requeridos antes de continuar
-        let requiredFieldsValid = true;
-        const requiredFields = {};
-        const requiredInputs = document.querySelectorAll('#required-fields-inputs input[required]');
-        
-        requiredInputs.forEach(input => {
-          if (!input.value.trim()) {
-            requiredFieldsValid = false;
-            input.style.border = '1px solid red';
-            input.placeholder = 'Campo obligatorio';
-          } else {
-            input.style.border = '';
-            const fieldName = input.previousElementSibling?.textContent?.replace(':', '').trim();
-            if (fieldName) {
-              requiredFields[fieldName] = input.value;
-            }
-          }
-        });
-        
-        if (!requiredFieldsValid) {
-          Notifications.showNotification('Error', 'Por favor complete todos los campos requeridos');
-          return;
-        }
+// Configuración inicial
+console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
+console.log('🕒 Hora de inicio:', new Date().toISOString());
+console.log('🔌 Conectando a Supabase...');
 
-        // Mostrar estado de carga
-        const confirmBtn = document.getElementById('confirm-purchase');
-        const originalBtnText = confirmBtn.innerHTML;
-        confirmBtn.innerHTML = '<div class="spinner"></div> Procesando...';
-        confirmBtn.disabled = true;
-        
-        const proofPreview = document.getElementById('transfer-proof-preview');
-        proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
+const app = express();
+const PORT = process.env.PORT || 10000;
 
-        // 1. Crear FormData para enviar la imagen y los datos
-        const formData = new FormData();
-        formData.append('image', proofFile);
-        formData.append('userId', userId);
-        formData.append('paymentMethod', method);
-        
-        // Datos del usuario
-        formData.append('fullName', document.getElementById('checkout-fullname').value);
-        formData.append('ci', document.getElementById('checkout-ci').value);
-        formData.append('phone', document.getElementById('checkout-phone').value);
-        formData.append('address', document.getElementById('checkout-address').value);
-        formData.append('province', document.getElementById('checkout-province').value);
-        
-        // Datos del receptor si aplica
-        if (document.getElementById('add-recipient')?.checked) {
-          formData.append('recipientName', document.getElementById('recipient-name').value);
-          formData.append('recipientCi', document.getElementById('recipient-ci').value);
-          formData.append('recipientPhone', document.getElementById('recipient-phone').value);
-        }
-        
-        // Campos requeridos
-        formData.append('requiredFields', JSON.stringify(requiredFields));
-        
-        // Calcular el total basado en el método de pago seleccionado
-        let total = 0;
-        this.cartItemsWithDetails.forEach(item => {
-          // Usar el precio correspondiente al método de pago seleccionado
-          let price = 0;
-          if (method === 'BPA' || method === 'BANDEC') {
-            price = item.prices['CUP'] || 0;
-          } else if (method === 'MLC') {
-            price = item.prices['MLC'] || 0;
-          } else if (method === 'Saldo Móvil') {
-            price = item.prices['Saldo Móvil'] || 0;
-          }
-          
-          total += price * item.quantity;
-        });
-        
-        formData.append('total', total.toString());
-        
-        // 2. Enviar datos al backend
-        const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
-          method: 'POST',
-          headers: { 
-            'Telegram-ID': userId.toString()
-          },
-          body: formData
-        });
+// Configuración de Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+console.log('✅ Supabase conectado');
 
-        // Manejar respuesta
-        if (!response.ok) {
-          let errorMessage = 'Error en el servidor';
-          try {
-            const errorBody = await response.json();
-            errorMessage = errorBody.error || errorBody.message || errorMessage;
-          } catch (e) {
-            errorMessage = `Error ${response.status}: ${response.statusText}`;
-          }
-          throw new Error(errorMessage);
-        }
+// Configuración de ImageKit
+const imagekit = new ImageKit({
+  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+});
+console.log('🖼️ ImageKit configurado');
 
-        const result = await response.json();
-        
-        // Éxito - limpiar y notificar
-        document.getElementById('product-modal').style.display = 'none';
-        CartSystem.clearCart();
-        Notifications.showNotification('🎉 ¡Compra realizada!', `Tu pedido #${result.orderId} ha sido creado`);
-        
-      } catch (error) {
-        console.error('Error en checkout:', error);
-        
-        // Mostrar error en la interfaz
-        const errorContainer = document.createElement('div');
-        errorContainer.className = 'error-message';
-        errorContainer.innerHTML = `
-          <strong>Error al confirmar la compra:</strong>
-          <p>${error.message}</p>
-          <p>Por favor, inténtalo de nuevo.</p>
-        `;
-        
-        const proofPreview = document.getElementById('transfer-proof-preview');
-        const existingError = proofPreview.querySelector('.error-message');
-        if (existingError) existingError.remove();
-        proofPreview.appendChild(errorContainer);
-        
-        alert('Error al confirmar la compra: ' + error.message);
-      } finally {
-        // Restaurar botón
-        const confirmBtn = document.getElementById('confirm-purchase');
-        if (confirmBtn) {
-          confirmBtn.innerHTML = '✅ Confirmar Compra';
-          confirmBtn.disabled = false;
-        }
-      }
-    });
-  },
+// Middlewares
+console.log('🛠️ Configurando middlewares...');
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
+}));
+app.use(express.json());
+app.use(fileUpload({
+  limits: { fileSize: 5 * 1024 * 1024 },
+  abortOnLimit: true
+}));
+
+app.use((req, res, next) => {
+  req.telegramId = req.headers['telegram-id'] || 
+                   req.query.tgid || 
+                   req.body.telegramId;
+  console.log(`📩 Petición recibida: ${req.method} ${req.path} | Usuario: ${req.telegramId || 'No identificado'}`);
+  next();
+});
+
+// Middleware de administrador
+const isAdmin = (req, res, next) => {
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+    : [];
   
-  getRequiredFields: function() {
-    const fields = new Map(); // Usar Map para evitar duplicados
-    
-    this.cartItemsWithDetails.forEach(item => {
-      if (item.required_fields) {
-        item.required_fields.forEach(field => {
-          if (field.required && field.name) {
-            // Agregar solo si no existe
-            if (!fields.has(field.name)) {
-              fields.set(field.name, {
-                name: field.name,
-                required: field.required
-              });
-            }
-          }
-        });
-      }
-    });
-    
-    return Array.from(fields.values());
-  },
-  
-  showRequiredFields: function(fields) {
-    const container = document.getElementById('required-fields-inputs');
-    const section = document.getElementById('required-fields-section');
-    
-    if (!container || !section) return;
-    
-    container.innerHTML = '';
-    
-    if (fields.length === 0) {
-      section.style.display = 'none';
-      return;
-    }
-    
-    fields.forEach(field => {
-      const fieldId = `field-${field.name.replace(/\s+/g, '-')}`;
-      container.innerHTML += `
-        <div class="form-group">
-          <label for="${fieldId}">${field.name}:</label>
-          <input type="text" 
-                 id="${fieldId}" 
-                 ${field.required ? 'required' : ''}
-                 class="modern-input"
-                 placeholder="Ingrese ${field.name.toLowerCase()}">
-        </div>
-      `;
-    });
-    
-    section.style.display = 'block';
-  },
-  
-  goToStep: function(step) {
-    document.querySelectorAll('.checkout-step').forEach(el => el.style.display = 'none');
-    const stepEl = document.getElementById(`step-${step}`);
-    if (stepEl) stepEl.style.display = 'block';
-    
-    document.querySelectorAll('.step').forEach((el, index) => {
-      if (index + 1 <= step) el.classList.add('active');
-      else el.classList.remove('active');
-    });
-    
-    // Actualizar información al cambiar de paso
-    if (step === 3) {
-      this.updatePaymentInfo();
-    }
-  },
-  
-  updatePaymentInfo: function() {
-    const method = this.selectedPaymentMethod;
-    if (!method) return;
-    
-    const adminData = UserProfile.getUserData();
-    let cardNumber = '';
-    let phoneNumber = adminData.adminPhone || 'Número no disponible';
-    
-    // Obtener datos de tarjeta
-    if (adminData.adminCards) {
-      switch(method) {
-        case 'BPA': 
-          cardNumber = adminData.adminCards.bpa || 'Tarjeta no configurada'; 
-          break;
-        case 'BANDEC': 
-          cardNumber = adminData.adminCards.bandec || 'Tarjeta no configurada'; 
-          break;
-        case 'MLC': 
-          cardNumber = adminData.adminCards.mlc || 'Tarjeta no configurada'; 
-          break;
-      }
-    }
-    
-    // Actualizar UI
-    const accountInfo = document.querySelector('.account-info');
-    if (accountInfo) {
-      if (method === 'Saldo Móvil') {
-        accountInfo.innerHTML = `<p>📱 Teléfono: ${phoneNumber}</p>`;
-      } else {
-        accountInfo.innerHTML = `
-          <p>💳 Tarjeta: ${cardNumber}</p>
-          <p>📱 Teléfono: ${phoneNumber}</p>
-        `;
-      }
-    }
-    
-    // Calcular y mostrar total
-    let currency = 'CUP';
-    if (method === 'MLC') currency = 'MLC';
-    else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
-    
-    let total = 0;
-    this.cartItemsWithDetails.forEach(item => {
-      if (item.prices && item.prices[currency]) {
-        total += parseFloat(item.prices[currency]) * item.quantity;
-      }
-    });
-    
-    const totalDisplay = document.getElementById('order-total-display');
-    if (totalDisplay) {
-      totalDisplay.textContent = `Total a pagar: ${total.toFixed(2)} ${currency}`;
-    }
+  if (req.path.startsWith('/api/users/')) {
+    console.log('🔓 Ruta pública de usuario, acceso permitido');
+    return next();
   }
+
+  if (!req.telegramId) {
+    console.log('🔒 Intento de acceso sin Telegram-ID');
+    return res.status(401).json({ error: 'Se requiere Telegram-ID' });
+  }
+  
+  if (!adminIds.includes(req.telegramId.toString())) {
+    console.log(`⛔ Acceso no autorizado desde ID: ${req.telegramId}`);
+    return res.status(403).json({ error: 'Acceso no autorizado' });
+  }
+  
+  console.log(`👑 Acceso admin autorizado para ID: ${req.telegramId}`);
+  next();
 };
+
+// Rutas básicas
+app.get('/', (req, res) => {
+  console.log('🏠 Petición a endpoint raíz');
+  res.send('Backend Nexus Store funcionando');
+});
+
+app.get('/api/admin/health', (req, res) => {
+  console.log('🩺 Verificación de salud del servidor');
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date(),
+    supabaseConnected: !!process.env.SUPABASE_URL,
+    imagekitConfigured: !!process.env.IMAGEKIT_PUBLIC_KEY
+  });
+});
+
+app.get('/api/admin/ids', (req, res) => {
+  console.log('🆔 IDs de admin solicitadas');
+  const adminIds = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+    : [];
+  res.json(adminIds);
+});
+
+// ==================================================
+// Rutas de perfil de usuario (MODIFICADAS PARA SOPORTAR ADMINCARDS)
+// ==================================================
+
+app.get('/api/users/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  console.log(`👤 GET perfil solicitado para usuario: ${userId}`);
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('profile_data, admin_phone, admin_cards')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error(`❌ Error obteniendo perfil: ${error.message}`);
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Combinar los campos en un solo objeto de perfil
+    const profileData = {
+      ...(data.profile_data || {}),
+      adminPhone: data.admin_phone || null,
+      adminCards: data.admin_cards || {
+        bpa: "",
+        bandec: "",
+        mlc: ""
+      }
+    };
+
+    console.log(`✅ Perfil obtenido para ${userId}`);
+    res.json(profileData);
+  } catch (error) {
+    console.error('💥 Error en GET /api/users/:userId:', {
+      error: error.message,
+      userId
+    });
+    res.status(500).json({ error: 'Error obteniendo perfil' });
+  }
+});
+
+app.put('/api/users/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  const profileData = req.body;
+  console.log(`✏️ PUT perfil solicitado para usuario: ${userId}`, profileData);
+
+  try {
+    // Extraer campos específicos para almacenamiento separado
+    const adminPhone = profileData.adminPhone || null;
+    const adminCards = profileData.adminCards || {
+      bpa: "",
+      bandec: "",
+      mlc: ""
+    };
+
+    // Eliminar campos específicos para evitar duplicación
+    const cleanProfileData = { ...profileData };
+    delete cleanProfileData.adminPhone;
+    delete cleanProfileData.adminCards;
+
+    const { data, error } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        profile_data: cleanProfileData,
+        admin_phone: adminPhone,
+        admin_cards: adminCards,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`❌ Error guardando perfil: ${error.message}`);
+      throw error;
+    }
+    
+    // Construir respuesta combinando todos los campos
+    const responseData = {
+      ...(data.profile_data || {}),
+      adminPhone: data.admin_phone,
+      adminCards: data.admin_cards
+    };
+
+    console.log(`✅ Perfil guardado para ${userId}`);
+    res.json(responseData);
+  } catch (error) {
+    console.error('💥 Error en PUT /api/users/:userId:', {
+      error: error.message,
+      userId,
+      profileData
+    });
+    res.status(500).json({ 
+      error: 'Error guardando perfil',
+      details: error.message 
+    });
+  }
+});
+
+// Ruta para subir imágenes
+app.post('/api/upload-image', isAdmin, async (req, res) => {
+  console.log('🖼️ Solicitud de subida de imagen recibida');
+  
+  try {
+    if (!req.files || !req.files.image) {
+      console.log('⚠️ No se recibió archivo de imagen');
+      return res.status(400).json({ error: 'No se subió ninguna imagen' });
+    }
+
+    const imageFile = req.files.image;
+    console.log(`📄 Archivo recibido: ${imageFile.name} (${imageFile.size} bytes)`);
+    
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024;
+    
+    if (!validTypes.includes(imageFile.mimetype)) {
+      console.log(`⚠️ Formato inválido: ${imageFile.mimetype}`);
+      return res.status(400).json({ error: 'Formato inválido. Use JPG, PNG o WEBP' });
+    }
+    
+    if (imageFile.size > maxSize) {
+      console.log(`⚠️ Archivo demasiado grande: ${(imageFile.size/1024/1024).toFixed(1)}MB`);
+      return res.status(400).json({ 
+        error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB). Máx: 5MB` 
+      });
+    }
+
+    console.log('☁️ Subiendo a ImageKit...');
+    const uploadResponse = await imagekit.upload({
+      file: imageFile.data,
+      fileName: imageFile.name,
+      useUniqueFileName: true
+    });
+
+    console.log('✅ Imagen subida correctamente:', uploadResponse.url);
+    res.json({ url: uploadResponse.url });
+  } catch (error) {
+    console.error('💥 Error subiendo imagen:', {
+      error: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ error: 'Error subiendo imagen' });
+  }
+});
+
+// ==================================================
+// Rutas de carrito con logs detallados
+// ==================================================
+
+app.get('/api/cart/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  console.log(`🛒 GET carrito solicitado para usuario: ${userId}`);
+  
+  try {
+    console.log(`🔍 Buscando carrito en Supabase para usuario ${userId}...`);
+    const { data: cart, error } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error(`❌ Error Supabase al obtener carrito: ${error.message}`);
+      throw error;
+    }
+    
+    const items = cart?.items || [];
+    console.log(`📦 Carrito obtenido con ${items.length} items`);
+    
+    res.json({ userId, items });
+  } catch (error) {
+    console.error('💥 Error en GET /api/cart/:userId:', {
+      error: error.message,
+      stack: error.stack,
+      userId
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo carrito',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/cart/add', async (req, res) => {
+  const { userId, productId, tabType } = req.body;
+  console.log(`➕ ADD al carrito - Usuario: ${userId}, Producto: ${productId}, Tab: ${tabType}`);
+  
+  try {
+    console.log('🔍 Verificando carrito existente...');
+    let { data: cart, error } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('❌ Error al obtener carrito existente:', error);
+      throw error;
+    }
+    
+    let items = cart?.items || [];
+    const existingItemIndex = items.findIndex(item => 
+      item.productId == productId && item.tabType === tabType
+    );
+    
+    if (existingItemIndex !== -1) {
+      items[existingItemIndex].quantity += 1;
+      console.log(`🔄 Producto existente, nueva cantidad: ${items[existingItemIndex].quantity}`);
+    } else {
+      items.push({ 
+        productId, 
+        tabType, 
+        quantity: 1, 
+        addedAt: new Date().toISOString() 
+      });
+      console.log('🆕 Nuevo producto añadido al carrito');
+    }
+    
+    console.log('💾 Guardando carrito actualizado...');
+    const { data: updatedCart, error: upsertError } = await supabase
+      .from('carts')
+      .upsert({ 
+        user_id: userId, 
+        items, 
+        updated_at: new Date().toISOString() 
+      }, { 
+        onConflict: 'user_id' 
+      })
+      .select()
+      .single();
+    
+    if (upsertError) {
+      console.error('❌ Error al guardar carrito:', upsertError);
+      throw upsertError;
+    }
+    
+    console.log('✅ Carrito actualizado con éxito');
+    res.json({ 
+      userId, 
+      items: updatedCart.items 
+    });
+  } catch (error) {
+    console.error('💥 Error en POST /api/cart/add:', {
+      error: error.message,
+      userId,
+      productId,
+      tabType
+    });
+    res.status(500).json({ 
+      error: 'Error añadiendo al carrito',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/cart/remove', async (req, res) => {
+  const { userId, productId, tabType } = req.body;
+  console.log(`➖ REMOVE del carrito - Usuario: ${userId}, Producto: ${productId}, Tab: ${tabType}`);
+  
+  try {
+    console.log('🔍 Obteniendo carrito actual...');
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        console.log('⚠️ Carrito no encontrado');
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      console.error('❌ Error al obtener carrito:', cartError);
+      throw cartError;
+    }
+    
+    let items = cart.items;
+    const initialLength = items.length;
+    items = items.filter(item => 
+      !(item.productId == productId && item.tabType === tabType)
+    );
+    
+    if (items.length === initialLength) {
+      console.log('⚠️ Producto no encontrado en el carrito');
+      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
+    }
+    
+    console.log('💾 Actualizando carrito...');
+    const { data: updatedCart, error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al actualizar carrito:', error);
+      throw error;
+    }
+    
+    console.log('✅ Producto eliminado del carrito');
+    res.json({ 
+      userId, 
+      items: updatedCart.items 
+    });
+  } catch (error) {
+    console.error('💥 Error en POST /api/cart/remove:', {
+      error: error.message,
+      userId,
+      productId,
+      tabType
+    });
+    res.status(500).json({ 
+      error: 'Error removiendo del carrito',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/cart/update', async (req, res) => {
+  const { userId, productId, tabType, quantity } = req.body;
+  console.log(`🔄 UPDATE cantidad - Usuario: ${userId}, Producto: ${productId}, Cantidad: ${quantity}`);
+  
+  try {
+    if (quantity < 1) {
+      console.log('⚠️ Cantidad inválida recibida');
+      return res.status(400).json({ error: 'Cantidad inválida' });
+    }
+    
+    console.log('🔍 Obteniendo carrito actual...');
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError) {
+      if (cartError.code === 'PGRST116') {
+        console.log('⚠️ Carrito no encontrado');
+        return res.status(404).json({ error: 'Carrito no encontrado' });
+      }
+      console.error('❌ Error al obtener carrito:', cartError);
+      throw cartError;
+    }
+    
+    let items = cart.items;
+    const itemIndex = items.findIndex(item => 
+      item.productId == productId && item.tabType === tabType
+    );
+    
+    if (itemIndex === -1) {
+      console.log('⚠️ Producto no encontrado en el carrito');
+      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
+    }
+    
+    console.log(`🔄 Actualizando cantidad de ${items[itemIndex].quantity} a ${quantity}`);
+    items[itemIndex].quantity = quantity;
+    
+    console.log('💾 Guardando cambios...');
+    const { data: updatedCart, error } = await supabase
+      .from('carts')
+      .update({ items })
+      .eq('user_id', userId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al actualizar carrito:', error);
+      throw error;
+    }
+    
+    console.log('✅ Cantidad actualizada con éxito');
+    res.json({ 
+      userId, 
+      items: updatedCart.items 
+    });
+  } catch (error) {
+    console.error('💥 Error en POST /api/cart/update:', {
+      error: error.message,
+      userId,
+      productId,
+      tabType,
+      quantity
+    });
+    res.status(500).json({ 
+      error: 'Error actualizando carrito',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/cart/clear/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  console.log(`🧹 CLEAR carrito solicitado para usuario: ${userId}`);
+  
+  try {
+    console.log('🗑️ Eliminando carrito...');
+    const { error, count } = await supabase
+      .from('carts')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('❌ Error al vaciar carrito:', error);
+      throw error;
+    }
+    
+    if (count > 0) {
+      console.log('✅ Carrito vaciado con éxito');
+    } else {
+      console.log('⚠️ Carrito no encontrado');
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('💥 Error en POST /api/cart/clear/:userId:', {
+      error: error.message,
+      userId
+    });
+    res.status(500).json({ 
+      error: 'Error vaciando carrito',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ==================================================
+// Rutas de productos
+// ==================================================
+
+app.get('/api/products/:type', async (req, res) => {
+  const type = req.params.type;
+  console.log(`📦 GET productos solicitados - Tipo: ${type}`);
+  
+  try {
+    console.log(`🔍 Buscando productos de tipo ${type} en Supabase...`);
+    const { data: products, error } = await supabase
+      .from('products')
+      .select(`
+        id, type, name, description, details, prices, images, 
+        has_color_variant, colors, required_fields, date_created,
+        categories!inner(name)
+      `)
+      .eq('type', type);
+    
+    if (error) {
+      console.error('❌ Error al obtener productos:', error);
+      throw error;
+    }
+
+    const result = {};
+    products.forEach(product => {
+      const categoryName = product.categories.name;
+      if (!result[categoryName]) result[categoryName] = [];
+      result[categoryName].push({ ...product, category: categoryName });
+    });
+    
+    console.log(`✅ Encontrados ${products.length} productos en ${Object.keys(result).length} categorías`);
+    res.json(result);
+  } catch (error) {
+    console.error('💥 Error en GET /api/products/:type:', {
+      error: error.message,
+      type
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo productos',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.get('/api/products/:type/:id', async (req, res) => {
+  const { type, id } = req.params;
+  console.log(`🔍 GET producto detallado - Tipo: ${type}, ID: ${id}`);
+  
+  try {
+    console.log('Buscando producto en Supabase...');
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('*, categories!inner(name)')
+      .eq('type', type)
+      .eq('id', id)
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al obtener producto:', error);
+      throw error;
+    }
+
+    if (!product) {
+      console.log('⚠️ Producto no encontrado');
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    
+    console.log('✅ Producto encontrado');
+    res.json({ ...product, category: product.categories.name });
+  } catch (error) {
+    console.error('💥 Error en GET /api/products/:type/:id:', {
+      error: error.message,
+      type,
+      id
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo producto',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ==================================================
+// Rutas de administración
+// ==================================================
+
+app.get('/api/admin/categories', isAdmin, async (req, res) => {
+  console.log('📚 GET categorías solicitadas (admin)');
+  
+  try {
+    console.log('🔍 Obteniendo categorías de Supabase...');
+    const { data: categories, error } = await supabase.from('categories').select('*');
+    
+    if (error) {
+      console.error('❌ Error al obtener categorías:', error);
+      throw error;
+    }
+    
+    console.log(`✅ ${categories.length} categorías encontradas`);
+    res.json(categories);
+  } catch (error) {
+    console.error('💥 Error en GET /api/admin/categories:', error);
+    res.status(500).json({ 
+      error: 'Error obteniendo categorías',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/admin/categories', isAdmin, async (req, res) => {
+  const { type, name } = req.body;
+  console.log(`➕ POST nueva categoría - Tipo: ${type}, Nombre: ${name}`);
+  
+  try {
+    if (!type || !name) {
+      console.log('⚠️ Faltan parámetros requeridos');
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+    
+    console.log('🔍 Verificando si la categoría ya existe...');
+    const { data: existingCategory, error: existError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('type', type)
+      .eq('name', name);
+    
+    if (existError) {
+      console.error('❌ Error al verificar categoría existente:', existError);
+      throw existError;
+    }
+    
+    if (existingCategory && existingCategory.length > 0) {
+      console.log('⚠️ La categoría ya existe');
+      return res.status(400).json({ error: 'La categoría ya existe' });
+    }
+    
+    console.log('➕ Creando nueva categoría...');
+    const { data, error } = await supabase
+      .from('categories')
+      .insert([{ type, name }])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al crear categoría:', error);
+      throw error;
+    }
+    
+    console.log('✅ Categoría creada con éxito');
+    res.status(201).json(data);
+  } catch (error) {
+    console.error('💥 Error en POST /api/admin/categories:', {
+      error: error.message,
+      type,
+      name
+    });
+    res.status(500).json({ 
+      error: 'Error al crear categoría',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
+  const categoryId = req.params.id;
+  console.log(`🗑️ DELETE categoría solicitada - ID: ${categoryId}`);
+  
+  try {
+    console.log('Eliminando categoría...');
+    const { error, count } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+    
+    if (error) {
+      console.error('❌ Error al eliminar categoría:', error);
+      throw error;
+    }
+    
+    if (count === 0) {
+      console.log('⚠️ Categoría no encontrada');
+      return res.status(404).json({ error: 'Categoría no encontrada' });
+    }
+    
+    console.log('✅ Categoría eliminada con éxito');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('💥 Error en DELETE /api/admin/categories/:id:', {
+      error: error.message,
+      categoryId
+    });
+    res.status(500).json({ 
+      error: 'Error eliminando categoría',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.post('/api/admin/products', isAdmin, async (req, res) => {
+  const { type, categoryId, product } = req.body;
+  console.log(`➕ POST nuevo producto - Tipo: ${type}, Categoría: ${categoryId}`);
+  
+  try {
+    if (!type || !categoryId || !product) {
+      console.log('⚠️ Faltan parámetros requeridos');
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    }
+    
+    console.log('🔍 Verificando categoría...');
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', categoryId)
+      .single();
+    
+    if (categoryError || !category) {
+      console.error('❌ Categoría inválida:', categoryError);
+      return res.status(400).json({ error: 'Categoría inválida' });
+    }
+    
+    const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    console.log(`🆕 ID de producto generado: ${productId}`);
+    
+    const productData = {
+      id: productId,
+      type,
+      category_id: categoryId,
+      name: product.name,
+      description: product.description,
+      details: product.details || null,
+      prices: product.prices,
+      images: product.images || [],
+      has_color_variant: product.has_color_variant || false,
+      colors: product.colors || null,
+      required_fields: product.required_fields || null,
+      date_created: new Date().toISOString(),
+      tab_type: type
+    };
+
+    console.log('💾 Guardando producto en Supabase...');
+    const { data, error } = await supabase
+      .from('products')
+      .insert([productData])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error Supabase:', error);
+      throw error;
+    }
+    
+    console.log('✅ Producto creado con éxito');
+    res.status(201).json({ id: data.id, ...product });
+  } catch (error) {
+    console.error('💥 Error en POST /api/admin/products:', {
+      error: error.message,
+      type,
+      categoryId,
+      product
+    });
+    res.status(500).json({ 
+      error: 'Error creando producto',
+      message: error.message,
+      details: error.details || null
+    });
+  }
+});
+
+app.get('/api/admin/products', isAdmin, async (req, res) => {
+  console.log('📦 GET todos los productos (admin)');
+  
+  try {
+    console.log('🔍 Obteniendo productos de Supabase...');
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('*, categories (id, name)');
+    
+    if (error) {
+      console.error('❌ Error al obtener productos:', error);
+      throw error;
+    }
+    
+    const formattedProducts = products.map(product => ({
+      ...product,
+      category: product.categories ? product.categories.name : 'Sin categoría'
+    }));
+    
+    console.log(`✅ ${formattedProducts.length} productos encontrados`);
+    res.json(formattedProducts);
+  } catch (error) {
+    console.error('💥 Error en GET /api/admin/products:', error);
+    res.status(500).json({ 
+      error: 'Error obteniendo productos',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
+  const productId = req.params.id;
+  console.log(`🗑️ DELETE producto solicitado - ID: ${productId}`);
+  
+  try {
+    console.log('Eliminando producto...');
+    const { error, count } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+    
+    if (error) {
+      console.error('❌ Error al eliminar producto:', error);
+      throw error;
+    }
+    
+    if (count === 0) {
+      console.log('⚠️ Producto no encontrado');
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    
+    console.log('✅ Producto eliminado con éxito');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('💥 Error en DELETE /api/admin/products/:id:', {
+      error: error.message,
+      productId
+    });
+    res.status(500).json({ 
+      error: 'Error eliminando producto',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+app.get('/api/categories/:type', async (req, res) => {
+  const type = req.params.type;
+  console.log(`📚 GET categorías por tipo - Tipo: ${type}`);
+  
+  try {
+    console.log('🔍 Obteniendo categorías de Supabase...');
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('type', type);
+    
+    if (error) {
+      console.error('❌ Error al obtener categorías:', error);
+      throw error;
+    }
+    
+    console.log(`✅ ${categories.length} categorías encontradas para tipo ${type}`);
+    res.json(categories);
+  } catch (error) {
+    console.error('💥 Error en GET /api/categories/:type:', {
+      error: error.message,
+      type
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo categorías',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ==================================================
+// Rutas de pedidos
+// ==================================================
+
+app.get('/api/orders/user/:userId', async (req, res) => {
+  const userId = req.params.userId;
+  console.log(`📦 GET pedidos solicitados para usuario: ${userId}`);
+  
+  try {
+    console.log('🔍 Buscando pedidos en Supabase...');
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        user_data,
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+      `)
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('❌ Error al obtener pedidos:', error);
+      throw error;
+    }
+    
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      userData: order.user_data,
+      payment: {
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
+      },
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
+      items: order.order_items
+    }));
+    
+    console.log(`✅ ${parsedOrders.length} pedidos encontrados`);
+    res.json(parsedOrders);
+  } catch (error) {
+    console.error('💥 Error en GET /api/orders/user/:userId:', {
+      error: error.message,
+      userId
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo pedidos', 
+      details: error.message 
+    });
+  }
+});
+
+app.get('/api/admin/orders', isAdmin, async (req, res) => {
+  console.log('📦 GET todos los pedidos (admin)');
+  
+  try {
+    console.log('🔍 Buscando pedidos en Supabase...');
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        user_data,
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+      `);
+    
+    if (error) {
+      console.error('❌ Error al obtener pedidos:', error);
+      throw error;
+    }
+    
+    const parsedOrders = orders.map(order => ({
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      userData: order.user_data,
+      payment: {
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
+      },
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
+      items: order.order_items
+    }));
+    
+    console.log(`✅ ${parsedOrders.length} pedidos encontrados`);
+    res.json(parsedOrders);
+  } catch (error) {
+    console.error('💥 Error en GET /api/admin/orders:', error);
+    res.status(500).json({ 
+      error: 'Error obteniendo pedidos', 
+      details: error.message 
+    });
+  }
+});
+
+app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
+  const orderId = req.params.orderId;
+  console.log(`🔍 GET pedido detallado - ID: ${orderId}`);
+  
+  try {
+    console.log('Buscando pedido en Supabase...');
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        user_id,
+        total,
+        status,
+        created_at,
+        updated_at,
+        user_data,
+        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+      `)
+      .eq('id', orderId)
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al obtener pedido:', error);
+      throw error;
+    }
+
+    if (!order) {
+      console.log('⚠️ Pedido no encontrado');
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+    
+    const parsedOrder = {
+      id: order.id,
+      userId: order.user_id,
+      total: order.total,
+      status: order.status,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at,
+      userData: order.user_data,
+      payment: {
+        method: order.order_details[0].payment_method,
+        ...order.order_details[0].transfer_data
+      },
+      recipient: order.order_details[0].recipient_data,
+      requiredFields: order.order_details[0].required_fields,
+      items: order.order_items
+    };
+    
+    console.log('✅ Pedido encontrado');
+    res.json(parsedOrder);
+  } catch (error) {
+    console.error('💥 Error en GET /api/admin/orders/:orderId:', {
+      error: error.message,
+      orderId
+    });
+    res.status(500).json({ 
+      error: 'Error obteniendo pedido', 
+      details: error.message 
+    });
+  }
+});
+
+app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
+  const orderId = req.params.orderId;
+  const { status } = req.body;
+  console.log(`✏️ PUT actualizar pedido - ID: ${orderId}, Nuevo estado: ${status}`);
+  
+  try {
+    console.log('Actualizando estado del pedido...');
+    const { data: updatedOrder, error } = await supabase
+      .from('orders')
+      .update({ 
+        status: status, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', orderId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error al actualizar pedido:', error);
+      throw error;
+    }
+    
+    console.log('✅ Estado del pedido actualizado');
+    res.json(updatedOrder);
+  } catch (error) {
+    console.error('💥 Error en PUT /api/admin/orders/:orderId:', {
+      error: error.message,
+      orderId,
+      status
+    });
+    res.status(500).json({ 
+      error: 'Error actualizando orden',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ==================================================
+// Keep-Alive: Ping automático cada 5 minutos
+// ==================================================
+
+if (process.env.TELEGRAM_BOT_TOKEN) {
+  const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+  console.log('⏳ Configurando Keep-Alive para el bot de Telegram...');
+
+  setInterval(() => {
+    const date = new Date();
+    console.log(`🔄 Keep-Alive ping a las ${date.toLocaleTimeString()}`);
+    
+    const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+    if (ADMIN_CHAT_ID) {
+      bot.sendMessage(ADMIN_CHAT_ID, `🔄 Bot activo (${date.toLocaleTimeString()})`)
+        .then(() => console.log('📩 Notificación de Keep-Alive enviada'))
+        .catch(err => console.error('❌ Error enviando Keep-Alive:', err));
+    }
+  }, 5 * 60 * 1000);
+
+  console.log('✅ Keep-Alive configurado');
+}
+
+// ==================================================
+// Inicio del servidor
+// ==================================================
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
+  console.log('🛜 Endpoints disponibles:');
+  console.log(`- GET /api/cart/:userId`);
+  console.log(`- POST /api/cart/add`);
+  console.log(`- POST /api/cart/remove`);
+  console.log(`- POST /api/cart/update`);
+  console.log(`- POST /api/cart/clear/:userId`);
+  console.log(`- POST /api/checkout`);
+  console.log(`- GET /api/products/:type`);
+  console.log(`- GET /api/products/:type/:id`);
+  console.log(`- GET /api/orders/user/:userId`);
+  console.log(`- GET /api/admin/orders`);
+  console.log(`- GET /api/admin/orders/:orderId`);
+  console.log(`- PUT /api/admin/orders/:orderId`);
+  
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+    console.log('🤖 Bot de Telegram iniciado');
+    
+    const ADMIN_IDS = process.env.ADMIN_IDS 
+      ? process.env.ADMIN_IDS.split(',').map(Number) 
+      : [];
+    
+    const getFrontendUrl = () => process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
+    
+    bot.onText(/\/start/, (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
+      
+      console.log(`👋 Comando /start recibido de usuario ${userId}`);
+      
+      const promoMessage = `🌟 <b>¡BIENVENIDO A NEXUS STORE!</b> 🌟`;
+      
+      const keyboard = {
+        inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
+      };
+      
+      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard })
+        .then(() => console.log(`📩 Mensaje de bienvenida enviado a ${userId}`))
+        .catch(err => console.error('❌ Error al enviar mensaje:', err));
+    });
+    
+    bot.on('message', (msg) => {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const text = msg.text || '';
+      
+      if (ADMIN_IDS.includes(userId) && text === '/admin') {
+        console.log(`👑 Acceso admin solicitado por ${userId}`);
+        const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
+        bot.sendMessage(chatId, '👑 <b>ACCESO DE ADMINISTRADOR HABILITADO</b> 👑', {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: "⚙️ ABRIR PANEL ADMIN", web_app: { url: webAppUrl } }]] }
+        });
+      } else if (text === '/admin') {
+        console.log(`⛔ Intento de acceso admin no autorizado por ${userId}`);
+        bot.sendMessage(chatId, '❌ <b>No tienes permisos de administrador</b>', { parse_mode: 'HTML' });
+      }
+    });
+    
+    bot.on('web_app_data', (msg) => {
+      console.log('📲 Datos de WebApp recibidos');
+      const chatId = msg.chat.id;
+      const data = msg.web_app_data ? JSON.parse(msg.web_app_data.data) : null;
+      if (data && data.command === 'new_order') {
+        console.log(`🛍️ Nueva orden confirmada por usuario ${msg.from.id}`);
+        bot.sendMessage(chatId, '🎉 <b>¡PEDIDO CONFIRMADO!</b> 🎉', { parse_mode: 'HTML' });
+      }
+    });
+  }
+});
+
+console.log('===========================================');
+console.log('🚀 Sistema completamente inicializado 🚀');
+console.log('===========================================');
+console.log('🕒 Hora actual:', new Date().toISOString());
