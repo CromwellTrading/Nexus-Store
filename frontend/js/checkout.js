@@ -1,6 +1,7 @@
 const CheckoutSystem = {
   selectedMethodPrices: {},
   cartItemsWithDetails: [],
+  selectedPaymentMethod: null,
     
   async openCheckout(cart, totalByCurrency) {
     this.selectedMethodPrices = totalByCurrency;
@@ -217,20 +218,17 @@ const CheckoutSystem = {
     if (availableCurrencies.includes('Saldo Móvil')) {
       container.innerHTML += `
         <div class="payment-method">
-          <input type="radio" name="payment-method" id="payment-mobile" value="Saldo Móvil" checked>
+          <input type="radio" name="payment-method" id="payment-mobile" value="Saldo Móvil">
           <label for="payment-mobile">📱 Saldo Móvil</label>
         </div>
       `;
     }
     
-    // Si solo hay un método disponible, seleccionarlo automáticamente
+    // Seleccionar el primer método disponible por defecto
     const methods = container.querySelectorAll('input[type="radio"]');
-    if (methods.length === 1) {
+    if (methods.length > 0) {
       methods[0].checked = true;
-    } else {
-      // Seleccionar Saldo Móvil por defecto si está disponible
-      const mobilePayment = document.getElementById('payment-mobile');
-      if (mobilePayment) mobilePayment.checked = true;
+      this.selectedPaymentMethod = methods[0].value;
     }
     
     // Actualizar la información de pago
@@ -319,7 +317,10 @@ const CheckoutSystem = {
     });
     
     document.querySelectorAll('input[name="payment-method"]')?.forEach(radio => {
-      radio.addEventListener('change', () => this.updatePaymentInfo());
+      radio.addEventListener('change', () => {
+        this.selectedPaymentMethod = radio.value;
+        this.updatePaymentInfo();
+      });
     });
     
     document.getElementById('transfer-proof')?.addEventListener('change', (e) => {
@@ -341,7 +342,7 @@ const CheckoutSystem = {
     
     document.getElementById('confirm-purchase')?.addEventListener('click', async () => {
       try {
-        const method = document.querySelector('input[name="payment-method"]:checked')?.value;
+        const method = this.selectedPaymentMethod;
         const userId = UserProfile.getTelegramUserId();
         
         if (!method) return alert('Por favor seleccione un método de pago');
@@ -542,18 +543,42 @@ const CheckoutSystem = {
       if (index + 1 <= step) el.classList.add('active');
       else el.classList.remove('active');
     });
+    
+    // Actualizar información al cambiar de paso
+    if (step === 3) {
+      this.updatePaymentInfo();
+    }
   },
   
   updatePaymentInfo: function() {
-    const method = document.querySelector('input[name="payment-method"]:checked')?.value;
+    const method = this.selectedPaymentMethod || document.querySelector('input[name="payment-method"]:checked')?.value;
     if (!method) return;
     
     const adminData = UserProfile.getUserData();
     let cardNumber = '';
     let phoneNumber = adminData.adminPhone || 'Número no disponible';
+    let currency = '';
+    let paymentType = '';
     
-    // Obtener datos de tarjeta
-    if (adminData.adminCards) {
+    // Determinar moneda y tipo de pago
+    switch(method) {
+      case 'BPA':
+      case 'BANDEC':
+        currency = 'CUP';
+        paymentType = 'Transferencia';
+        break;
+      case 'MLC':
+        currency = 'MLC';
+        paymentType = 'Transferencia';
+        break;
+      case 'Saldo Móvil':
+        currency = 'Saldo Móvil';
+        paymentType = 'Saldo Móvil';
+        break;
+    }
+    
+    // Obtener datos de tarjeta para métodos de transferencia
+    if (paymentType === 'Transferencia' && adminData.adminCards) {
       switch(method) {
         case 'BPA': 
           cardNumber = adminData.adminCards.bpa || 'Tarjeta no configurada'; 
@@ -567,7 +592,7 @@ const CheckoutSystem = {
       }
     }
     
-    // Actualizar UI
+    // Actualizar UI con los datos correctos
     const accountInfo = document.querySelector('.account-info');
     if (accountInfo) {
       if (method === 'Saldo Móvil') {
@@ -580,11 +605,7 @@ const CheckoutSystem = {
       }
     }
     
-    // Calcular y mostrar total
-    let currency = 'CUP';
-    if (method === 'MLC') currency = 'MLC';
-    else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
-    
+    // Calcular y mostrar total en la moneda seleccionada
     let total = 0;
     this.cartItemsWithDetails.forEach(item => {
       if (item.prices && item.prices[currency]) {
@@ -594,7 +615,7 @@ const CheckoutSystem = {
     
     const totalDisplay = document.getElementById('order-total-display');
     if (totalDisplay) {
-      totalDisplay.textContent = `Total: ${total.toFixed(2)} ${currency}`;
+      totalDisplay.textContent = `Total a pagar: ${total.toFixed(2)} ${currency}`;
     }
   }
 };
