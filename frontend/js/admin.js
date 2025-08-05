@@ -1025,6 +1025,23 @@ const AdminSystem = {
     .then(response => response.json())
     .then(order => {
       const modal = document.getElementById('product-modal');
+      
+      // Mostrar campos requeridos
+      let requiredFieldsHTML = '';
+      if (order.requiredFields && Object.keys(order.requiredFields).length > 0) {
+        requiredFieldsHTML = `
+          <div class="required-fields-info">
+            <h4>📝 Campos Requeridos</h4>
+            ${Object.entries(order.requiredFields).map(([key, value]) => `
+              <div class="field-row">
+                <strong>${key}:</strong> 
+                <span>${value || 'No proporcionado'}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+      
       modal.innerHTML = `
         <div class="modal-content">
           <div class="modal-header">
@@ -1083,13 +1100,7 @@ const AdminSystem = {
               </div>` : 
               '<p>No hay información adicional de receptor</p>'}
               
-            ${order.requiredFields && Object.keys(order.requiredFields).length > 0 ? 
-              `<div class="required-fields-info">
-                <h4>📝 Campos Requeridos</h4>
-                ${Object.entries(order.requiredFields).map(([key, value]) => `
-                  <div><strong>${key}:</strong> ${value}</div>
-                `).join('')}
-              </div>` : ''}
+            ${requiredFieldsHTML}
           </div>
         </div>
       `;
