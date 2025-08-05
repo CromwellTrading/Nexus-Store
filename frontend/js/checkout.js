@@ -151,9 +151,11 @@ const CheckoutSystem = {
     this.updateOrderSummary();
     
     // Verificar si hay campos requeridos y mostrarlos
-    const requiredFields = this.getRequiredFields(cart.items);
+    const requiredFields = this.getRequiredFields();
     if (requiredFields.length > 0) {
       this.showRequiredFields(requiredFields);
+    } else {
+      document.getElementById('required-fields-section').style.display = 'none';
     }
   },
   
@@ -167,7 +169,8 @@ const CheckoutSystem = {
           itemsWithDetails.push({
             ...item,
             name: product.name,
-            prices: product.prices // Guardamos todos los precios
+            prices: product.prices,
+            required_fields: product.required_fields || [] // Añadimos los campos requeridos
           });
         }
       } catch (error) {
@@ -479,14 +482,12 @@ const CheckoutSystem = {
     });
   },
   
-  getRequiredFields: function(cartItems) {
+  getRequiredFields: function() {
     const fields = new Map(); // Usar Map para evitar duplicados
     
-    cartItems.forEach(item => {
-      const product = ProductView.getProductById(item.productId, item.tabType);
-      
-      if (product && product.required_fields) {
-        product.required_fields.forEach(field => {
+    this.cartItemsWithDetails.forEach(item => {
+      if (item.required_fields) {
+        item.required_fields.forEach(field => {
           if (field.required && field.name) {
             // Agregar solo si no existe
             if (!fields.has(field.name)) {
