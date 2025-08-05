@@ -30,6 +30,15 @@ const UserProfile = {
     // Primero intentar cargar desde localStorage
     this.loadFromLocalStorage();
     
+    // Asegurar que adminCards existe
+    if (!this.userData.adminCards) {
+      this.userData.adminCards = {
+        bpa: "",
+        bandec: "",
+        mlc: ""
+      };
+    }
+    
     // Luego intentar cargar desde API si hay userId
     if (userId) {
       try {
@@ -42,6 +51,13 @@ const UserProfile = {
             ...(user.profile_data || {})
           };
           console.log("[UserProfile] Datos de usuario cargados desde API");
+          
+          // Asegurar que adminCards está completo
+          this.userData.adminCards = {
+            bpa: this.userData.adminCards?.bpa || "",
+            bandec: this.userData.adminCards?.bandec || "",
+            mlc: this.userData.adminCards?.mlc || ""
+          };
           
           // Guardar en localStorage después de cargar desde API
           localStorage.setItem('userProfile', JSON.stringify(this.userData));
