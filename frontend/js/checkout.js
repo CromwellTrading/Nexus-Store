@@ -224,11 +224,18 @@ const CheckoutSystem = {
       `;
     }
     
-    // Seleccionar el primer método disponible por defecto
+    // Si solo hay un método disponible, seleccionarlo automáticamente
     const methods = container.querySelectorAll('input[type="radio"]');
-    if (methods.length > 0) {
+    if (methods.length === 1) {
       methods[0].checked = true;
       this.selectedPaymentMethod = methods[0].value;
+    } else {
+      // Seleccionar Saldo Móvil por defecto si está disponible
+      const mobilePayment = document.getElementById('payment-mobile');
+      if (mobilePayment) {
+        mobilePayment.checked = true;
+        this.selectedPaymentMethod = 'Saldo Móvil';
+      }
     }
     
     // Actualizar la información de pago
@@ -316,11 +323,12 @@ const CheckoutSystem = {
       document.getElementById('product-modal').style.display = 'none';
     });
     
-    document.querySelectorAll('input[name="payment-method"]')?.forEach(radio => {
-      radio.addEventListener('change', () => {
-        this.selectedPaymentMethod = radio.value;
+    // Evento para cambio de método de pago
+    document.getElementById('payment-methods-container')?.addEventListener('change', (e) => {
+      if (e.target && e.target.name === 'payment-method') {
+        this.selectedPaymentMethod = e.target.value;
         this.updatePaymentInfo();
-      });
+      }
     });
     
     document.getElementById('transfer-proof')?.addEventListener('change', (e) => {
@@ -551,34 +559,15 @@ const CheckoutSystem = {
   },
   
   updatePaymentInfo: function() {
-    const method = this.selectedPaymentMethod || document.querySelector('input[name="payment-method"]:checked')?.value;
+    const method = this.selectedPaymentMethod;
     if (!method) return;
     
     const adminData = UserProfile.getUserData();
     let cardNumber = '';
     let phoneNumber = adminData.adminPhone || 'Número no disponible';
-    let currency = '';
-    let paymentType = '';
     
-    // Determinar moneda y tipo de pago
-    switch(method) {
-      case 'BPA':
-      case 'BANDEC':
-        currency = 'CUP';
-        paymentType = 'Transferencia';
-        break;
-      case 'MLC':
-        currency = 'MLC';
-        paymentType = 'Transferencia';
-        break;
-      case 'Saldo Móvil':
-        currency = 'Saldo Móvil';
-        paymentType = 'Saldo Móvil';
-        break;
-    }
-    
-    // Obtener datos de tarjeta para métodos de transferencia
-    if (paymentType === 'Transferencia' && adminData.adminCards) {
+    // Obtener datos de tarjeta
+    if (adminData.adminCards) {
       switch(method) {
         case 'BPA': 
           cardNumber = adminData.adminCards.bpa || 'Tarjeta no configurada'; 
@@ -592,7 +581,7 @@ const CheckoutSystem = {
       }
     }
     
-    // Actualizar UI con los datos correctos
+    // Actualizar UI
     const accountInfo = document.querySelector('.account-info');
     if (accountInfo) {
       if (method === 'Saldo Móvil') {
@@ -605,7 +594,11 @@ const CheckoutSystem = {
       }
     }
     
-    // Calcular y mostrar total en la moneda seleccionada
+    // Calcular y mostrar total
+    let currency = 'CUP';
+    if (method === 'MLC') currency = 'MLC';
+    else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
+    
     let total = 0;
     this.cartItemsWithDetails.forEach(item => {
       if (item.prices && item.prices[currency]) {
