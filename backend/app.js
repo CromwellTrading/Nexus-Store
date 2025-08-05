@@ -101,7 +101,7 @@ app.get('/api/admin/ids', (req, res) => {
 });
 
 // ==================================================
-// Rutas de perfil de usuario
+// Rutas de perfil de usuario (MODIFICADAS PARA SOPORTAR ADMINCARDS)
 // ==================================================
 
 app.get('/api/users/:userId', async (req, res) => {
@@ -111,7 +111,7 @@ app.get('/api/users/:userId', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('profile_data')
+      .select('profile_data, admin_phone, admin_cards')
       .eq('id', userId)
       .single();
 
@@ -120,8 +120,19 @@ app.get('/api/users/:userId', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Combinar los campos en un solo objeto de perfil
+    const profileData = {
+      ...(data.profile_data || {}),
+      adminPhone: data.admin_phone || null,
+      adminCards: data.admin_cards || {
+        bpa: "",
+        bandec: "",
+        mlc: ""
+      }
+    };
+
     console.log(`✅ Perfil obtenido para ${userId}`);
-    res.json(data.profile_data || {});
+    res.json(profileData);
   } catch (error) {
     console.error('💥 Error en GET /api/users/:userId:', {
       error: error.message,
@@ -137,11 +148,26 @@ app.put('/api/users/:userId', async (req, res) => {
   console.log(`✏️ PUT perfil solicitado para usuario: ${userId}`, profileData);
 
   try {
+    // Extraer campos específicos para almacenamiento separado
+    const adminPhone = profileData.adminPhone || null;
+    const adminCards = profileData.adminCards || {
+      bpa: "",
+      bandec: "",
+      mlc: ""
+    };
+
+    // Eliminar campos específicos para evitar duplicación
+    const cleanProfileData = { ...profileData };
+    delete cleanProfileData.adminPhone;
+    delete cleanProfileData.adminCards;
+
     const { data, error } = await supabase
       .from('users')
       .upsert({
         id: userId,
-        profile_data: profileData,
+        profile_data: cleanProfileData,
+        admin_phone: adminPhone,
+        admin_cards: adminCards,
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' })
       .select()
@@ -152,8 +178,15 @@ app.put('/api/users/:userId', async (req, res) => {
       throw error;
     }
     
+    // Construir respuesta combinando todos los campos
+    const responseData = {
+      ...(data.profile_data || {}),
+      adminPhone: data.admin_phone,
+      adminCards: data.admin_cards
+    };
+
     console.log(`✅ Perfil guardado para ${userId}`);
-    res.json(data.profile_data);
+    res.json(responseData);
   } catch (error) {
     console.error('💥 Error en PUT /api/users/:userId:', {
       error: error.message,
@@ -477,11 +510,10 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
     
     if (count > 0) {
       console.log('✅ Carrito vaciado con éxito');
-      res.json({ success: true });
     } else {
       console.log('⚠️ Carrito no encontrado');
-      res.status(404).json({ error: 'Carrito no encontrado' });
     }
+    res.json({ success: true });
   } catch (error) {
     console.error('💥 Error en POST /api/cart/clear/:userId:', {
       error: error.message,
