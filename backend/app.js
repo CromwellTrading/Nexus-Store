@@ -159,7 +159,19 @@ app.post('/api/checkout', async (req, res) => {
     }
 
     const userData = { fullName, ci, phone, address, province };
-    const parsedRequiredFields = requiredFields ? JSON.parse(requiredFields) : {};
+    
+    // Procesar campos requeridos
+    const parsedRequiredFields = {};
+    if (requiredFields) {
+      try {
+        const fields = JSON.parse(requiredFields);
+        Object.entries(fields).forEach(([key, value]) => {
+          parsedRequiredFields[key] = value;
+        });
+      } catch (e) {
+        console.error('Error parsing required fields', e);
+      }
+    }
 
     // 3. Obtener carrito
     console.log('[CHECKOUT] Obteniendo carrito...');
