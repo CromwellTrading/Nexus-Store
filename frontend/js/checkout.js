@@ -1,5 +1,3 @@
-// checkout.js
-
 const CheckoutSystem = {
   selectedMethodPrices: {},
   cartItemsWithDetails: [],
@@ -129,8 +127,8 @@ const CheckoutSystem = {
               </div>
             </div>
             
-            <!-- Sección de campos requeridos - SIEMPRE presente, pero oculta si no hay campos -->
-            <div id="required-fields-section" style="margin-top: 20px; display: none;">
+            <!-- Sección de campos requeridos - SIEMPRE presente -->
+            <div id="required-fields-section" style="margin-top: 20px;">
               <h4>📝 Datos Requeridos</h4>
               <div id="required-fields-inputs"></div>
             </div>
@@ -511,12 +509,6 @@ const CheckoutSystem = {
           </div>
         `;
       });
-      
-      // Mostrar la sección solo si hay campos
-      const section = document.getElementById('required-fields-section');
-      if (section) {
-        section.style.display = fields.length > 0 ? 'block' : 'none';
-      }
     }
   },
   
