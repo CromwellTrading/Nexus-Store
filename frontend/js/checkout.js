@@ -92,8 +92,7 @@ const CheckoutSystem = {
             <div class="admin-info">
               <p><strong>📌 Realizar transferencia a:</strong></p>
               <div class="account-info">
-                <p id="admin-card-number">Cargando información...</p>
-                <p id="admin-phone-number">Cargando teléfono...</p>
+                <!-- Aquí se mostrarán los datos de pago -->
               </div>
               <p class="warning-note">⚠️ Importante: Debe incluir la prueba de transferencia en el siguiente paso</p>
             </div>
@@ -546,39 +545,50 @@ const CheckoutSystem = {
   },
   
   updatePaymentInfo: function() {
-    const userData = UserProfile.getUserData();
     const method = document.querySelector('input[name="payment-method"]:checked')?.value;
     if (!method) return;
     
+    const adminData = UserProfile.getUserData();
     let cardNumber = '';
-    let phoneNumber = userData.adminPhone || 'Número no disponible';
+    let phoneNumber = adminData.adminPhone || 'Número no disponible';
     
-    if (method === 'Saldo Móvil') {
-      document.getElementById('admin-card-number').textContent = `📱 Teléfono: ${phoneNumber}`;
-      document.getElementById('admin-phone-number').textContent = '';
-    } else {
-      if (userData.adminCards) {
-        switch(method) {
-          case 'BPA': cardNumber = userData.adminCards.bpa || 'Tarjeta no configurada'; break;
-          case 'BANDEC': cardNumber = userData.adminCards.bandec || 'Tarjeta no configurada'; break;
-          case 'MLC': cardNumber = userData.adminCards.mlc || 'Tarjeta no configurada'; break;
-        }
+    // Obtener datos de tarjeta
+    if (adminData.adminCards) {
+      switch(method) {
+        case 'BPA': 
+          cardNumber = adminData.adminCards.bpa || 'Tarjeta no configurada'; 
+          break;
+        case 'BANDEC': 
+          cardNumber = adminData.adminCards.bandec || 'Tarjeta no configurada'; 
+          break;
+        case 'MLC': 
+          cardNumber = adminData.adminCards.mlc || 'Tarjeta no configurada'; 
+          break;
       }
-      
-      document.getElementById('admin-card-number').textContent = `💳 Tarjeta: ${cardNumber}`;
-      document.getElementById('admin-phone-number').textContent = `📱 Teléfono: ${phoneNumber}`;
     }
     
-    // Determinar moneda
+    // Actualizar UI
+    const accountInfo = document.querySelector('.account-info');
+    if (accountInfo) {
+      if (method === 'Saldo Móvil') {
+        accountInfo.innerHTML = `<p>📱 Teléfono: ${phoneNumber}</p>`;
+      } else {
+        accountInfo.innerHTML = `
+          <p>💳 Tarjeta: ${cardNumber}</p>
+          <p>📱 Teléfono: ${phoneNumber}</p>
+        `;
+      }
+    }
+    
+    // Calcular y mostrar total
     let currency = 'CUP';
     if (method === 'MLC') currency = 'MLC';
     else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
     
-    // Calcular el total basado en los precios de los productos para la moneda seleccionada
     let total = 0;
     this.cartItemsWithDetails.forEach(item => {
       if (item.prices && item.prices[currency]) {
-        total += item.prices[currency] * item.quantity;
+        total += parseFloat(item.prices[currency]) * item.quantity;
       }
     });
     
