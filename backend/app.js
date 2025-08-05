@@ -51,6 +51,11 @@ const isAdmin = (req, res, next) => {
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   
+  // Permitir acceso a rutas públicas (perfiles)
+  if (req.path.startsWith('/api/users/')) {
+    return next();
+  }
+
   if (!req.telegramId) return res.status(401).json({ error: 'Se requiere Telegram-ID' });
   if (!adminIds.includes(req.telegramId.toString())) return res.status(403).json({ error: 'Acceso no autorizado' });
   next();
@@ -68,6 +73,66 @@ app.get('/api/admin/ids', (req, res) => {
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
   res.json(adminIds);
+});
+
+// ==================================================
+// Rutas de perfil de usuario
+// ==================================================
+app.get('/api/users/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    console.log(`[Perfil] GET perfil para userId: ${userId}`);
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('profile_data')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error(`[Perfil] Error obteniendo perfil: ${error.message}`);
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    console.log(`[Perfil] Perfil obtenido para ${userId}:`, data.profile_data);
+    res.json(data.profile_data || {});
+  } catch (error) {
+    console.error('[Perfil] Error obteniendo perfil:', error);
+    res.status(500).json({ error: 'Error obteniendo perfil' });
+  }
+});
+
+app.put('/api/users/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const profileData = req.body;
+    console.log(`[Perfil] PUT perfil para userId: ${userId}`, profileData);
+
+    // Actualizar o insertar el usuario
+    const { data, error } = await supabase
+      .from('users')
+      .upsert({
+        id: userId,
+        profile_data: profileData,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`[Perfil] Error guardando perfil: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[Perfil] Perfil guardado para ${userId}:`, data.profile_data);
+    res.json(data.profile_data);
+  } catch (error) {
+    console.error('[Perfil] Error guardando perfil:', error);
+    res.status(500).json({ 
+      error: 'Error guardando perfil',
+      details: error.message 
+    });
+  }
 });
 
 // Ruta para subir imágenes
