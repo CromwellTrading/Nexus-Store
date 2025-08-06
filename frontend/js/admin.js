@@ -117,6 +117,9 @@ const AdminSystem = {
             <h3>📦 Gestionar Productos</h3>
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
+              <!-- Campo oculto para ID del producto -->
+              <input type="hidden" id="product-id">
+              
               <div class="form-group">
                 <label>📦 Tipo de Producto:</label>
                 <div class="tab-selector">
@@ -367,6 +370,7 @@ const AdminSystem = {
       console.log("[AdminSystem] Cancelando creación de producto");
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
+      this.resetProductForm();
     });
     
     document.getElementById('add-category-btn').addEventListener('click', () => {
@@ -420,6 +424,7 @@ const AdminSystem = {
   
   saveProduct: async function() {
     console.log("[AdminSystem] Iniciando guardado de producto...");
+    const productId = document.getElementById('product-id').value;
     const type = this.productType;
     const name = document.getElementById('product-name').value;
     const description = document.getElementById('product-description').value;
@@ -541,10 +546,15 @@ const AdminSystem = {
         });
       }
       
-      // Guardar el producto
-      console.log("[AdminSystem] Enviando datos del producto al backend...");
-      const response = await fetch(`${window.API_BASE_URL}/api/admin/products`, {
-        method: 'POST',
+      // Determinar si es creación o actualización
+      const method = productId ? 'PUT' : 'POST';
+      const url = productId 
+        ? `${window.API_BASE_URL}/api/admin/products/${productId}`
+        : `${window.API_BASE_URL}/api/admin/products`;
+      
+      console.log(`[AdminSystem] Enviando datos (${method}) al backend...`);
+      const response = await fetch(url, {
+        method: method,
         headers: { 
           'Content-Type': 'application/json',
           'Telegram-ID': this.telegramUserId.toString()
@@ -561,11 +571,14 @@ const AdminSystem = {
         throw new Error(`Error ${response.status}: ${errorBody}`);
       }
       
-      console.log("[AdminSystem] Producto creado exitosamente");
-      alert('✅ Producto creado correctamente!');
+      const action = productId ? 'actualizado' : 'creado';
+      console.log(`[AdminSystem] Producto ${action} exitosamente`);
+      alert(`✅ Producto ${action} correctamente!`);
+      
       this.renderProductsList();
       document.getElementById('product-form').style.display = 'none';
       document.getElementById('add-product-btn').style.display = 'block';
+      this.resetProductForm();
     } catch (error) {
       console.error('[AdminSystem] Error al guardar el producto:', error);
       alert('Error al guardar el producto: ' + error.message);
@@ -685,6 +698,12 @@ const AdminSystem = {
         form.style.display = 'block';
         document.getElementById('add-product-btn').style.display = 'none';
         
+        // Establecer ID del producto
+        document.getElementById('product-id').value = product.id;
+        
+        // Cambiar texto del botón a "Actualizar"
+        document.getElementById('save-product').textContent = '🔄 Actualizar Producto';
+        
         this.productType = product.type;
         document.querySelectorAll('.type-tab').forEach(tab => {
           tab.classList.toggle('active', tab.dataset.type === product.type);
@@ -720,6 +739,13 @@ const AdminSystem = {
             });
           }
           
+          // Añadir mensaje informativo
+          preview.innerHTML += `
+            <div style="font-size: 12px; color: #666; margin-top: 10px;">
+              Las imágenes existentes se mantendrán. Sube nuevas solo si quieres reemplazarlas.
+            </div>
+          `;
+          
           if (product.has_color_variant && product.colors) {
             const container = document.getElementById('color-variants-container');
             container.innerHTML = '';
@@ -748,6 +774,13 @@ const AdminSystem = {
             imgEl.style.objectFit = 'contain';
             preview.appendChild(imgEl);
           }
+          
+          // Añadir mensaje informativo
+          preview.innerHTML += `
+            <div style="font-size: 12px; color: #666; margin-top: 10px;">
+              La imagen existente se mantendrá. Sube una nueva solo si quieres reemplazarla.
+            </div>
+          `;
           
           const container = document.getElementById('required-fields-container');
           container.innerHTML = '';
@@ -1152,6 +1185,11 @@ const AdminSystem = {
   
   resetProductForm: function() {
     console.log("[AdminSystem] Reseteando formulario de producto");
+    // Limpiar ID y restaurar texto del botón
+    document.getElementById('product-id').value = '';
+    document.getElementById('save-product').textContent = '💾 Guardar Producto';
+    
+    // Limpiar otros campos
     document.getElementById('product-name').value = '';
     document.getElementById('product-description').value = '';
     document.getElementById('product-details').value = '';
