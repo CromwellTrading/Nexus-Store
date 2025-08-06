@@ -388,7 +388,7 @@ app.get('/api/products/:type', async (req, res) => {
       .select(`
         id, type, name, description, details, prices, images, 
         has_color_variant, colors, required_fields, date_created,
-        categories!inner(name)
+        categories:category_id!inner(name)
       `)
       .eq('type', type);
     
@@ -414,7 +414,7 @@ app.get('/api/products/:type/:id', async (req, res) => {
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('*, categories!inner(name)')
+      .select('*, categories:category_id!inner(name)')
       .eq('type', type)
       .eq('id', id)
       .single();
@@ -486,6 +486,11 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
 
 app.post('/api/admin/products', isAdmin, async (req, res) => {
   const { type, categoryId, product } = req.body;
+
+  // Validación básica
+  if (!type || !categoryId || !product) {
+    return res.status(400).json({ error: 'Faltan campos requeridos' });
+  }
   
   try {
     const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -502,8 +507,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       has_color_variant: product.has_color_variant || false,
       colors: product.colors || null,
       required_fields: product.required_fields || null,
-      date_created: new Date().toISOString(),
-      tab_type: type
+      date_created: new Date().toISOString()
     };
 
     const { data, error } = await supabase
@@ -520,14 +524,14 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
   }
 });
 
-// Ruta para obtener un producto específico (ADMIN) - ¡ESTA ES LA RUTA CRÍTICA QUE FALTABA!
+// Ruta para obtener un producto específico (ADMIN)
 app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
   
   try {
     const { data: product, error } = await supabase
       .from('products')
-      .select('*, categories (id, name)')
+      .select('*, categories:category_id (id, name)')
       .eq('id', productId)
       .single();
 
@@ -589,7 +593,7 @@ app.get('/api/admin/products', isAdmin, async (req, res) => {
   try {
     const { data: products, error } = await supabase
       .from('products')
-      .select('*, categories (id, name)');
+      .select('*, categories:category_id (id, name)');
     
     if (error) throw error;
     
@@ -826,7 +830,7 @@ app.listen(PORT, () => {
   console.log(`- GET /api/products/:type`);
   console.log(`- GET /api/products/:type/:id`);
   console.log(`- PUT /api/admin/products/:id`);
-  console.log(`- GET /api/admin/products/:id`); // Nueva ruta crítica
+  console.log(`- GET /api/admin/products/:id`);
   
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
