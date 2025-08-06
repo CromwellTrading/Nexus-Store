@@ -585,6 +585,11 @@ app.get('/api/products/:type/:id', async (req, res) => {
       .single();
     
     if (error) {
+      // Manejar específicamente el caso de "0 filas"
+      if (error.code === 'PGRST116') {
+        console.log(`⚠️ Producto no encontrado: ${type}/${id}`);
+        return res.status(404).json({ error: 'Producto no encontrado' });
+      }
       console.error('❌ Error al obtener producto:', error);
       throw error;
     }
@@ -791,6 +796,65 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
       error: 'Error creando producto',
       message: error.message,
       details: error.details || null
+    });
+  }
+});
+
+// Ruta para actualizar productos (EDITAR)
+app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
+  const productId = req.params.id;
+  const { type, categoryId, product } = req.body;
+  console.log(`✏️ PUT actualizar producto - ID: ${productId}, Tipo: ${type}`);
+
+  try {
+    // Verificar que la categoría existe
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', categoryId)
+      .single();
+    
+    if (categoryError || !category) {
+      console.error('❌ Categoría inválida:', categoryError);
+      return res.status(400).json({ error: 'Categoría inválida' });
+    }
+
+    // Actualizar el producto
+    const { data, error } = await supabase
+      .from('products')
+      .update({
+        type,
+        category_id: categoryId,
+        name: product.name,
+        description: product.description,
+        details: product.details || null,
+        prices: product.prices,
+        images: product.images || [],
+        has_color_variant: product.has_color_variant || false,
+        colors: product.colors || null,
+        required_fields: product.required_fields || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error al actualizar producto:', error);
+      throw error;
+    }
+    
+    console.log('✅ Producto actualizado con éxito');
+    res.json(data);
+  } catch (error) {
+    console.error('💥 Error en PUT /api/admin/products/:id:', {
+      error: error.message,
+      productId,
+      product
+    });
+    res.status(500).json({ 
+      error: 'Error actualizando producto',
+      details: error.message 
     });
   }
 });
@@ -1144,6 +1208,7 @@ app.listen(PORT, () => {
   console.log(`- GET /api/admin/orders`);
   console.log(`- GET /api/admin/orders/:orderId`);
   console.log(`- PUT /api/admin/orders/:orderId`);
+  console.log(`- PUT /api/admin/products/:id`); // Nuevo endpoint para editar productos
   
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
