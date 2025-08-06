@@ -520,6 +520,38 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
   }
 });
 
+// Ruta para obtener un producto específico (ADMIN) - ¡ESTA ES LA RUTA CRÍTICA QUE FALTABA!
+app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
+  const productId = req.params.id;
+  
+  try {
+    const { data: product, error } = await supabase
+      .from('products')
+      .select('*, categories (id, name)')
+      .eq('id', productId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Producto no encontrado' });
+      }
+      throw error;
+    }
+
+    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
+    
+    const formattedProduct = {
+      ...product,
+      category: product.categories ? product.categories.name : 'Sin categoría'
+    };
+    
+    res.json(formattedProduct);
+  } catch (error) {
+    console.error('💥 Error en GET /api/admin/products/:id:', error);
+    res.status(500).json({ error: 'Error obteniendo producto' });
+  }
+});
+
 // Ruta para actualizar productos (EDITAR)
 app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
@@ -793,7 +825,8 @@ app.listen(PORT, () => {
   console.log('🛜 Endpoints disponibles:');
   console.log(`- GET /api/products/:type`);
   console.log(`- GET /api/products/:type/:id`);
-  console.log(`- PUT /api/admin/products/:id`); // Endpoint para editar productos
+  console.log(`- PUT /api/admin/products/:id`);
+  console.log(`- GET /api/admin/products/:id`); // Nueva ruta crítica
   
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
