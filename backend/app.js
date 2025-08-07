@@ -7,7 +7,6 @@ import TelegramBot from 'node-telegram-bot-api';
 import fileUpload from 'express-fileupload';
 import ImageKit from 'imagekit';
 
-// Configuración inicial
 console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
 console.log('🕒 Hora de inicio:', new Date().toISOString());
 console.log('🔌 Conectando a Supabase...');
@@ -15,14 +14,12 @@ console.log('🔌 Conectando a Supabase...');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Configuración de Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 console.log('✅ Supabase conectado');
 
-// Configuración de ImageKit
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
@@ -30,14 +27,14 @@ const imagekit = new ImageKit({
 });
 console.log('🖼️ ImageKit configurado');
 
-// Middlewares
 console.log('🛠️ Configurando middlewares...');
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(fileUpload({
   limits: { fileSize: 5 * 1024 * 1024 },
   abortOnLimit: true
@@ -51,7 +48,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware de administrador simplificado
 const isAdmin = (req, res, next) => {
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
@@ -71,7 +67,6 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
-// Rutas básicas
 app.get('/', (req, res) => {
   console.log('🏠 Petición a endpoint raíz');
   res.send('Backend Nexus Store funcionando');
@@ -94,10 +89,6 @@ app.get('/api/admin/ids', (req, res) => {
     : [];
   res.json(adminIds);
 });
-
-// ==================================================
-// Rutas de perfil de usuario
-// ==================================================
 
 app.get('/api/users/:userId', async (req, res) => {
   const userId = req.params.userId;
@@ -188,7 +179,6 @@ app.put('/api/users/:userId', async (req, res) => {
   }
 });
 
-// Ruta para subir imágenes
 app.post('/api/upload-image', isAdmin, async (req, res) => {
   console.log('🖼️ Solicitud de subida de imagen recibida');
   
@@ -224,10 +214,6 @@ app.post('/api/upload-image', isAdmin, async (req, res) => {
     res.status(500).json({ error: 'Error subiendo imagen' });
   }
 });
-
-// ==================================================
-// Rutas de carrito
-// ==================================================
 
 app.get('/api/cart/:userId', async (req, res) => {
   const userId = req.params.userId;
@@ -375,10 +361,6 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
   }
 });
 
-// ==================================================
-// Rutas de productos
-// ==================================================
-
 app.get('/api/products/:type', async (req, res) => {
   const type = req.params.type;
   
@@ -434,10 +416,6 @@ app.get('/api/products/:type/:id', async (req, res) => {
   }
 });
 
-// ==================================================
-// Rutas de administración
-// ==================================================
-
 app.get('/api/admin/categories', isAdmin, async (req, res) => {
   try {
     const { data: categories, error } = await supabase.from('categories').select('*');
@@ -487,7 +465,6 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
 app.post('/api/admin/products', isAdmin, async (req, res) => {
   const { type, categoryId, product } = req.body;
 
-  // Validación básica
   if (!type || !categoryId || !product) {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
   }
@@ -524,7 +501,6 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
   }
 });
 
-// Ruta para obtener un producto específico (ADMIN)
 app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
   
@@ -556,7 +532,6 @@ app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
   }
 });
 
-// Ruta para actualizar productos (EDITAR)
 app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
   const { type, categoryId, product } = req.body;
@@ -642,10 +617,6 @@ app.get('/api/categories/:type', async (req, res) => {
     res.status(500).json({ error: 'Error obteniendo categorías' });
   }
 });
-
-// ==================================================
-// Rutas de pedidos
-// ==================================================
 
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
@@ -800,9 +771,152 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   }
 });
 
-// ==================================================
-// Keep-Alive: Ping automático cada 5 minutos
-// ==================================================
+app.post('/api/checkout', async (req, res) => {
+  console.log('🛒 Procesando pedido...');
+  
+  try {
+    const userId = req.headers['telegram-id'];
+    if (!userId) {
+      return res.status(401).json({ error: 'No se pudo identificar el usuario' });
+    }
+
+    const formData = req.body;
+    const imageFile = req.files?.image;
+    
+    if (!formData.paymentMethod || !formData.total) {
+      return res.status(400).json({ error: 'Faltan datos esenciales' });
+    }
+
+    if (formData.paymentMethod !== 'Saldo Móvil' && !imageFile) {
+      return res.status(400).json({ error: 'Se requiere comprobante de transferencia' });
+    }
+
+    let proofUrl = '';
+    if (imageFile) {
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const maxSize = 5 * 1024 * 1024;
+      
+      if (!validTypes.includes(imageFile.mimetype)) {
+        return res.status(400).json({ error: 'Formato de imagen inválido' });
+      }
+      
+      if (imageFile.size > maxSize) {
+        return res.status(400).json({ 
+          error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB)` 
+        });
+      }
+
+      const uploadResponse = await imagekit.upload({
+        file: imageFile.data,
+        fileName: `transfer_${Date.now()}.${imageFile.name.split('.').pop()}`,
+        useUniqueFileName: true
+      });
+      proofUrl = uploadResponse.url;
+    }
+
+    const orderId = `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+    const orderData = {
+      id: orderId,
+      user_id: userId,
+      total: parseFloat(formData.total),
+      status: 'Pendiente',
+      user_data: {
+        fullName: formData.fullName,
+        ci: formData.ci,
+        phone: formData.phone,
+        address: formData.address,
+        province: formData.province
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert([orderData])
+      .select()
+      .single();
+    
+    if (orderError) throw orderError;
+
+    const paymentDetails = {
+      order_id: orderId,
+      payment_method: formData.paymentMethod,
+      transfer_data: {
+        proof_url: proofUrl
+      },
+      recipient_data: formData.recipientName ? {
+        name: formData.recipientName,
+        ci: formData.recipientCi,
+        phone: formData.recipientPhone
+      } : null,
+      required_fields: formData.requiredFields ? JSON.parse(formData.requiredFields) : {}
+    };
+
+    const { error: detailsError } = await supabase
+      .from('order_details')
+      .insert([paymentDetails]);
+    
+    if (detailsError) throw detailsError;
+
+    const { data: cart, error: cartError } = await supabase
+      .from('carts')
+      .select('items')
+      .eq('user_id', userId)
+      .single();
+    
+    if (cartError) throw cartError;
+
+    const orderItems = [];
+    for (const item of cart.items) {
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('name, prices, images')
+        .eq('id', item.productId)
+        .single();
+      
+      if (productError) throw productError;
+
+      let price;
+      if (formData.paymentMethod === 'MLC') {
+        price = product.prices.MLC || 0;
+      } else if (formData.paymentMethod === 'Saldo Móvil') {
+        price = product.prices['Saldo Móvil'] || 0;
+      } else {
+        price = product.prices.CUP || 0;
+      }
+
+      orderItems.push({
+        order_id: orderId,
+        product_id: item.productId,
+        product_name: product.name,
+        quantity: item.quantity,
+        price: price,
+        image_url: product.images[0] || '',
+        tab_type: item.tabType
+      });
+    }
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems);
+    
+    if (itemsError) throw itemsError;
+
+    await supabase
+      .from('carts')
+      .delete()
+      .eq('user_id', userId);
+
+    console.log(`✅ Pedido ${orderId} creado exitosamente`);
+    res.json({ orderId, status: 'Pendiente', total: formData.total, proofUrl });
+    
+  } catch (error) {
+    console.error('💥 Error en POST /api/checkout:', error);
+    res.status(500).json({ error: 'Error procesando pedido', details: error.message });
+  }
+});
 
 if (process.env.TELEGRAM_BOT_TOKEN) {
   const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
@@ -820,17 +934,14 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
   }, 5 * 60 * 1000);
 }
 
-// ==================================================
-// Inicio del servidor
-// ==================================================
-
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
   console.log('🛜 Endpoints disponibles:');
   console.log(`- GET /api/products/:type`);
   console.log(`- GET /api/products/:type/:id`);
-  console.log(`- PUT /api/admin/products/:id`);
-  console.log(`- GET /api/admin/products/:id`);
+  console.log(`- POST /api/checkout`);
+  console.log(`- GET /api/orders/user/:userId`);
+  console.log(`- GET /api/admin/orders`);
   
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
