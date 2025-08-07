@@ -1,215 +1,168 @@
-const OrdersSystem = {
-  orders: [],
-  isLoading: false,
-  
-  init: async function() {
-    try {
-      console.log("[OrdersSystem] Iniciando inicialización...");
-      this.setupEventListeners();
-      await this.loadOrders();
-      console.log("[OrdersSystem] Inicializado correctamente");
-      return true;
-    } catch (error) {
-      console.error("[OrdersSystem] Error en init:", error);
-      return false;
-    }
-  },
-  
-  setupEventListeners: function() {
-    console.log("[OrdersSystem] Configurando event listeners...");
-    document.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-view-order')) {
-        const orderId = e.target.dataset.id;
-        const order = this.orders.find(o => o.id === orderId);
-        if (order) this.showOrderDetails(order);
-      }
-    });
-  },
-  
-  loadOrders: async function() {
-    try {
-      console.log("[OrdersSystem] Cargando pedidos...");
-      
-      if (this.isLoading) {
-        console.log("[OrdersSystem] Ya se está cargando, omitiendo...");
-        return;
-      }
-      
-      this.isLoading = true;
-      const userId = UserProfile.getTelegramUserId();
-      
-      if (!userId) {
-        console.error("[OrdersSystem] No hay ID de usuario");
-        this.isLoading = false;
-        return;
-      }
+const OrdersSystem = (function() {
+    let orders = [];
+    let isModalOpen = false;
 
-      const response = await fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`);
-      
-      // Verificar si la respuesta es exitosa
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[OrdersSystem] Respuesta no OK:", response.status, errorText);
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-      
-      const orders = await response.json();
-      console.log("[OrdersSystem] Pedidos recibidos:", orders);
-      
-      // Verificar que orders es un array
-      if (!Array.isArray(orders)) {
-        console.error("[OrdersSystem] La respuesta de pedidos no es un array:", orders);
-        this.orders = [];
-      } else {
-        this.orders = orders;
-      }
-      
-      this.renderOrders();
-      this.isLoading = false;
-    } catch (error) {
-      console.error("[OrdersSystem] Error cargando pedidos:", error);
-      Notifications.showNotification("Error", "No se pudieron cargar los pedidos");
-      this.isLoading = false;
+    async function fetchUserOrders(userId) {
+        console.log(`[Frontend] Solicitando pedidos para usuario: ${userId}`);
+        try {
+            const response = await fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[Frontend] Error en respuesta HTTP: ${response.status} - ${errorText}`);
+                throw new Error(`Error HTTP: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`[Frontend] Pedidos recibidos:`, data);
+            return data;
+        } catch (error) {
+            console.error(`[Frontend] Error obteniendo pedidos: ${error.message}`);
+            throw error;
+        }
     }
-  },
-  
-  renderOrders: function() {
-    const container = document.getElementById('orders-container');
-    if (!container) return;
-    
-    if (!this.orders || this.orders.length === 0) {
-      container.innerHTML = '<p class="no-orders">No tienes pedidos registrados</p>';
-      return;
+
+    function renderOrdersModal(ordersData) {
+        console.log(`[Frontend] Renderizando modal con ${ordersData.length} pedidos`);
+        const modal = document.getElementById('product-modal');
+        modal.innerHTML = '';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        
+        // Verificar si hay pedidos
+        if (!ordersData || ordersData.length === 0) {
+            modalContent.innerHTML = `
+                <h2>Mis Pedidos</h2>
+                <p>No tienes pedidos aún</p>
+                <button class="close-modal">Cerrar</button>
+            `;
+        } else {
+            modalContent.innerHTML = `
+                <h2>Mis Pedidos</h2>
+                <div class="orders-container">
+                    ${ordersData.map(order => `
+                        <div class="order-card">
+                            <h3>Pedido #${order.id}</h3>
+                            <p><strong>Total:</strong> $${order.total.toFixed(2)}</p>
+                            <p><strong>Estado:</strong> ${order.status}</p>
+                            <p><strong>Fecha:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+                            <button class="view-order-details" data-order-id="${order.id}">Ver Detalles</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button class="close-modal">Cerrar</button>
+            `;
+        }
+
+        modal.appendChild(modalContent);
+        modal.style.display = 'flex';
+
+        // Event listeners para los botones de detalles
+        modalContent.querySelectorAll('.view-order-details').forEach(button => {
+            button.addEventListener('click', function() {
+                const orderId = this.getAttribute('data-order-id');
+                renderOrderDetailsModal(orderId);
+            });
+        });
+
+        // Event listener para cerrar el modal
+        modalContent.querySelector('.close-modal').addEventListener('click', function() {
+            modal.style.display = 'none';
+            isModalOpen = false;
+        });
     }
-    
-    container.innerHTML = this.orders.map(order => {
-      // Asegurar que order.items existe y es un array
-      const orderItems = order.items || [];
-      const itemsPreview = orderItems.slice(0, 3).map(item => {
-        return `
-          <div class="order-item-preview">
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}">` : ''}
-            <span>${item.product_name || 'Producto'} x${item.quantity}</span>
-          </div>
+
+    function renderOrderDetailsModal(orderId) {
+        console.log(`[Frontend] Renderizando detalles del pedido: ${orderId}`);
+        const order = orders.find(o => o.id === orderId);
+        if (!order) {
+            alert('Pedido no encontrado');
+            return;
+        }
+
+        const modal = document.getElementById('product-modal');
+        modal.innerHTML = '';
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.innerHTML = `
+            <h2>Detalles del Pedido #${order.id}</h2>
+            <p><strong>Estado:</strong> ${order.status}</p>
+            <p><strong>Total:</strong> $${order.total.toFixed(2)}</p>
+            <p><strong>Fecha:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+            
+            <h3>Productos</h3>
+            <ul class="order-items">
+                ${order.items.map(item => `
+                    <li>
+                        <img src="${item.image_url}" alt="${item.product_name}" width="50">
+                        <span>${item.product_name} (x${item.quantity}) - $${item.price.toFixed(2)}</span>
+                    </li>
+                `).join('')}
+            </ul>
+            
+            <h3>Datos de Envío</h3>
+            <p><strong>Nombre:</strong> ${order.userData.fullName}</p>
+            <p><strong>CI:</strong> ${order.userData.ci}</p>
+            <p><strong>Teléfono:</strong> ${order.userData.phone}</p>
+            <p><strong>Dirección:</strong> ${order.userData.address}, ${order.userData.province}</p>
+            
+            <button class="close-modal">Volver</button>
         `;
-      }).join('');
-      
-      return `
-        <div class="order-card">
-          <div class="order-header">
-            <span class="order-id">Pedido #${order.id}</span>
-            <span class="order-status ${order.status.toLowerCase()}">${order.status}</span>
-          </div>
-          
-          <div class="order-date">
-            ${new Date(order.createdAt).toLocaleDateString()}
-          </div>
-          
-          <div class="order-total">
-            Total: $${order.total?.toFixed(2) || '0.00'}
-          </div>
-          
-          <div class="order-items-preview">
-            ${itemsPreview}
-          </div>
-          
-          <button class="btn-view-order" data-id="${order.id}">
-            Ver detalles
-          </button>
-        </div>
-      `;
-    }).join('');
-  },
-  
-  showOrderDetails: function(order) {
-    const modal = document.getElementById('product-modal');
-    
-    let itemsHTML = '';
-    const orderItems = order.items || [];
-    orderItems.forEach(item => {
-      itemsHTML += `
-        <div class="order-item-detail">
-          <div class="product-image">
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}">` : ''}
-          </div>
-          <div class="product-info">
-            <div class="product-name">${item.product_name || 'Producto'}</div>
-            <div class="product-quantity">Cantidad: ${item.quantity}</div>
-            <div class="product-price">Precio: $${item.price?.toFixed(2) || '0.00'}</div>
-          </div>
-        </div>
-      `;
-    });
-    
-    let paymentHTML = '';
-    if (order.payment && order.payment.method) {
-      paymentHTML = `
-        <div class="payment-info">
-          <h3>💳 Información de Pago</h3>
-          <p><strong>Método:</strong> ${order.payment.method}</p>
-          ${order.payment.proof_url ? `<p><strong>Comprobante:</strong> <a href="${order.payment.proof_url}" target="_blank">Ver imagen</a></p>` : ''}
-        </div>
-      `;
+
+        modal.appendChild(modalContent);
+
+        // Event listener para cerrar el modal
+        modalContent.querySelector('.close-modal').addEventListener('click', function() {
+            renderOrdersModal(orders);
+        });
     }
 
-    let requiredFieldsHTML = '';
-    if (order.requiredFields && Object.keys(order.requiredFields).length > 0) {
-      requiredFieldsHTML = `
-        <div class="required-fields-info">
-          <h4>📝 Campos Requeridos</h4>
-          ${Object.entries(order.requiredFields).map(([key, value]) => `
-            <div class="field-row">
-              <strong>${key}:</strong> 
-              <span>${value || 'No proporcionado'}</span>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-    
-    modal.innerHTML = `
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>📋 Detalles del Pedido #${order.id}</h2>
-          <button class="close-modal">&times;</button>
-        </div>
-        <div class="order-details-content">
-          <div class="order-info">
-            <p><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
-            <p><strong>🔄 Estado:</strong> <span class="status-${order.status.toLowerCase()}">${order.status}</span></p>
-            <p><strong>💰 Total:</strong> $${order.total?.toFixed(2) || '0.00'}</p>
-          </div>
-          
-          <div class="customer-info">
-            <h3>👤 Información del Cliente</h3>
-            <p><strong>Nombre:</strong> ${order.userData?.fullName || 'No especificado'}</p>
-            <p><strong>CI:</strong> ${order.userData?.ci || 'No especificado'}</p>
-            <p><strong>Teléfono:</strong> ${order.userData?.phone || 'No especificado'}</p>
-            <p><strong>Dirección:</strong> ${order.userData?.address || 'No especificado'}, ${order.userData?.province || ''}</p>
-          </div>
-          
-          ${paymentHTML}
-          
-          ${requiredFieldsHTML}
-          
-          <div class="order-items">
-            <h3>🛒 Productos</h3>
-            <div class="items-list">
-              ${itemsHTML}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    modal.style.display = 'flex';
-    
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-  }
-};
+    return {
+        init: async function() {
+            console.log('[Frontend] Sistema de pedidos inicializado');
+        },
 
-document.addEventListener('DOMContentLoaded', () => {
-  OrdersSystem.init();
-});
+        openOrdersModal: async function() {
+            console.log('[Frontend] Abriendo modal de pedidos...');
+            try {
+                const userId = UserProfile.getUserId();
+                console.log('[Frontend] ID de usuario obtenido:', userId);
+                
+                if (!userId) {
+                    console.error('[Frontend] Error: ID de usuario no disponible');
+                    alert('No se pudo identificar al usuario');
+                    return;
+                }
+                
+                isModalOpen = true;
+                
+                // Mostrar indicador de carga
+                const modal = document.getElementById('product-modal');
+                modal.innerHTML = '<div class="modal-content"><p>Cargando pedidos...</p></div>';
+                modal.style.display = 'flex';
+                
+                orders = await fetchUserOrders(userId);
+                renderOrdersModal(orders);
+            } catch (error) {
+                console.error('[Frontend] Error al abrir modal de pedidos:', error);
+                
+                // Mostrar error en el modal
+                const modal = document.getElementById('product-modal');
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <h2>Error</h2>
+                        <p>No se pudieron cargar los pedidos: ${error.message}</p>
+                        <button class="close-modal">Cerrar</button>
+                    </div>
+                `;
+                modal.style.display = 'flex';
+                
+                modal.querySelector('.close-modal').addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+        }
+    };
+})();
