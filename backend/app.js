@@ -618,6 +618,10 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
+// ==================================================
+// Rutas de pedidos (CORREGIDAS)
+// ==================================================
+
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
   
@@ -631,29 +635,35 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items (product_name, quantity, price, image_url, tab_type)
       `)
       .eq('user_id', userId);
     
     if (error) throw error;
     
-    const parsedOrders = orders.map(order => ({
-      id: order.id,
-      userId,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      userData: order.user_data,
-      payment: {
-        method: order.order_details[0].payment_method,
-        ...order.order_details[0].transfer_data
-      },
-      recipient: order.order_details[0].recipient_data,
-      requiredFields: order.order_details[0].required_fields,
-      items: order.order_items
-    }));
+    const parsedOrders = orders.map(order => {
+      const orderDetail = order.order_details && order.order_details.length > 0 
+        ? order.order_details[0] 
+        : null;
+      
+      return {
+        id: order.id,
+        userId,
+        total: order.total,
+        status: order.status,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        userData: order.user_data,
+        payment: orderDetail ? {
+          method: orderDetail.payment_method,
+          ...(orderDetail.transfer_data || {})
+        } : null,
+        recipient: orderDetail ? orderDetail.recipient_data : null,
+        requiredFields: orderDetail ? orderDetail.required_fields : null,
+        items: order.order_items || []
+      };
+    });
     
     res.json(parsedOrders);
   } catch (error) {
@@ -674,28 +684,34 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items (product_name, quantity, price, image_url, tab_type)
       `);
     
     if (error) throw error;
     
-    const parsedOrders = orders.map(order => ({
-      id: order.id,
-      userId: order.user_id,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      userData: order.user_data,
-      payment: {
-        method: order.order_details[0].payment_method,
-        ...order.order_details[0].transfer_data
-      },
-      recipient: order.order_details[0].recipient_data,
-      requiredFields: order.order_details[0].required_fields,
-      items: order.order_items
-    }));
+    const parsedOrders = orders.map(order => {
+      const orderDetail = order.order_details && order.order_details.length > 0 
+        ? order.order_details[0] 
+        : null;
+      
+      return {
+        id: order.id,
+        userId: order.user_id,
+        total: order.total,
+        status: order.status,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        userData: order.user_data,
+        payment: orderDetail ? {
+          method: orderDetail.payment_method,
+          ...(orderDetail.transfer_data || {})
+        } : null,
+        recipient: orderDetail ? orderDetail.recipient_data : null,
+        requiredFields: orderDetail ? orderDetail.required_fields : null,
+        items: order.order_items || []
+      };
+    });
     
     res.json(parsedOrders);
   } catch (error) {
@@ -718,14 +734,18 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details!inner (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items!inner (product_name, quantity, price, image_url, tab_type)
+        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
+        order_items:order_items (product_name, quantity, price, image_url, tab_type)
       `)
       .eq('id', orderId)
       .single();
     
     if (error) throw error;
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+    
+    const orderDetail = order.order_details && order.order_details.length > 0 
+      ? order.order_details[0] 
+      : null;
     
     const parsedOrder = {
       id: order.id,
@@ -735,13 +755,13 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       userData: order.user_data,
-      payment: {
-        method: order.order_details[0].payment_method,
-        ...order.order_details[0].transfer_data
-      },
-      recipient: order.order_details[0].recipient_data,
-      requiredFields: order.order_details[0].required_fields,
-      items: order.order_items
+      payment: orderDetail ? {
+        method: orderDetail.payment_method,
+        ...(orderDetail.transfer_data || {})
+      } : null,
+      recipient: orderDetail ? orderDetail.recipient_data : null,
+      requiredFields: orderDetail ? orderDetail.required_fields : null,
+      items: order.order_items || []
     };
     
     res.json(parsedOrder);
@@ -939,9 +959,10 @@ app.listen(PORT, () => {
   console.log('🛜 Endpoints disponibles:');
   console.log(`- GET /api/products/:type`);
   console.log(`- GET /api/products/:type/:id`);
+  console.log(`- PUT /api/admin/products/:id`);
+  console.log(`- GET /api/admin/products/:id`);
   console.log(`- POST /api/checkout`);
   console.log(`- GET /api/orders/user/:userId`);
-  console.log(`- GET /api/admin/orders`);
   
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
