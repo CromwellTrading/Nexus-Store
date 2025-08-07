@@ -40,21 +40,11 @@ app.use(fileUpload({
   abortOnLimit: true
 }));
 
-// Middleware para obtener el ID de Telegram con logs detallados
 app.use((req, res, next) => {
-  const telegramId = req.headers['telegram-id'] || 
+  req.telegramId = req.headers['telegram-id'] || 
                    req.query.tgid || 
                    req.body.telegramId;
-  
-  console.log(`📩 Petición recibida: ${req.method} ${req.path} | Usuario: ${telegramId || 'No identificado'}`);
-  
-  if (!telegramId) {
-    console.warn('⚠️ Advertencia: Petición sin Telegram-ID');
-  } else {
-    console.log(`🔑 Usuario identificado: ${telegramId}`);
-  }
-  
-  req.telegramId = telegramId;
+  console.log(`📩 Petición recibida: ${req.method} ${req.path} | Usuario: ${req.telegramId || 'No identificado'}`);
   next();
 });
 
@@ -62,8 +52,6 @@ const isAdmin = (req, res, next) => {
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
     : [];
-  
-  console.log(`🔑 Verificando admin para ID: ${req.telegramId}`);
   
   if (!req.telegramId) {
     console.log('🔒 Intento de acceso sin Telegram-ID');
@@ -94,7 +82,7 @@ app.get('/api/admin/health', (req, res) => {
   });
 });
 
-app.get('/api/admin/ids', isAdmin, (req, res) => {
+app.get('/api/admin/ids', (req, res) => {
   console.log('🆔 IDs de admin solicitadas');
   const adminIds = process.env.ADMIN_IDS 
     ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
@@ -630,7 +618,7 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
-// Rutas de pedidos actualizadas
+// Rutas de pedidos actualizadas con estructura unificada
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
   console.log(`🔍 Buscando pedidos para usuario: ${userId}`);
@@ -655,7 +643,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
     // Paso 2: Obtener detalles adicionales para cada orden
     const orderIds = orders.map(order => order.id);
     
-    // Obtener detalles de pago
+    // Obtener detalles de pago y campos requeridos
     const { data: orderDetails, error: detailsError } = await supabase
       .from('order_details')
       .select('order_id, payment_method, transfer_data, recipient_data, required_fields')
@@ -677,7 +665,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
       return res.status(500).json({ error: 'Error obteniendo items de pedidos' });
     }
     
-    // Paso 3: Combinar los datos
+    // Paso 3: Combinar los datos con estructura unificada
     const parsedOrders = orders.map(order => {
       const details = orderDetails.find(d => d.order_id === order.id);
       const items = orderItems.filter(i => i.order_id === order.id);
@@ -687,16 +675,23 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         userId,
         total: order.total,
         status: order.status,
-        createdAt: order.created_at,
-        updatedAt: order.updated_at,
+        createdAt: order.created_at,  // Nombre unificado para frontend
+        updatedAt: order.updated_at,  // Nombre unificado para frontend
         userData: order.user_data,
         payment: {
           method: details?.payment_method || 'No especificado',
-          ...(details?.transfer_data || {})
+          ...(details?.transfer_data || {}),
+          proof_url: details?.transfer_data?.proof_url || '' // Asegurar campo de comprobante
         },
         recipient: details?.recipient_data || null,
         requiredFields: details?.required_fields || null,
-        items: items || []
+        items: items.map(item => ({
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+          image_url: item.image_url,
+          tab_type: item.tab_type
+        })) || []
       };
     });
     
@@ -1042,9 +1037,7 @@ app.listen(PORT, () => {
         inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
       };
       
-      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard })
-        .then(() => console.log(`🤖 Mensaje enviado a: ${userId}`))
-        .catch(err => console.error('❌ Error enviando mensaje:', err));
+      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard });
     });
   }
 });
