@@ -10,7 +10,6 @@ const CheckoutSystem = {
     const isProfileComplete = userData.fullName && userData.ci && userData.phone && userData.address && userData.province;
     const startingStep = isProfileComplete ? 2 : 1;
     
-    // Obtener detalles de los productos del carrito
     this.cartItemsWithDetails = await this.getCartItemsDetails(cart.items);
     
     modal.innerHTML = `
@@ -87,13 +86,11 @@ const CheckoutSystem = {
             <h3>💳 Método de Pago</h3>
             
             <div class="payment-methods" id="payment-methods-container">
-              <!-- Los métodos de pago se generarán dinámicamente -->
             </div>
             
             <div class="admin-info">
               <p><strong>📌 Realizar transferencia a:</strong></p>
               <div class="account-info">
-                <!-- Aquí se mostrarán los datos de pago -->
               </div>
               <p class="warning-note">⚠️ Importante: Debe incluir la prueba de transferencia en el siguiente paso</p>
             </div>
@@ -143,14 +140,8 @@ const CheckoutSystem = {
     
     modal.style.display = 'flex';
     this.setupCheckoutEvents(cart);
-    
-    // Generar métodos de pago disponibles basados en los precios de los productos
     this.generatePaymentMethods();
-    
-    // Mostrar los productos en el resumen
     this.updateOrderSummary();
-    
-    // Verificar si hay campos requeridos y mostrarlos
     const requiredFields = this.getRequiredFields();
     if (requiredFields.length > 0) {
       this.showRequiredFields(requiredFields);
@@ -170,7 +161,7 @@ const CheckoutSystem = {
             ...item,
             name: product.name,
             prices: product.prices,
-            required_fields: product.required_fields || [] // Añadimos los campos requeridos
+            required_fields: product.required_fields || []
           });
         }
       } catch (error) {
@@ -185,12 +176,9 @@ const CheckoutSystem = {
     const container = document.getElementById('payment-methods-container');
     if (!container) return;
     
-    // Determinar qué métodos de pago están disponibles basados en los precios de los productos
     const availableCurrencies = this.getAvailableCurrencies();
-    
     container.innerHTML = '';
     
-    // BPA y BANDEC siempre disponibles para CUP
     if (availableCurrencies.includes('CUP')) {
       container.innerHTML += `
         <div class="payment-method">
@@ -204,7 +192,6 @@ const CheckoutSystem = {
       `;
     }
     
-    // MLC solo disponible si hay productos con precio en MLC
     if (availableCurrencies.includes('MLC')) {
       container.innerHTML += `
         <div class="payment-method">
@@ -214,7 +201,6 @@ const CheckoutSystem = {
       `;
     }
     
-    // Saldo Móvil solo disponible si hay productos con precio en Saldo Móvil
     if (availableCurrencies.includes('Saldo Móvil')) {
       container.innerHTML += `
         <div class="payment-method">
@@ -224,13 +210,11 @@ const CheckoutSystem = {
       `;
     }
     
-    // Si solo hay un método disponible, seleccionarlo automáticamente
     const methods = container.querySelectorAll('input[type="radio"]');
     if (methods.length === 1) {
       methods[0].checked = true;
       this.selectedPaymentMethod = methods[0].value;
     } else {
-      // Seleccionar Saldo Móvil por defecto si está disponible
       const mobilePayment = document.getElementById('payment-mobile');
       if (mobilePayment) {
         mobilePayment.checked = true;
@@ -238,7 +222,6 @@ const CheckoutSystem = {
       }
     }
     
-    // Actualizar la información de pago
     this.updatePaymentInfo();
   },
   
@@ -248,7 +231,6 @@ const CheckoutSystem = {
     this.cartItemsWithDetails.forEach(item => {
       if (item.prices) {
         Object.keys(item.prices).forEach(currency => {
-          // Solo considerar monedas con precio definido y mayor a 0
           if (item.prices[currency] && parseFloat(item.prices[currency]) > 0) {
             currencies.add(currency);
           }
@@ -279,7 +261,6 @@ const CheckoutSystem = {
   },
   
   getPriceForDisplay(item) {
-    // Mostrar todos los precios disponibles para el producto
     if (!item.prices) return 'Precio no disponible';
     
     let display = '';
@@ -323,7 +304,6 @@ const CheckoutSystem = {
       document.getElementById('product-modal').style.display = 'none';
     });
     
-    // Evento para cambio de método de pago
     document.getElementById('payment-methods-container')?.addEventListener('change', (e) => {
       if (e.target && e.target.name === 'payment-method') {
         this.selectedPaymentMethod = e.target.value;
@@ -359,7 +339,6 @@ const CheckoutSystem = {
         const proofFile = document.getElementById('transfer-proof')?.files[0];
         if (!proofFile) return alert('Por favor suba la captura de pantalla de la transferencia');
 
-        // Validar campos requeridos antes de continuar
         let requiredFieldsValid = true;
         const requiredFields = {};
         const requiredInputs = document.querySelectorAll('#required-fields-inputs input[required]');
@@ -383,7 +362,6 @@ const CheckoutSystem = {
           return;
         }
 
-        // Mostrar estado de carga
         const confirmBtn = document.getElementById('confirm-purchase');
         const originalBtnText = confirmBtn.innerHTML;
         confirmBtn.innerHTML = '<div class="spinner"></div> Procesando...';
@@ -392,33 +370,26 @@ const CheckoutSystem = {
         const proofPreview = document.getElementById('transfer-proof-preview');
         proofPreview.innerHTML = '<div class="loading">Subiendo comprobante...</div>';
 
-        // 1. Crear FormData para enviar la imagen y los datos
         const formData = new FormData();
         formData.append('image', proofFile);
         formData.append('userId', userId);
         formData.append('paymentMethod', method);
-        
-        // Datos del usuario
         formData.append('fullName', document.getElementById('checkout-fullname').value);
         formData.append('ci', document.getElementById('checkout-ci').value);
         formData.append('phone', document.getElementById('checkout-phone').value);
         formData.append('address', document.getElementById('checkout-address').value);
         formData.append('province', document.getElementById('checkout-province').value);
         
-        // Datos del receptor si aplica
         if (document.getElementById('add-recipient')?.checked) {
           formData.append('recipientName', document.getElementById('recipient-name').value);
           formData.append('recipientCi', document.getElementById('recipient-ci').value);
           formData.append('recipientPhone', document.getElementById('recipient-phone').value);
         }
         
-        // Campos requeridos
         formData.append('requiredFields', JSON.stringify(requiredFields));
         
-        // Calcular el total basado en el método de pago seleccionado
         let total = 0;
         this.cartItemsWithDetails.forEach(item => {
-          // Usar el precio correspondiente al método de pago seleccionado
           let price = 0;
           if (method === 'BPA' || method === 'BANDEC') {
             price = item.prices['CUP'] || 0;
@@ -433,7 +404,6 @@ const CheckoutSystem = {
         
         formData.append('total', total.toString());
         
-        // 2. Enviar datos al backend
         const response = await fetch(`${window.API_BASE_URL}/api/checkout`, {
           method: 'POST',
           headers: { 
@@ -442,7 +412,6 @@ const CheckoutSystem = {
           body: formData
         });
 
-        // Manejar respuesta
         if (!response.ok) {
           let errorMessage = 'Error en el servidor';
           try {
@@ -456,7 +425,6 @@ const CheckoutSystem = {
 
         const result = await response.json();
         
-        // Éxito - limpiar y notificar
         document.getElementById('product-modal').style.display = 'none';
         CartSystem.clearCart();
         Notifications.showNotification('🎉 ¡Compra realizada!', `Tu pedido #${result.orderId} ha sido creado`);
@@ -464,7 +432,6 @@ const CheckoutSystem = {
       } catch (error) {
         console.error('Error en checkout:', error);
         
-        // Mostrar error en la interfaz
         const errorContainer = document.createElement('div');
         errorContainer.className = 'error-message';
         errorContainer.innerHTML = `
@@ -480,7 +447,6 @@ const CheckoutSystem = {
         
         alert('Error al confirmar la compra: ' + error.message);
       } finally {
-        // Restaurar botón
         const confirmBtn = document.getElementById('confirm-purchase');
         if (confirmBtn) {
           confirmBtn.innerHTML = '✅ Confirmar Compra';
@@ -491,13 +457,12 @@ const CheckoutSystem = {
   },
   
   getRequiredFields: function() {
-    const fields = new Map(); // Usar Map para evitar duplicados
+    const fields = new Map();
     
     this.cartItemsWithDetails.forEach(item => {
       if (item.required_fields) {
         item.required_fields.forEach(field => {
           if (field.required && field.name) {
-            // Agregar solo si no existe
             if (!fields.has(field.name)) {
               fields.set(field.name, {
                 name: field.name,
@@ -552,7 +517,6 @@ const CheckoutSystem = {
       else el.classList.remove('active');
     });
     
-    // Actualizar información al cambiar de paso
     if (step === 3) {
       this.updatePaymentInfo();
     }
@@ -566,7 +530,6 @@ const CheckoutSystem = {
     let cardNumber = '';
     let phoneNumber = adminData.adminPhone || 'Número no disponible';
     
-    // Obtener datos de tarjeta
     if (adminData.adminCards) {
       switch(method) {
         case 'BPA': 
@@ -581,7 +544,6 @@ const CheckoutSystem = {
       }
     }
     
-    // Actualizar UI
     const accountInfo = document.querySelector('.account-info');
     if (accountInfo) {
       if (method === 'Saldo Móvil') {
@@ -594,7 +556,6 @@ const CheckoutSystem = {
       }
     }
     
-    // Calcular y mostrar total
     let currency = 'CUP';
     if (method === 'MLC') currency = 'MLC';
     else if (method === 'Saldo Móvil') currency = 'Saldo Móvil';
