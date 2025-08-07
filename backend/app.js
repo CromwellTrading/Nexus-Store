@@ -618,54 +618,71 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
-// Rutas de pedidos actualizadas con estructura unificada
+// Rutas de pedidos con logs detallados
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
-  console.log(`🔍 Buscando pedidos para usuario: ${userId}`);
+  console.log(`🔍 [LOG] Buscando pedidos para usuario: ${userId}`);
   
   try {
     // Paso 1: Obtener las órdenes básicas
+    console.log(`🔍 [LOG] Obteniendo órdenes básicas para ${userId}`);
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, total, status, created_at, updated_at, user_data')
       .eq('user_id', userId);
     
     if (ordersError) {
-      console.error('❌ Error obteniendo órdenes:', ordersError);
+      console.error('❌ [ERROR] Error obteniendo órdenes:', {
+        message: ordersError.message,
+        details: ordersError.details,
+        userId
+      });
       return res.status(500).json({ error: 'Error obteniendo pedidos' });
     }
     
     if (!orders || orders.length === 0) {
-      console.log('ℹ️ No se encontraron pedidos para el usuario');
+      console.log(`ℹ️ [LOG] No se encontraron pedidos para el usuario ${userId}`);
       return res.json([]);
     }
     
-    // Paso 2: Obtener detalles adicionales para cada orden
+    // Paso 2: Obtener detalles adicionales
     const orderIds = orders.map(order => order.id);
+    console.log(`🔍 [LOG] IDs de órdenes encontradas: ${orderIds.join(', ')}`);
     
     // Obtener detalles de pago y campos requeridos
+    console.log(`🔍 [LOG] Obteniendo detalles de pedidos`);
     const { data: orderDetails, error: detailsError } = await supabase
       .from('order_details')
       .select('order_id, payment_method, transfer_data, recipient_data, required_fields')
       .in('order_id', orderIds);
     
     if (detailsError) {
-      console.error('❌ Error obteniendo detalles de pedidos:', detailsError);
+      console.error('❌ [ERROR] Error obteniendo detalles de pedidos:', {
+        message: detailsError.message,
+        details: detailsError.details,
+        orderIds
+      });
       return res.status(500).json({ error: 'Error obteniendo detalles de pedidos' });
     }
     
     // Obtener items de los pedidos
+    console.log(`🔍 [LOG] Obteniendo items de pedidos`);
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
       .select('order_id, product_name, quantity, price, image_url, tab_type')
       .in('order_id', orderIds);
     
     if (itemsError) {
-      console.error('❌ Error obteniendo items de pedidos:', itemsError);
+      console.error('❌ [ERROR] Error obteniendo items de pedidos:', {
+        message: itemsError.message,
+        details: itemsError.details,
+        orderIds
+      });
       return res.status(500).json({ error: 'Error obteniendo items de pedidos' });
     }
     
-    // Paso 3: Combinar los datos con estructura unificada
+    // Paso 3: Combinar los datos
+    console.log(`🔍 [LOG] Combinando datos para ${orderIds.length} órdenes`);
     const parsedOrders = orders.map(order => {
       const details = orderDetails.find(d => d.order_id === order.id);
       const items = orderItems.filter(i => i.order_id === order.id);
@@ -675,13 +692,13 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         userId,
         total: order.total,
         status: order.status,
-        createdAt: order.created_at,  // Nombre unificado para frontend
-        updatedAt: order.updated_at,  // Nombre unificado para frontend
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
         userData: order.user_data,
         payment: {
           method: details?.payment_method || 'No especificado',
           ...(details?.transfer_data || {}),
-          proof_url: details?.transfer_data?.proof_url || '' // Asegurar campo de comprobante
+          proof_url: details?.transfer_data?.proof_url || ''
         },
         recipient: details?.recipient_data || null,
         requiredFields: details?.required_fields || null,
@@ -695,10 +712,14 @@ app.get('/api/orders/user/:userId', async (req, res) => {
       };
     });
     
-    console.log(`✅ Pedidos obtenidos: ${parsedOrders.length}`);
+    console.log(`✅ [LOG] Pedidos obtenidos: ${parsedOrders.length}`);
     res.json(parsedOrders);
   } catch (error) {
-    console.error('💥 Error en GET /api/orders/user/:userId:', error);
+    console.error('💥 [ERROR] Crítico en GET /api/orders/user/:userId:', {
+      error: error.message,
+      stack: error.stack,
+      userId
+    });
     res.status(500).json({ 
       error: 'Error obteniendo pedidos',
       details: error.message 
