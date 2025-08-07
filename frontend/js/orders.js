@@ -17,7 +17,6 @@ const OrdersSystem = {
   
   setupEventListeners: function() {
     console.log("[OrdersSystem] Configurando event listeners...");
-    // Eventos para botones de detalles de pedidos
     document.addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-view-order')) {
         const orderId = e.target.dataset.id;
@@ -48,7 +47,6 @@ const OrdersSystem = {
       const response = await fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`);
       const orders = await response.json();
       
-      // Verificar que orders es un array
       if (!Array.isArray(orders)) {
         console.error("[OrdersSystem] La respuesta de pedidos no es un array:", orders);
         this.orders = [];
@@ -110,7 +108,6 @@ const OrdersSystem = {
   showOrderDetails: function(order) {
     const modal = document.getElementById('product-modal');
     
-    // Construir HTML de detalles del pedido
     let itemsHTML = '';
     (order.items || []).forEach(item => {
       itemsHTML += `
@@ -127,7 +124,6 @@ const OrdersSystem = {
       `;
     });
     
-    // Mostrar datos de pago si existen
     let paymentHTML = '';
     if (order.payment && order.payment.method) {
       paymentHTML = `
@@ -135,6 +131,21 @@ const OrdersSystem = {
           <h3>💳 Información de Pago</h3>
           <p><strong>Método:</strong> ${order.payment.method}</p>
           ${order.payment.proof_url ? `<p><strong>Comprobante:</strong> <a href="${order.payment.proof_url}" target="_blank">Ver imagen</a></p>` : ''}
+        </div>
+      `;
+    }
+
+    let requiredFieldsHTML = '';
+    if (order.requiredFields && Object.keys(order.requiredFields).length > 0) {
+      requiredFieldsHTML = `
+        <div class="required-fields-info">
+          <h4>📝 Campos Requeridos</h4>
+          ${Object.entries(order.requiredFields).map(([key, value]) => `
+            <div class="field-row">
+              <strong>${key}:</strong> 
+              <span>${value || 'No proporcionado'}</span>
+            </div>
+          `).join('')}
         </div>
       `;
     }
@@ -162,6 +173,8 @@ const OrdersSystem = {
           
           ${paymentHTML}
           
+          ${requiredFieldsHTML}
+          
           <div class="order-items">
             <h3>🛒 Productos</h3>
             <div class="items-list">
@@ -174,14 +187,12 @@ const OrdersSystem = {
     
     modal.style.display = 'flex';
     
-    // Evento para cerrar modal
     modal.querySelector('.close-modal').addEventListener('click', () => {
       modal.style.display = 'none';
     });
   }
 };
 
-// Inicializar cuando el DOM esté cargado
 document.addEventListener('DOMContentLoaded', () => {
   OrdersSystem.init();
 });
