@@ -45,8 +45,16 @@ const OrdersSystem = {
       }
 
       const response = await fetch(`${window.API_BASE_URL}/api/orders/user/${userId}`);
+      
+      // Verificar si la respuesta es exitosa
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+      
       const orders = await response.json();
       
+      // Verificar que orders es un array
       if (!Array.isArray(orders)) {
         console.error("[OrdersSystem] La respuesta de pedidos no es un array:", orders);
         this.orders = [];
@@ -73,6 +81,17 @@ const OrdersSystem = {
     }
     
     container.innerHTML = this.orders.map(order => {
+      // Asegurar que order.items existe y es un array
+      const orderItems = order.items || [];
+      const itemsPreview = orderItems.slice(0, 3).map(item => {
+        return `
+          <div class="order-item-preview">
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}">` : ''}
+            <span>${item.product_name || 'Producto'} x${item.quantity}</span>
+          </div>
+        `;
+      }).join('');
+      
       return `
         <div class="order-card">
           <div class="order-header">
@@ -85,16 +104,11 @@ const OrdersSystem = {
           </div>
           
           <div class="order-total">
-            Total: $${order.total.toFixed(2)}
+            Total: $${order.total?.toFixed(2) || '0.00'}
           </div>
           
           <div class="order-items-preview">
-            ${(order.items || []).slice(0, 3).map(item => `
-              <div class="order-item-preview">
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}">` : ''}
-                <span>${item.product_name} x${item.quantity}</span>
-              </div>
-            `).join('')}
+            ${itemsPreview}
           </div>
           
           <button class="btn-view-order" data-id="${order.id}">
@@ -109,16 +123,17 @@ const OrdersSystem = {
     const modal = document.getElementById('product-modal');
     
     let itemsHTML = '';
-    (order.items || []).forEach(item => {
+    const orderItems = order.items || [];
+    orderItems.forEach(item => {
       itemsHTML += `
         <div class="order-item-detail">
           <div class="product-image">
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.product_name}">` : ''}
           </div>
           <div class="product-info">
-            <div class="product-name">${item.product_name}</div>
+            <div class="product-name">${item.product_name || 'Producto'}</div>
             <div class="product-quantity">Cantidad: ${item.quantity}</div>
-            <div class="product-price">Precio: $${item.price.toFixed(2)}</div>
+            <div class="product-price">Precio: $${item.price?.toFixed(2) || '0.00'}</div>
           </div>
         </div>
       `;
@@ -160,7 +175,7 @@ const OrdersSystem = {
           <div class="order-info">
             <p><strong>📅 Fecha:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
             <p><strong>🔄 Estado:</strong> <span class="status-${order.status.toLowerCase()}">${order.status}</span></p>
-            <p><strong>💰 Total:</strong> $${order.total.toFixed(2)}</p>
+            <p><strong>💰 Total:</strong> $${order.total?.toFixed(2) || '0.00'}</p>
           </div>
           
           <div class="customer-info">
