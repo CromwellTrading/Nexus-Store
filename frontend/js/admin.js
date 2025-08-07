@@ -964,79 +964,92 @@ const AdminSystem = {
     });
   },
   
-  loadOrders: function(filter = 'all') {
-    console.log(`[AdminSystem] Cargando pedidos con filtro: ${filter}`);
-    const ordersList = document.getElementById('admin-orders-list');
-    ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+// En la función loadOrders
+loadOrders: function(filter = 'all') {
+  console.log(`[AdminSystem] Cargando pedidos con filtro: ${filter}`);
+  const ordersList = document.getElementById('admin-orders-list');
+  ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
+  
+  fetch(`${window.API_BASE_URL}/api/admin/orders`, {
+    headers: { 
+      'Telegram-ID': this.telegramUserId.toString(),
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(orders => {
+    // Verificación crítica: asegurar que orders es un array
+    if (!Array.isArray(orders)) {
+      console.error('[AdminSystem] La respuesta de pedidos no es un array:', orders);
+      orders = [];
+    }
     
-    fetch(`${window.API_BASE_URL}/api/admin/orders`, {
-      headers: { 
-        'Telegram-ID': this.telegramUserId.toString(),
-        'Content-Type': 'application/json'
-      }
-    })
-    .then(response => response.json())
-    .then(orders => {
-      let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
-      
-      if (filteredOrders.length === 0) {
-        console.log(`[AdminSystem] No hay pedidos con filtro: ${filter}`);
-        ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-        return;
-      }
-      
-      // Ordenar por estado
-      const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
-      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-      
-      console.log(`[AdminSystem] Mostrando ${filteredOrders.length} pedidos`);
-      ordersList.innerHTML = '';
-      filteredOrders.forEach(order => {
-        const orderElement = document.createElement('div');
-        orderElement.className = 'admin-order';
-        orderElement.innerHTML = `
-          <div class="order-header">
-            <div class="order-id">📋 Pedido #${order.id}</div>
-            <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
-            <div class="order-status">
-              <select class="status-select" data-id="${order.id}">
-                <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-                <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-                <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-                <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-              </select>
-            </div>
+    let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
+    
+    // Verificar que filteredOrders es un array
+    if (!Array.isArray(filteredOrders)) {
+      console.error('[AdminSystem] filteredOrders no es un array:', filteredOrders);
+      filteredOrders = [];
+    }
+    
+    if (filteredOrders.length === 0) {
+      console.log(`[AdminSystem] No hay pedidos con filtro: ${filter}`);
+      ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+      return;
+    }
+    
+    // Ordenar por estado
+    const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
+    filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+    
+    console.log(`[AdminSystem] Mostrando ${filteredOrders.length} pedidos`);
+    ordersList.innerHTML = '';
+    filteredOrders.forEach(order => {
+      const orderElement = document.createElement('div');
+      orderElement.className = 'admin-order';
+      orderElement.innerHTML = `
+        <div class="order-header">
+          <div class="order-id">📋 Pedido #${order.id}</div>
+          <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+          <div class="order-status">
+            <select class="status-select" data-id="${order.id}">
+              <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+              <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+              <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+              <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+            </select>
           </div>
-          <div class="order-details">
-            <div><strong>👤 Cliente:</strong> ${order.userData?.fullName || order.userId}</div>
-            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-          </div>
-          <div class="order-actions">
-            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
-          </div>
-        `;
-        ordersList.appendChild(orderElement);
-      });
-      
-      document.querySelectorAll('.btn-view').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          console.log(`[AdminSystem] Viendo detalles del pedido: ${e.target.dataset.id}`);
-          this.viewOrderDetails(e.target.dataset.id);
-        });
-      });
-      
-      document.querySelectorAll('.status-select').forEach(select => {
-        select.addEventListener('change', (e) => {
-          console.log(`[AdminSystem] Actualizando estado del pedido ${e.target.dataset.id} a ${e.target.value}`);
-          this.updateOrderStatus(e.target.dataset.id, e.target.value);
-        });
-      });
-    })
-    .catch(error => {
-      console.error('[AdminSystem] Error cargando pedidos:', error);
-      ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
+        </div>
+        <div class="order-details">
+          <div><strong>👤 Cliente:</strong> ${order.userData?.fullName || order.userId}</div>
+          <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+        </div>
+        <div class="order-actions">
+          <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+        </div>
+      `;
+      ordersList.appendChild(orderElement);
     });
-  },
+    
+    document.querySelectorAll('.btn-view').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        console.log(`[AdminSystem] Viendo detalles del pedido: ${e.target.dataset.id}`);
+        this.viewOrderDetails(e.target.dataset.id);
+      });
+    });
+    
+    document.querySelectorAll('.status-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        console.log(`[AdminSystem] Actualizando estado del pedido ${e.target.dataset.id} a ${e.target.value}`);
+        this.updateOrderStatus(e.target.dataset.id, e.target.value);
+      });
+    });
+  })
+  .catch(error => {
+    console.error('[AdminSystem] Error cargando pedidos:', error);
+    ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
+  });
+},
   
   updateOrderStatus: function(orderId, newStatus) {
     console.log(`[AdminSystem] Actualizando estado del pedido ${orderId} a ${newStatus}`);
