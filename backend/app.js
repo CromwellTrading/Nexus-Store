@@ -104,11 +104,9 @@ app.get('/api/admin/ids', isAdmin, (req, res) => {
 
 app.get('/api/users/:userId', async (req, res) => {
   const userId = req.params.userId;
-  console.log(`👤 [USUARIO] GET perfil solicitado para: ${userId}`);
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
-  
+  console.log(`👤 GET perfil solicitado para usuario: ${userId}`);
+
   try {
-    console.log(`🔍 [USUARIO] Buscando usuario en Supabase: ${userId}`);
     const { data, error } = await supabase
       .from('users')
       .select('profile_data, admin_phone, admin_cards')
@@ -116,7 +114,7 @@ app.get('/api/users/:userId', async (req, res) => {
       .single();
 
     if (error) {
-      console.error(`❌ [USUARIO] Error obteniendo perfil: ${error.message}`);
+      console.error(`❌ Error obteniendo perfil: ${error.message}`);
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
@@ -130,10 +128,10 @@ app.get('/api/users/:userId', async (req, res) => {
       }
     };
 
-    console.log(`✅ [USUARIO] Perfil obtenido para ${userId}`);
+    console.log(`✅ Perfil obtenido para ${userId}`);
     res.json(profileData);
   } catch (error) {
-    console.error('💥 [USUARIO] Error crítico:', {
+    console.error('💥 Error en GET /api/users/:userId:', {
       error: error.message,
       userId
     });
@@ -144,8 +142,7 @@ app.get('/api/users/:userId', async (req, res) => {
 app.put('/api/users/:userId', async (req, res) => {
   const userId = req.params.userId;
   const profileData = req.body;
-  console.log(`✏️ [USUARIO] PUT perfil solicitado para usuario: ${userId}`, profileData);
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
+  console.log(`✏️ PUT perfil solicitado para usuario: ${userId}`, profileData);
 
   try {
     const adminPhone = profileData.adminPhone || null;
@@ -179,10 +176,10 @@ app.put('/api/users/:userId', async (req, res) => {
       adminCards: data.admin_cards
     };
 
-    console.log(`✅ [USUARIO] Perfil guardado para ${userId}`);
+    console.log(`✅ Perfil guardado para ${userId}`);
     res.json(responseData);
   } catch (error) {
-    console.error('💥 [USUARIO] Error en PUT:', {
+    console.error('💥 Error en PUT /api/users/:userId:', {
       error: error.message,
       userId,
       profileData
@@ -232,8 +229,7 @@ app.post('/api/upload-image', isAdmin, async (req, res) => {
 
 app.get('/api/cart/:userId', async (req, res) => {
   const userId = req.params.userId;
-  console.log(`🛒 [CARRITO] GET carrito para usuario: ${userId}`);
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
+  console.log(`🛒 GET carrito para usuario: ${userId}`);
   
   try {
     const { data: cart, error } = await supabase
@@ -245,14 +241,13 @@ app.get('/api/cart/:userId', async (req, res) => {
     const items = cart?.items || [];
     res.json({ userId, items });
   } catch (error) {
-    console.error('💥 [CARRITO] Error en GET:', error);
+    console.error('💥 Error en GET /api/cart/:userId:', error);
     res.status(500).json({ error: 'Error obteniendo carrito' });
   }
 });
 
 app.post('/api/cart/add', async (req, res) => {
   const { userId, productId, tabType } = req.body;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     let { data: cart } = await supabase
@@ -286,14 +281,13 @@ app.post('/api/cart/add', async (req, res) => {
     if (error) throw error;
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
-    console.error('💥 [CARRITO] Error en POST /add:', error);
+    console.error('💥 Error en POST /api/cart/add:', error);
     res.status(500).json({ error: 'Error añadiendo al carrito' });
   }
 });
 
 app.post('/api/cart/remove', async (req, res) => {
   const { userId, productId, tabType } = req.body;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { data: cart } = await supabase
@@ -319,14 +313,13 @@ app.post('/api/cart/remove', async (req, res) => {
     if (error) throw error;
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
-    console.error('💥 [CARRITO] Error en POST /remove:', error);
+    console.error('💥 Error en POST /api/cart/remove:', error);
     res.status(500).json({ error: 'Error removiendo del carrito' });
   }
 });
 
 app.post('/api/cart/update', async (req, res) => {
   const { userId, productId, tabType, quantity } = req.body;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { data: cart } = await supabase
@@ -358,14 +351,13 @@ app.post('/api/cart/update', async (req, res) => {
     if (error) throw error;
     res.json({ userId, items: updatedCart.items });
   } catch (error) {
-    console.error('💥 [CARRITO] Error en POST /update:', error);
+    console.error('💥 Error en POST /api/cart/update:', error);
     res.status(500).json({ error: 'Error actualizando carrito' });
   }
 });
 
 app.post('/api/cart/clear/:userId', async (req, res) => {
   const userId = req.params.userId;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { error } = await supabase
@@ -376,14 +368,13 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (error) {
-    console.error('💥 [CARRITO] Error en POST /clear:', error);
+    console.error('💥 Error en POST /api/cart/clear/:userId:', error);
     res.status(500).json({ error: 'Error vaciando carrito' });
   }
 });
 
 app.get('/api/products/:type', async (req, res) => {
   const type = req.params.type;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { data: products, error } = await supabase
@@ -406,14 +397,13 @@ app.get('/api/products/:type', async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error('💥 [PRODUCTOS] Error en GET /:type:', error);
+    console.error('💥 Error en GET /api/products/:type:', error);
     res.status(500).json({ error: 'Error obteniendo productos' });
   }
 });
 
 app.get('/api/products/:type/:id', async (req, res) => {
   const { type, id } = req.params;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { data: product, error } = await supabase
@@ -433,27 +423,24 @@ app.get('/api/products/:type/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json({ ...product, category: product.categories.name });
   } catch (error) {
-    console.error('💥 [PRODUCTOS] Error en GET /:type/:id:', error);
+    console.error('💥 Error en GET /api/products/:type/:id:', error);
     res.status(500).json({ error: 'Error obteniendo producto' });
   }
 });
 
 app.get('/api/admin/categories', isAdmin, async (req, res) => {
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
-  
   try {
     const { data: categories, error } = await supabase.from('categories').select('*');
     if (error) throw error;
     res.json(categories);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en GET /categories:', error);
+    console.error('💥 Error en GET /api/admin/categories:', error);
     res.status(500).json({ error: 'Error obteniendo categorías' });
   }
 });
 
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
   const { type, name } = req.body;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { data, error } = await supabase
@@ -465,14 +452,13 @@ app.post('/api/admin/categories', isAdmin, async (req, res) => {
     if (error) throw error;
     res.status(201).json(data);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en POST /categories:', error);
+    console.error('💥 Error en POST /api/admin/categories:', error);
     res.status(500).json({ error: 'Error al crear categoría' });
   }
 });
 
 app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
   const categoryId = req.params.id;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { error } = await supabase
@@ -483,14 +469,13 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (error) {
-    console.error('💥 [ADMIN] Error en DELETE /categories/:id:', error);
+    console.error('💥 Error en DELETE /api/admin/categories/:id:', error);
     res.status(500).json({ error: 'Error eliminando categoría' });
   }
 });
 
 app.post('/api/admin/products', isAdmin, async (req, res) => {
   const { type, categoryId, product } = req.body;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
 
   if (!type || !categoryId || !product) {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
@@ -523,14 +508,13 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     if (error) throw error;
     res.status(201).json({ id: data.id, ...product });
   } catch (error) {
-    console.error('💥 [ADMIN] Error en POST /products:', error);
+    console.error('💥 Error en POST /api/admin/products:', error);
     res.status(500).json({ error: 'Error creando producto' });
   }
 });
 
 app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { data: product, error } = await supabase
@@ -555,7 +539,7 @@ app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
     
     res.json(formattedProduct);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en GET /products/:id:', error);
+    console.error('💥 Error en GET /api/admin/products/:id:', error);
     res.status(500).json({ error: 'Error obteniendo producto' });
   }
 });
@@ -563,7 +547,6 @@ app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
 app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
   const { type, categoryId, product } = req.body;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
 
   try {
     const { data, error } = await supabase
@@ -588,14 +571,12 @@ app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json(data);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en PUT /products/:id:', error);
+    console.error('💥 Error en PUT /api/admin/products/:id:', error);
     res.status(500).json({ error: 'Error actualizando producto' });
   }
 });
 
 app.get('/api/admin/products', isAdmin, async (req, res) => {
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
-  
   try {
     const { data: products, error } = await supabase
       .from('products')
@@ -610,14 +591,13 @@ app.get('/api/admin/products', isAdmin, async (req, res) => {
     
     res.json(formattedProducts);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en GET /products:', error);
+    console.error('💥 Error en GET /api/admin/products:', error);
     res.status(500).json({ error: 'Error obteniendo productos' });
   }
 });
 
 app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { error } = await supabase
@@ -628,14 +608,13 @@ app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json({ success: true });
   } catch (error) {
-    console.error('💥 [ADMIN] Error en DELETE /products/:id:', error);
+    console.error('💥 Error en DELETE /api/admin/products/:id:', error);
     res.status(500).json({ error: 'Error eliminando producto' });
   }
 });
 
 app.get('/api/categories/:type', async (req, res) => {
   const type = req.params.type;
-  console.log(`🔑 Usuario autenticado: ${req.telegramId}`);
   
   try {
     const { data: categories, error } = await supabase
@@ -646,76 +625,59 @@ app.get('/api/categories/:type', async (req, res) => {
     if (error) throw error;
     res.json(categories);
   } catch (error) {
-    console.error('💥 [CATEGORIAS] Error en GET /:type:', error);
+    console.error('💥 Error en GET /api/categories/:type:', error);
     res.status(500).json({ error: 'Error obteniendo categorías' });
   }
 });
 
-// Ruta de pedidos con logs exhaustivos
+// Rutas de pedidos actualizadas
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
-  const telegramIdHeader = req.headers['telegram-id'];
+  console.log(`🔍 Buscando pedidos para usuario: ${userId}`);
   
-  console.log(`🔍 [PEDIDOS] Buscando pedidos para usuario: ${userId}`);
-  console.log(`🔑 Telegram-ID del header: ${telegramIdHeader}`);
-  console.log(`🔑 Usuario solicitado: ${userId}`);
-  
-  // Verificar coincidencia de usuario
-  if (userId !== telegramIdHeader) {
-    console.error(`🚨 [PEDIDOS] Intento de acceso no autorizado: 
-      Usuario solicitado: ${userId} 
-      Usuario autenticado: ${telegramIdHeader}`);
-    
-    return res.status(403).json({ 
-      error: 'No tienes permiso para acceder a estos pedidos' 
-    });
-  }
-
   try {
-    console.log('📦 [PEDIDOS] Obteniendo órdenes básicas...');
+    // Paso 1: Obtener las órdenes básicas
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, total, status, created_at, updated_at, user_data')
       .eq('user_id', userId);
     
     if (ordersError) {
-      console.error('❌ [PEDIDOS] Error obteniendo órdenes:', ordersError);
+      console.error('❌ Error obteniendo órdenes:', ordersError);
       return res.status(500).json({ error: 'Error obteniendo pedidos' });
     }
     
-    console.log(`ℹ️ [PEDIDOS] Órdenes encontradas: ${orders?.length || 0}`);
-    
     if (!orders || orders.length === 0) {
-      console.log('ℹ️ [PEDIDOS] No se encontraron pedidos para el usuario');
+      console.log('ℹ️ No se encontraron pedidos para el usuario');
       return res.json([]);
     }
     
+    // Paso 2: Obtener detalles adicionales para cada orden
     const orderIds = orders.map(order => order.id);
-    console.log(`📝 [PEDIDOS] IDs de órdenes: ${orderIds.join(', ')}`);
     
-    console.log('📦 [PEDIDOS] Obteniendo detalles de pago...');
+    // Obtener detalles de pago
     const { data: orderDetails, error: detailsError } = await supabase
       .from('order_details')
       .select('order_id, payment_method, transfer_data, recipient_data, required_fields')
       .in('order_id', orderIds);
     
     if (detailsError) {
-      console.error('❌ [PEDIDOS] Error obteniendo detalles:', detailsError);
+      console.error('❌ Error obteniendo detalles de pedidos:', detailsError);
       return res.status(500).json({ error: 'Error obteniendo detalles de pedidos' });
     }
     
-    console.log('📦 [PEDIDOS] Obteniendo items de pedidos...');
+    // Obtener items de los pedidos
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
       .select('order_id, product_name, quantity, price, image_url, tab_type')
       .in('order_id', orderIds);
     
     if (itemsError) {
-      console.error('❌ [PEDIDOS] Error obteniendo items:', itemsError);
+      console.error('❌ Error obteniendo items de pedidos:', itemsError);
       return res.status(500).json({ error: 'Error obteniendo items de pedidos' });
     }
     
-    console.log('🧩 [PEDIDOS] Combinando datos de pedidos...');
+    // Paso 3: Combinar los datos
     const parsedOrders = orders.map(order => {
       const details = orderDetails.find(d => d.order_id === order.id);
       const items = orderItems.filter(i => i.order_id === order.id);
@@ -738,14 +700,10 @@ app.get('/api/orders/user/:userId', async (req, res) => {
       };
     });
     
-    console.log(`✅ [PEDIDOS] Pedidos obtenidos: ${parsedOrders.length}`);
+    console.log(`✅ Pedidos obtenidos: ${parsedOrders.length}`);
     res.json(parsedOrders);
   } catch (error) {
-    console.error('💥 [PEDIDOS] Error crítico:', {
-      message: error.message,
-      stack: error.stack,
-      userId
-    });
+    console.error('💥 Error en GET /api/orders/user/:userId:', error);
     res.status(500).json({ 
       error: 'Error obteniendo pedidos',
       details: error.message 
@@ -754,8 +712,6 @@ app.get('/api/orders/user/:userId', async (req, res) => {
 });
 
 app.get('/api/admin/orders', isAdmin, async (req, res) => {
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
-  
   try {
     const { data: orders, error } = await supabase
       .from('orders')
@@ -807,14 +763,13 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
     
     res.json(parsedOrders);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en GET /orders:', error);
+    console.error('💥 Error en GET /api/admin/orders:', error);
     res.status(500).json({ error: 'Error obteniendo pedidos' });
   }
 });
 
 app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   const orderId = req.params.orderId;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { data: order, error } = await supabase
@@ -868,7 +823,7 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
     
     res.json(parsedOrder);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en GET /orders/:orderId:', error);
+    console.error('💥 Error en GET /api/admin/orders/:orderId:', error);
     res.status(500).json({ error: 'Error obteniendo pedido' });
   }
 });
@@ -876,7 +831,6 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
 app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
   const orderId = req.params.orderId;
   const { status } = req.body;
-  console.log(`🔑 Usuario admin autenticado: ${req.telegramId}`);
   
   try {
     const { data: updatedOrder, error } = await supabase
@@ -889,19 +843,17 @@ app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
     if (error) throw error;
     res.json(updatedOrder);
   } catch (error) {
-    console.error('💥 [ADMIN] Error en PUT /orders/:orderId:', error);
+    console.error('💥 Error en PUT /api/admin/orders/:orderId:', error);
     res.status(500).json({ error: 'Error actualizando orden' });
   }
 });
 
 app.post('/api/checkout', async (req, res) => {
-  console.log('🛒 [CHECKOUT] Procesando pedido...');
-  const userId = req.headers['telegram-id'];
-  console.log(`🔑 Usuario autenticado: ${userId}`);
+  console.log('🛒 Procesando pedido...');
   
   try {
+    const userId = req.headers['telegram-id'];
     if (!userId) {
-      console.error('🔒 Usuario no identificado');
       return res.status(401).json({ error: 'No se pudo identificar el usuario' });
     }
 
@@ -909,12 +861,10 @@ app.post('/api/checkout', async (req, res) => {
     const imageFile = req.files?.image;
     
     if (!formData.paymentMethod || !formData.total) {
-      console.error('❌ Faltan datos esenciales');
       return res.status(400).json({ error: 'Faltan datos esenciales' });
     }
 
     if (formData.paymentMethod !== 'Saldo Móvil' && !imageFile) {
-      console.error('❌ Falta comprobante de transferencia');
       return res.status(400).json({ error: 'Se requiere comprobante de transferencia' });
     }
 
@@ -924,12 +874,10 @@ app.post('/api/checkout', async (req, res) => {
       const maxSize = 5 * 1024 * 1024;
       
       if (!validTypes.includes(imageFile.mimetype)) {
-        console.error('❌ Formato de imagen inválido');
         return res.status(400).json({ error: 'Formato de imagen inválido' });
       }
       
       if (imageFile.size > maxSize) {
-        console.error(`❌ Imagen demasiado grande: ${(imageFile.size/1024/1024).toFixed(1)}MB`);
         return res.status(400).json({ 
           error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB)` 
         });
@@ -1038,11 +986,11 @@ app.post('/api/checkout', async (req, res) => {
       .delete()
       .eq('user_id', userId);
 
-    console.log(`✅ [CHECKOUT] Pedido ${orderId} creado exitosamente`);
+    console.log(`✅ Pedido ${orderId} creado exitosamente`);
     res.json({ orderId, status: 'Pendiente', total: formData.total, proofUrl });
     
   } catch (error) {
-    console.error('💥 [CHECKOUT] Error en POST /checkout:', error);
+    console.error('💥 Error en POST /api/checkout:', error);
     res.status(500).json({ error: 'Error procesando pedido', details: error.message });
   }
 });
@@ -1088,25 +1036,15 @@ app.listen(PORT, () => {
       const userId = msg.from.id;
       const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
       
-      console.log(`🤖 [BOT] Comando /start recibido de: ${userId}`);
-      
       const promoMessage = `🌟 <b>💎𝘽𝙄𝙀𝙉𝙑𝙀𝙉𝙄𝘿𝙊𝙎 𝘼 𝙉𝙀𝙓𝙐𝙎 𝙎𝙃𝙊𝙋💎</b> 🌟`;
       
       const keyboard = {
-        inline_keyboard: [[{ 
-          text: "🚀 ABRIR TIENDA AHORA", 
-          web_app: { url: webAppUrl } 
-        }]]
+        inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
       };
       
-      bot.sendMessage(chatId, promoMessage, { 
-        parse_mode: 'HTML', 
-        reply_markup: keyboard 
-      }).then(() => {
-        console.log(`🤖 [BOT] Mensaje enviado a: ${userId}`);
-      }).catch(err => {
-        console.error('❌ [BOT] Error enviando mensaje:', err);
-      });
+      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard })
+        .then(() => console.log(`🤖 Mensaje enviado a: ${userId}`))
+        .catch(err => console.error('❌ Error enviando mensaje:', err));
     });
   }
 });
