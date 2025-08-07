@@ -117,7 +117,6 @@ const AdminSystem = {
             <h3>📦 Gestionar Productos</h3>
             <button id="add-product-btn" class="admin-btn">➕ Nuevo Producto</button>
             <div id="product-form" style="display: none; margin-top: 20px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03);">
-              <!-- Campo oculto para ID del producto -->
               <input type="hidden" id="product-id">
               
               <div class="form-group">
@@ -442,7 +441,6 @@ const AdminSystem = {
       return;
     }
     
-    // Crear el objeto producto
     const product = { 
       name, 
       description, 
@@ -455,17 +453,14 @@ const AdminSystem = {
     };
     
     try {
-      // Subir imágenes al backend
       if (type === 'fisico') {
         const imageFiles = document.getElementById('product-images').files;
         if (imageFiles.length > 0) {
           product.images = [];
           for (let i = 0; i < imageFiles.length; i++) {
-            // Mostrar estado de carga
             console.log(`[AdminSystem] Subiendo imagen ${i+1}/${imageFiles.length}`);
             this.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
             
-            // Subir la imagen al backend
             const formData = new FormData();
             formData.append('image', imageFiles[i]);
             
@@ -483,7 +478,6 @@ const AdminSystem = {
             const { url } = await uploadResponse.json();
             product.images.push(url);
             
-            // Actualizar vista previa
             const preview = document.getElementById('image-preview');
             const img = document.createElement('img');
             img.src = url;
@@ -495,7 +489,6 @@ const AdminSystem = {
           }
         }
         
-        // Manejar variantes de color
         if (product.has_color_variant) {
           document.querySelectorAll('.color-variant').forEach(variant => {
             const color = variant.querySelector('.color-picker').value;
@@ -504,7 +497,6 @@ const AdminSystem = {
           });
         }
       } else {
-        // Producto digital
         const imageFile = document.getElementById('digital-image').files[0];
         if (imageFile) {
           console.log("[AdminSystem] Subiendo imagen digital");
@@ -527,7 +519,6 @@ const AdminSystem = {
           const { url } = await uploadResponse.json();
           product.images = [url];
           
-          // Mostrar imagen subida
           const preview = document.getElementById('digital-image-preview');
           preview.innerHTML = '';
           const img = document.createElement('img');
@@ -538,7 +529,6 @@ const AdminSystem = {
           preview.appendChild(img);
         }
         
-        // Campos requeridos
         document.querySelectorAll('.required-field').forEach(field => {
           const fieldName = field.querySelector('.field-name').value.trim();
           const isRequired = field.querySelector('.field-required').checked;
@@ -546,7 +536,6 @@ const AdminSystem = {
         });
       }
       
-      // Determinar si es creación o actualización
       const method = productId ? 'PUT' : 'POST';
       const url = productId 
         ? `${window.API_BASE_URL}/api/admin/products/${productId}`
@@ -698,10 +687,8 @@ const AdminSystem = {
         form.style.display = 'block';
         document.getElementById('add-product-btn').style.display = 'none';
         
-        // Establecer ID del producto
         document.getElementById('product-id').value = product.id;
         
-        // Cambiar texto del botón a "Actualizar"
         document.getElementById('save-product').textContent = '🔄 Actualizar Producto';
         
         this.productType = product.type;
@@ -739,7 +726,6 @@ const AdminSystem = {
             });
           }
           
-          // Añadir mensaje informativo
           preview.innerHTML += `
             <div style="font-size: 12px; color: #666; margin-top: 10px;">
               Las imágenes existentes se mantendrán. Sube nuevas solo si quieres reemplazarlas.
@@ -775,7 +761,6 @@ const AdminSystem = {
             preview.appendChild(imgEl);
           }
           
-          // Añadir mensaje informativo
           preview.innerHTML += `
             <div style="font-size: 12px; color: #666; margin-top: 10px;">
               La imagen existente se mantendrá. Sube una nueva solo si quieres reemplazarla.
@@ -964,92 +949,88 @@ const AdminSystem = {
     });
   },
   
-// En la función loadOrders
-loadOrders: function(filter = 'all') {
-  console.log(`[AdminSystem] Cargando pedidos con filtro: ${filter}`);
-  const ordersList = document.getElementById('admin-orders-list');
-  ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
-  
-  fetch(`${window.API_BASE_URL}/api/admin/orders`, {
-    headers: { 
-      'Telegram-ID': this.telegramUserId.toString(),
-      'Content-Type': 'application/json'
-    }
-  })
-  .then(response => response.json())
-  .then(orders => {
-    // Verificación crítica: asegurar que orders es un array
-    if (!Array.isArray(orders)) {
-      console.error('[AdminSystem] La respuesta de pedidos no es un array:', orders);
-      orders = [];
-    }
+  loadOrders: function(filter = 'all') {
+    console.log(`[AdminSystem] Cargando pedidos con filtro: ${filter}`);
+    const ordersList = document.getElementById('admin-orders-list');
+    ordersList.innerHTML = '<div class="loading">Cargando pedidos...</div>';
     
-    let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
-    
-    // Verificar que filteredOrders es un array
-    if (!Array.isArray(filteredOrders)) {
-      console.error('[AdminSystem] filteredOrders no es un array:', filteredOrders);
-      filteredOrders = [];
-    }
-    
-    if (filteredOrders.length === 0) {
-      console.log(`[AdminSystem] No hay pedidos con filtro: ${filter}`);
-      ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
-      return;
-    }
-    
-    // Ordenar por estado
-    const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
-    filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
-    
-    console.log(`[AdminSystem] Mostrando ${filteredOrders.length} pedidos`);
-    ordersList.innerHTML = '';
-    filteredOrders.forEach(order => {
-      const orderElement = document.createElement('div');
-      orderElement.className = 'admin-order';
-      orderElement.innerHTML = `
-        <div class="order-header">
-          <div class="order-id">📋 Pedido #${order.id}</div>
-          <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
-          <div class="order-status">
-            <select class="status-select" data-id="${order.id}">
-              <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
-              <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
-              <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
-              <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
-            </select>
+    fetch(`${window.API_BASE_URL}/api/admin/orders`, {
+      headers: { 
+        'Telegram-ID': this.telegramUserId.toString(),
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(orders => {
+      if (!Array.isArray(orders)) {
+        console.error('[AdminSystem] La respuesta de pedidos no es un array:', orders);
+        orders = [];
+      }
+      
+      let filteredOrders = filter === 'all' ? orders : orders.filter(order => order.status === filter);
+      
+      if (!Array.isArray(filteredOrders)) {
+        console.error('[AdminSystem] filteredOrders no es un array:', filteredOrders);
+        filteredOrders = [];
+      }
+      
+      if (filteredOrders.length === 0) {
+        console.log(`[AdminSystem] No hay pedidos con filtro: ${filter}`);
+        ordersList.innerHTML = '<p>No hay pedidos registrados</p>';
+        return;
+      }
+      
+      const statusOrder = { 'Pendiente': 1, 'En proceso': 2, 'Enviado': 3, 'Completado': 4 };
+      filteredOrders.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      
+      console.log(`[AdminSystem] Mostrando ${filteredOrders.length} pedidos`);
+      ordersList.innerHTML = '';
+      filteredOrders.forEach(order => {
+        const orderElement = document.createElement('div');
+        orderElement.className = 'admin-order';
+        orderElement.innerHTML = `
+          <div class="order-header">
+            <div class="order-id">📋 Pedido #${order.id}</div>
+            <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
+            <div class="order-status">
+              <select class="status-select" data-id="${order.id}">
+                <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
+                <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
+                <option value="Completado" ${order.status === 'Completado' ? 'selected' : ''}>Completado</option>
+              </select>
+            </div>
           </div>
-        </div>
-        <div class="order-details">
-          <div><strong>👤 Cliente:</strong> ${order.userData?.fullName || order.userId}</div>
-          <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
-        </div>
-        <div class="order-actions">
-          <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
-        </div>
-      `;
-      ordersList.appendChild(orderElement);
-    });
-    
-    document.querySelectorAll('.btn-view').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        console.log(`[AdminSystem] Viendo detalles del pedido: ${e.target.dataset.id}`);
-        this.viewOrderDetails(e.target.dataset.id);
+          <div class="order-details">
+            <div><strong>👤 Cliente:</strong> ${order.userData?.fullName || order.userId}</div>
+            <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
+          </div>
+          <div class="order-actions">
+            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+          </div>
+        `;
+        ordersList.appendChild(orderElement);
       });
-    });
-    
-    document.querySelectorAll('.status-select').forEach(select => {
-      select.addEventListener('change', (e) => {
-        console.log(`[AdminSystem] Actualizando estado del pedido ${e.target.dataset.id} a ${e.target.value}`);
-        this.updateOrderStatus(e.target.dataset.id, e.target.value);
+      
+      document.querySelectorAll('.btn-view').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          console.log(`[AdminSystem] Viendo detalles del pedido: ${e.target.dataset.id}`);
+          this.viewOrderDetails(e.target.dataset.id);
+        });
       });
+      
+      document.querySelectorAll('.status-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+          console.log(`[AdminSystem] Actualizando estado del pedido ${e.target.dataset.id} a ${e.target.value}`);
+          this.updateOrderStatus(e.target.dataset.id, e.target.value);
+        });
+      });
+    })
+    .catch(error => {
+      console.error('[AdminSystem] Error cargando pedidos:', error);
+      ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
     });
-  })
-  .catch(error => {
-    console.error('[AdminSystem] Error cargando pedidos:', error);
-    ordersList.innerHTML = `<div class="error"><p>Error cargando pedidos</p><p><small>${error.message}</small></p></div>`;
-  });
-},
+  },
   
   updateOrderStatus: function(orderId, newStatus) {
     console.log(`[AdminSystem] Actualizando estado del pedido ${orderId} a ${newStatus}`);
@@ -1081,7 +1062,6 @@ loadOrders: function(filter = 'all') {
     .then(order => {
       const modal = document.getElementById('product-modal');
       
-      // Mostrar campos requeridos
       let requiredFieldsHTML = '';
       if (order.requiredFields && Object.keys(order.requiredFields).length > 0) {
         requiredFieldsHTML = `
@@ -1122,9 +1102,8 @@ loadOrders: function(filter = 'all') {
             <h3>💳 Información de Pago</h3>
             <div class="payment-info">
               <div><strong>Método:</strong> ${order.payment?.method || 'No especificado'}</div>
-              <div><strong>🔑 ID Transferencia:</strong> ${order.payment?.transferId || 'N/A'}</div>
-              ${order.payment?.transferProof ? `
-                <div><strong>📸 Comprobante:</strong> <a href="${order.payment?.transferProof}" target="_blank">Ver imagen</a></div>
+              ${order.payment?.proof_url ? `
+                <div><strong>📸 Comprobante:</strong> <a href="${order.payment?.proof_url}" target="_blank">Ver imagen</a></div>
               ` : ''}
             </div>
             
@@ -1149,7 +1128,7 @@ loadOrders: function(filter = 'all') {
             ${order.recipient && Object.keys(order.recipient).length > 0 ? 
               `<div class="additional-info">
                 <h4>📦 Datos del Receptor</h4>
-                <div><strong>Nombre:</strong> ${order.recipient.fullName || 'N/A'}</div>
+                <div><strong>Nombre:</strong> ${order.recipient.name || 'N/A'}</div>
                 <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
                 <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
               </div>` : 
@@ -1198,11 +1177,9 @@ loadOrders: function(filter = 'all') {
   
   resetProductForm: function() {
     console.log("[AdminSystem] Reseteando formulario de producto");
-    // Limpiar ID y restaurar texto del botón
     document.getElementById('product-id').value = '';
     document.getElementById('save-product').textContent = '💾 Guardar Producto';
     
-    // Limpiar otros campos
     document.getElementById('product-name').value = '';
     document.getElementById('product-description').value = '';
     document.getElementById('product-details').value = '';
