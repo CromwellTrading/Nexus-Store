@@ -618,10 +618,7 @@ app.get('/api/categories/:type', async (req, res) => {
   }
 });
 
-// ==================================================
-// Rutas de pedidos (CORREGIDAS)
-// ==================================================
-
+// Rutas de pedidos actualizadas
 app.get('/api/orders/user/:userId', async (req, res) => {
   const userId = req.params.userId;
   
@@ -635,17 +632,26 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items (product_name, quantity, price, image_url, tab_type)
+        order_details!inner (
+          payment_method,
+          transfer_data,
+          recipient_data,
+          required_fields
+        ),
+        order_items:order_items (
+          product_name,
+          quantity,
+          price,
+          image_url,
+          tab_type
+        )
       `)
       .eq('user_id', userId);
     
     if (error) throw error;
     
     const parsedOrders = orders.map(order => {
-      const orderDetail = order.order_details && order.order_details.length > 0 
-        ? order.order_details[0] 
-        : null;
+      const orderDetail = order.order_details;
       
       return {
         id: order.id,
@@ -655,12 +661,12 @@ app.get('/api/orders/user/:userId', async (req, res) => {
         createdAt: order.created_at,
         updatedAt: order.updated_at,
         userData: order.user_data,
-        payment: orderDetail ? {
+        payment: {
           method: orderDetail.payment_method,
           ...(orderDetail.transfer_data || {})
-        } : null,
-        recipient: orderDetail ? orderDetail.recipient_data : null,
-        requiredFields: orderDetail ? orderDetail.required_fields : null,
+        },
+        recipient: orderDetail.recipient_data || null,
+        requiredFields: orderDetail.required_fields || null,
         items: order.order_items || []
       };
     });
@@ -684,16 +690,25 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items (product_name, quantity, price, image_url, tab_type)
+        order_details!inner (
+          payment_method,
+          transfer_data,
+          recipient_data,
+          required_fields
+        ),
+        order_items:order_items (
+          product_name,
+          quantity,
+          price,
+          image_url,
+          tab_type
+        )
       `);
     
     if (error) throw error;
     
     const parsedOrders = orders.map(order => {
-      const orderDetail = order.order_details && order.order_details.length > 0 
-        ? order.order_details[0] 
-        : null;
+      const orderDetail = order.order_details;
       
       return {
         id: order.id,
@@ -703,12 +718,12 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         createdAt: order.created_at,
         updatedAt: order.updated_at,
         userData: order.user_data,
-        payment: orderDetail ? {
+        payment: {
           method: orderDetail.payment_method,
           ...(orderDetail.transfer_data || {})
-        } : null,
-        recipient: orderDetail ? orderDetail.recipient_data : null,
-        requiredFields: orderDetail ? orderDetail.required_fields : null,
+        },
+        recipient: orderDetail.recipient_data || null,
+        requiredFields: orderDetail.required_fields || null,
         items: order.order_items || []
       };
     });
@@ -734,8 +749,19 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
         created_at,
         updated_at,
         user_data,
-        order_details:order_details (payment_method, transfer_data, recipient_data, required_fields),
-        order_items:order_items (product_name, quantity, price, image_url, tab_type)
+        order_details!inner (
+          payment_method,
+          transfer_data,
+          recipient_data,
+          required_fields
+        ),
+        order_items:order_items (
+          product_name,
+          quantity,
+          price,
+          image_url,
+          tab_type
+        )
       `)
       .eq('id', orderId)
       .single();
@@ -743,9 +769,7 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
     if (error) throw error;
     if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
     
-    const orderDetail = order.order_details && order.order_details.length > 0 
-      ? order.order_details[0] 
-      : null;
+    const orderDetail = order.order_details;
     
     const parsedOrder = {
       id: order.id,
@@ -755,12 +779,12 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       userData: order.user_data,
-      payment: orderDetail ? {
+      payment: {
         method: orderDetail.payment_method,
         ...(orderDetail.transfer_data || {})
-      } : null,
-      recipient: orderDetail ? orderDetail.recipient_data : null,
-      requiredFields: orderDetail ? orderDetail.required_fields : null,
+      },
+      recipient: orderDetail.recipient_data || null,
+      requiredFields: orderDetail.required_fields || null,
       items: order.order_items || []
     };
     
