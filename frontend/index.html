@@ -3,537 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Store - Futurista</title>
+    <title>Nexus Store</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    
     <style>
-        /* Variables CSS actualizadas para tema futurista */
-        :root {
-            /* Paleta futurista */
-            --primary-color: #00ff9d; /* Verde neón */
-            --secondary-color: #00d9ff; /* Azul neón */
-            --accent-color: #ff0055; /* Rojo neón */
-            --success-color: #00ff9d;
-            --warning-color: #ffcc00;
-            --danger-color: #ff0055;
-            
-            /* Colores de fondo */
-            --bg-light: #0a0a12;
-            --bg-dark: #050508;
-            
-            /* Textos */
-            --text-light: #ffffff;
-            --text-secondary: #a0a0c0;
-            
-            /* Elementos UI */
-            --border-color: rgba(0, 217, 255, 0.2);
-            --card-bg: rgba(20, 20, 30, 0.7);
-            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            
-            /* Degradados metálicos */
-            --metallic-primary: linear-gradient(145deg, var(--secondary-color), var(--primary-color));
-            --metallic-secondary: linear-gradient(145deg, var(--primary-color), var(--secondary-color));
-            --metallic-accent: linear-gradient(145deg, var(--accent-color), var(--warning-color));
-            
-            /* Sombras neón */
-            --glow-primary: 0 0 15px rgba(0, 255, 157, 0.5);
-            --glow-secondary: 0 0 15px rgba(0, 217, 255, 0.5);
-            --glow-accent: 0 0 15px rgba(255, 0, 85, 0.5);
-            
-            /* Transiciones */
-            --transition-fast: all 0.2s ease;
-            --transition-medium: all 0.3s ease;
-            --transition-slow: all 0.5s ease;
-            
-            /* Bordes */
-            --border-radius-sm: 6px;
-            --border-radius-md: 12px;
-            --border-radius-lg: 18px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: var(--bg-dark);
-            color: var(--text-light);
-            line-height: 1.6;
-            min-height: 100vh;
-            overflow-x: hidden;
-            position: relative;
-        }
-
-        /* Fondo de circuitos */
-        .circuit-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -2;
-            opacity: 0.15;
-            background: 
-                radial-gradient(circle, transparent 20%, var(--bg-dark) 70%),
-                repeating-linear-gradient(
-                    45deg,
-                    rgba(0, 217, 255, 0.05) 0px,
-                    rgba(0, 217, 255, 0.05) 1px,
-                    transparent 1px,
-                    transparent 11px
-                ),
-                repeating-linear-gradient(
-                    135deg,
-                    rgba(0, 217, 255, 0.05) 0px,
-                    rgba(0, 217, 255, 0.05) 1px,
-                    transparent 1px,
-                    transparent 11px
-                );
-            background-size: 100% 100%, 20px 20px, 20px 20px;
-        }
-
-        /* Animación de chispas */
-        .spark {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: var(--primary-color);
-            border-radius: 50%;
-            box-shadow: 0 0 10px var(--primary-color), 0 0 20px var(--primary-color);
-            z-index: -1;
-            animation: sparkMove 4s linear infinite;
-        }
-
-        @keyframes sparkMove {
-            0% { transform: translate(0, 0); opacity: 1; }
-            100% { transform: translate(100px, 100px); opacity: 0; }
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            position: relative;
-            z-index: 1;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-        }
-
-        .tab-button {
-            flex: 1;
-            padding: 12px 20px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius-sm);
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition-fast);
-            position: relative;
-            overflow: hidden;
-            color: var(--text-secondary);
-        }
-
-        .tab-button.active {
-            background: var(--metallic-primary);
-            color: white;
-            border-color: transparent;
-            box-shadow: var(--glow-primary);
-        }
-
-        .tab-button:not(.active):hover {
-            background: rgba(0, 255, 157, 0.1);
-        }
-
-        .main-content {
-            background: rgba(10, 10, 25, 0.5);
-            border-radius: var(--border-radius-lg);
-            padding: 20px;
-            backdrop-filter: blur(5px);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border-color);
-            position: relative;
-        }
-
-        .store-info {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-        }
-
-        .store-logo {
-            max-width: 200px;
-            height: auto;
-            filter: drop-shadow(0 0 10px var(--primary-color));
-            margin-bottom: 10px;
-        }
-
-        .header-icons {
-            display: flex;
-            gap: 15px;
-            position: absolute;
-            top: 20px;
-            right: 0;
-        }
-
-        .icon-button {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background: rgba(0, 217, 255, 0.1);
-            color: var(--secondary-color);
-            border: 1px solid var(--secondary-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1.2rem;
-            position: relative;
-            transition: var(--transition-fast);
-            box-shadow: var(--glow-secondary);
-        }
-
-        .icon-button:hover {
-            background: rgba(0, 217, 255, 0.3);
-            transform: translateY(-3px);
-            box-shadow: 0 0 20px var(--secondary-color);
-        }
-
-        .cart-counter, .notification-counter {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--accent-color);
-            color: white;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-            box-shadow: var(--glow-accent);
-        }
-
-        .theme-selector {
-            position: absolute;
-            top: 70px;
-            right: 0;
-            background: var(--card-bg);
-            border-radius: var(--border-radius-md);
-            padding: 15px;
-            display: flex;
-            gap: 15px;
-            box-shadow: var(--shadow-lg);
-            z-index: 100;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(10px);
-            transition: var(--transition-medium);
-        }
-
-        .theme-selector.active {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .theme-option {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: var(--transition-fast);
-            border: 2px solid transparent;
-        }
-
-        .theme-option:hover {
-            transform: scale(1.1);
-        }
-
-        .theme-option.theme-light {
-            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-        }
-
-        .theme-option.theme-dark {
-            background: linear-gradient(145deg, #1a1a2e, #121212);
-        }
-
-        .theme-option.theme-red {
-            background: linear-gradient(145deg, #e53935, #ff5252);
-        }
-
-        .theme-option.theme-blue {
-            background: linear-gradient(145deg, #2196f3, #42a5f5);
-        }
-
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .view-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        .view-button {
-            padding: 10px 15px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius-sm);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            transition: var(--transition-fast);
-        }
-
-        .view-button.active {
-            background: var(--metallic-secondary);
-            color: white;
-            border-color: transparent;
-        }
-
-        .view-button:not(.active):hover {
-            background: rgba(0, 217, 255, 0.1);
-        }
-
-        .search-filter {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        #search-input, #category-filter {
-            padding: 10px 15px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius-sm);
-            background: var(--card-bg);
-            color: var(--text-light);
-            transition: var(--transition-fast);
-        }
-
-        #search-input:focus, #category-filter:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(0, 255, 157, 0.2);
-        }
-
-        .products-container {
-            margin-bottom: 40px;
-        }
-
-        .product-list, .product-columns, .product-grid {
-            display: none;
-        }
-
-        .product-list.active {
-            display: block;
-        }
-
-        .product-grid.active {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 25px;
-        }
-
-        .product-item {
-            background: var(--card-bg);
-            border-radius: var(--border-radius-md);
-            box-shadow: var(--card-shadow);
-            overflow: hidden;
-            position: relative;
-            transition: var(--transition-medium);
-            border: 1px solid transparent;
-        }
-
-        .product-item:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 40px rgba(0, 217, 255, 0.2);
-            border-color: var(--primary-color);
-        }
-
-        .circuit-chip {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--primary-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary-color);
-            font-size: 1.2rem;
-            box-shadow: var(--glow-primary);
-            z-index: 3;
-            transition: var(--transition-fast);
-        }
-
-        .product-image {
-            width: 100%;
-            height: 180px;
-            background: linear-gradient(45deg, #1a1a2e, #16213e);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .product-image::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(
-                45deg, 
-                rgba(0, 255, 157, 0.1), 
-                rgba(0, 217, 255, 0.1), 
-                transparent
-            );
-            z-index: 1;
-        }
-
-        .product-image img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            z-index: 2;
-        }
-
-        .product-details {
-            padding: 20px;
-        }
-
-        .product-name {
-            font-size: 1.3rem;
-            margin-bottom: 10px;
-            font-weight: 700;
-            color: var(--text-light);
-        }
-
-        .product-description {
-            color: var(--text-secondary);
-            margin-bottom: 15px;
-            font-size: 0.95rem;
-        }
-
-        .product-price {
-            font-size: 1.4rem;
-            font-weight: 800;
-            background: var(--metallic-primary);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 15px;
-        }
-
-        .add-to-cart {
-            width: 100%;
-            padding: 12px;
-            background: rgba(0, 255, 157, 0.1);
-            color: var(--primary-color);
-            border: 1px solid var(--primary-color);
-            border-radius: var(--border-radius-sm);
-            cursor: pointer;
-            font-weight: 600;
-            transition: var(--transition-fast);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .add-to-cart:hover {
-            background: rgba(0, 255, 157, 0.3);
-            box-shadow: var(--glow-primary);
-            transform: translateY(-3px);
-        }
-
-        /* Indicador de administrador */
         .admin-indicator {
             position: fixed;
             top: 10px;
             right: 10px;
-            background: var(--success-color);
+            background: #4caf50;
             color: white;
             padding: 5px 10px;
             border-radius: 15px;
             font-size: 12px;
             z-index: 10000;
             display: none;
-            box-shadow: var(--glow-primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
         
         #admin-button.admin-active {
-            background-color: var(--success-color);
+            background-color: #4caf50;
             animation: pulse 2s infinite;
         }
         
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 255, 157, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 255, 157, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 255, 157, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
         
-        /* Modal del carrito */
+        /* Estilos para el modal del carrito */
         #product-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: rgba(0, 0, 0, 0.5);
             display: none;
             justify-content: center;
             align-items: center;
-            z-index: 2000;
+            z-index: 1000;
         }
         
         #product-modal .modal-content {
-            background-color: var(--card-bg);
+            background-color: white;
             padding: 20px;
-            border-radius: var(--border-radius-lg);
+            border-radius: 10px;
             max-width: 90%;
             max-height: 90vh;
             overflow-y: auto;
             width: 500px;
-            border: 1px solid var(--primary-color);
-            box-shadow: var(--glow-primary);
         }
         
         .cart-item {
             display: flex;
             gap: 15px;
             padding: 10px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid #eee;
             align-items: center;
-            background: rgba(0, 0, 0, 0.1);
         }
         
         .cart-buttons {
@@ -548,80 +77,24 @@
         }
         
         .checkout-btn {
-            background-color: var(--success-color);
+            background-color: #4CAF50;
             color: white;
             border: none;
             padding: 10px 20px;
-            border-radius: var(--border-radius-sm);
+            border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
             margin-top: 20px;
             width: 100%;
-            box-shadow: var(--glow-primary);
         }
         
         .checkout-btn:disabled {
-            background-color: var(--text-secondary);
+            background-color: #cccccc;
             cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            }
-            
-            .header-icons {
-                position: relative;
-                top: 0;
-                right: 0;
-            }
-            
-            .tabs {
-                flex-direction: column;
-            }
-            
-            .controls {
-                flex-direction: column;
-            }
-            
-            .product-grid.active {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            }
-        }
-
-        @media (max-width: 480px) {
-            .product-grid.active {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Animaciones */
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-
-        .float {
-            animation: float 3s ease-in-out infinite;
         }
     </style>
 </head>
 <body>
-    <!-- Fondo de circuitos -->
-    <div class="circuit-background"></div>
-    
-    <!-- Chispas animadas -->
-    <div class="spark" style="top: 10%; left: 15%; animation-delay: 0s;"></div>
-    <div class="spark" style="top: 30%; left: 70%; animation-delay: 0.5s;"></div>
-    <div class="spark" style="top: 60%; left: 40%; animation-delay: 1s;"></div>
-    <div class="spark" style="top: 80%; left: 85%; animation-delay: 1.5s;"></div>
-    <div class="spark" style="top: 45%; left: 25%; animation-delay: 2s;"></div>
-    
     <div id="admin-indicator" class="admin-indicator">
         <i class="fas fa-user-shield"></i> Modo Administrador
     </div>
@@ -674,7 +147,7 @@
             </div>
             
             <div class="products-container">
-                <div class="product-list active" id="list-view"></div>
+                <div class="product-list" id="list-view"></div>
                 <div class="product-columns" id="columns-view" style="display: none;"></div>
                 <div class="product-grid" id="grid-view" style="display: none;"></div>
             </div>
@@ -691,73 +164,46 @@
         window.ADMIN_IDS = [];
     </script>
 
-    <script>
-        // Script de diagnóstico mejorado con generación de chispas
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== DIAGNÓSTICO DEL SISTEMA ===');
-            
-            // Verificar módulos críticos
-            console.log('UserProfile:', typeof UserProfile);
-            console.log('UserProfile.getUserId:', typeof UserProfile?.getUserId);
-            console.log('OrdersSystem:', typeof OrdersSystem);
-            
-            // Verificar botones
-            const ordersButton = document.getElementById('orders-button');
-            console.log('Botón de pedidos:', ordersButton ? 'Encontrado' : 'No encontrado');
-            
-            if (ordersButton) {
-                ordersButton.addEventListener('click', () => {
-                    console.log('Click en botón de pedidos');
-                    if (typeof OrdersSystem?.openOrdersModal === 'function') {
-                        console.log('Ejecutando OrdersSystem.openOrdersModal()');
-                        OrdersSystem.openOrdersModal();
-                    } else {
-                        console.error('OrdersSystem.openOrdersModal no es una función');
-                    }
-                });
-            }
-            
-            // Generar chispas adicionales
-            function createSparks() {
-                const container = document.body;
-                const sparkCount = 15;
-                
-                for (let i = 0; i < sparkCount; i++) {
-                    const spark = document.createElement('div');
-                    spark.classList.add('spark');
-                    
-                    // Posición aleatoria
-                    const top = Math.floor(Math.random() * 100);
-                    const left = Math.floor(Math.random() * 100);
-                    
-                    // Animación aleatoria
-                    const duration = 2 + Math.random() * 3;
-                    const delay = Math.random() * 5;
-                    
-                    spark.style.top = top + '%';
-                    spark.style.left = left + '%';
-                    spark.style.animation = `sparkMove ${duration}s linear ${delay}s infinite`;
-                    
-                    container.appendChild(spark);
-                }
-            }
-            
-            createSparks();
-        });
-    </script>
-    
-    <!-- Scripts originales -->
     <script src="js/themes.js"></script>
     <script src="js/tabs.js"></script>
-    <script src="js/userProfile.js"></script>
+    <script src="js/userProfile.js"></script> <!-- Debe cargarse PRIMERO -->
     <script src="js/notifications.js"></script>
     <script src="js/productView.js"></script>
     <script src="js/productModal.js"></script>
     <script src="js/cart.js"></script>
     <script src="js/searchFilter.js"></script>
-    <script src="js/orders.js"></script>
+    <script src="js/orders.js"></script> <!-- Depende de userProfile.js -->
     <script src="js/checkout.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/main.js"></script>
+    
+    <!-- Código de diagnóstico mejorado -->
+    <script>
+    setTimeout(() => {
+        console.log('=== DIAGNÓSTICO DEL SISTEMA ===');
+        
+        // Verificar módulos críticos
+        console.log('UserProfile:', typeof UserProfile);
+        console.log('UserProfile.getUserId:', typeof UserProfile?.getUserId);
+        console.log('OrdersSystem:', typeof OrdersSystem);
+        
+        // Verificar botones
+        const ordersButton = document.getElementById('orders-button');
+        console.log('Botón de pedidos:', ordersButton ? 'Encontrado' : 'No encontrado');
+        
+        if (ordersButton) {
+            ordersButton.addEventListener('click', () => {
+                console.log('Click en botón de pedidos');
+                if (typeof OrdersSystem?.openOrdersModal === 'function') {
+                    console.log('Ejecutando OrdersSystem.openOrdersModal()');
+                    OrdersSystem.openOrdersModal();
+                } else {
+                    console.error('OrdersSystem.openOrdersModal no es una función');
+                }
+            });
+        }
+    }, 3000);
+    </script>
 </body>
 </html>
+
