@@ -127,13 +127,16 @@ const OrdersSystem = (function() {
         openOrdersModal: async function() {
             console.log('[Frontend] Abriendo modal de pedidos...');
             try {
+                // Verificar que UserProfile existe y tiene la función
+                if (!UserProfile || typeof UserProfile.getUserId !== 'function') {
+                    throw new Error('Módulo de perfil no disponible');
+                }
+                
                 const userId = UserProfile.getUserId();
                 console.log('[Frontend] ID de usuario obtenido:', userId);
                 
                 if (!userId) {
-                    console.error('[Frontend] Error: ID de usuario no disponible');
-                    alert('No se pudo identificar al usuario');
-                    return;
+                    throw new Error('Usuario no identificado');
                 }
                 
                 isModalOpen = true;
