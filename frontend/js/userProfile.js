@@ -25,7 +25,7 @@ const UserProfile = {
   
   async loadUserData() {
     console.log("[UserProfile] Cargando datos de usuario...");
-    const userId = this.getTelegramUserId();
+    const userId = this.getUserId();
     
     // Primero intentar cargar desde localStorage
     this.loadFromLocalStorage();
@@ -94,7 +94,7 @@ const UserProfile = {
       console.log("[UserProfile] Guardando datos de usuario...");
       localStorage.setItem('userProfile', JSON.stringify(this.userData));
       
-      const userId = this.getTelegramUserId();
+      const userId = this.getUserId();
       if (userId) {
         console.log(`[UserProfile] Enviando datos a API para userId: ${userId}`);
         const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`, {
@@ -120,7 +120,7 @@ const UserProfile = {
     try {
       console.log("[UserProfile] Abriendo modal de perfil...");
       
-      const userId = this.getTelegramUserId();
+      const userId = this.getUserId();
       if (!userId) {
         console.error("[UserProfile] No se pudo obtener ID de usuario");
         if (typeof Notifications !== 'undefined') {
@@ -276,7 +276,8 @@ const UserProfile = {
     return this.userData;
   },
   
-  getTelegramUserId: function() {
+  // Función corregida para obtener el ID de usuario
+  getUserId: function() {
     const urlParams = new URLSearchParams(window.location.search);
     const tgid = urlParams.get('tgid') || localStorage.getItem('telegramUserId');
     
@@ -286,5 +287,10 @@ const UserProfile = {
     }
     
     return null;
+  },
+  
+  // Nueva función para compatibilidad
+  getTelegramUserId: function() {
+    return this.getUserId();
   }
 };
