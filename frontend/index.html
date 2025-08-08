@@ -166,43 +166,41 @@
 
     <script src="js/themes.js"></script>
     <script src="js/tabs.js"></script>
-    <script src="js/userProfile.js"></script>
+    <script src="js/userProfile.js"></script> <!-- Debe cargarse PRIMERO -->
     <script src="js/notifications.js"></script>
     <script src="js/productView.js"></script>
     <script src="js/productModal.js"></script>
     <script src="js/cart.js"></script>
     <script src="js/searchFilter.js"></script>
-    <script src="js/orders.js"></script>
+    <script src="js/orders.js"></script> <!-- Depende de userProfile.js -->
     <script src="js/checkout.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/main.js"></script>
     
-    <!-- Código de diagnóstico -->
+    <!-- Código de diagnóstico mejorado -->
     <script>
     setTimeout(() => {
-        console.log('=== DIAGNÓSTICO DEL CARRITO ===');
-        const cartButton = document.getElementById('cart-button');
-        const modal = document.getElementById('product-modal');
+        console.log('=== DIAGNÓSTICO DEL SISTEMA ===');
         
-        console.log('1. Botón del carrito:', cartButton);
-        console.log('2. Modal del carrito:', modal);
-        console.log('3. CartSystem disponible:', typeof CartSystem);
-        console.log('4. Función openCartModal:', typeof CartSystem?.openCartModal);
+        // Verificar módulos críticos
+        console.log('UserProfile:', typeof UserProfile);
+        console.log('UserProfile.getUserId:', typeof UserProfile?.getUserId);
+        console.log('OrdersSystem:', typeof OrdersSystem);
         
-        if (cartButton) {
-            cartButton.style.border = '2px solid red'; // Para identificarlo visualmente
-            
-            cartButton.addEventListener('click', () => {
-                console.log('Click MANUAL en botón del carrito');
-                if (typeof CartSystem?.openCartModal === 'function') {
-                    console.log('Ejecutando CartSystem.openCartModal()');
-                    CartSystem.openCartModal();
+        // Verificar botones
+        const ordersButton = document.getElementById('orders-button');
+        console.log('Botón de pedidos:', ordersButton ? 'Encontrado' : 'No encontrado');
+        
+        if (ordersButton) {
+            ordersButton.addEventListener('click', () => {
+                console.log('Click en botón de pedidos');
+                if (typeof OrdersSystem?.openOrdersModal === 'function') {
+                    console.log('Ejecutando OrdersSystem.openOrdersModal()');
+                    OrdersSystem.openOrdersModal();
                 } else {
-                    console.error('CartSystem.openCartModal no es una función');
+                    console.error('OrdersSystem.openOrdersModal no es una función');
                 }
             });
-        } else {
-            console.error('No se encontró el botón del carrito');
         }
     }, 3000);
     </script>
