@@ -106,8 +106,11 @@ app.get('/api/users/:userId', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Eliminar campos de dirección, CI y provincia
+    const { address, ci, province, ...cleanProfile } = data.profile_data || {};
+    
     const profileData = {
-      ...(data.profile_data || {}),
+      ...cleanProfile,
       adminPhone: data.admin_phone || null,
       adminCards: data.admin_cards || {
         bpa: "",
@@ -129,10 +132,14 @@ app.get('/api/users/:userId', async (req, res) => {
 
 app.put('/api/users/:userId', async (req, res) => {
   const userId = req.params.userId;
-  const profileData = req.body;
+  let profileData = req.body;
   console.log(`✏️ PUT perfil solicitado para usuario: ${userId}`, profileData);
 
   try {
+    // Eliminar campos de dirección, CI y provincia
+    const { address, ci, province, ...cleanProfile } = profileData;
+    profileData = cleanProfile;
+
     const adminPhone = profileData.adminPhone || null;
     const adminCards = profileData.adminCards || {
       bpa: "",
@@ -235,7 +242,7 @@ app.get('/api/cart/:userId', async (req, res) => {
 });
 
 app.post('/api/cart/add', async (req, res) => {
-  const { userId, productId, tabType } = req.body;
+  const { userId, productId } = req.body;
   
   try {
     let { data: cart } = await supabase
@@ -246,7 +253,7 @@ app.post('/api/cart/add', async (req, res) => {
     
     let items = cart?.items || [];
     const existingItemIndex = items.findIndex(item => 
-      item.productId == productId && item.tabType === tabType
+      item.productId == productId
     );
     
     if (existingItemIndex !== -1) {
@@ -254,7 +261,6 @@ app.post('/api/cart/add', async (req, res) => {
     } else {
       items.push({ 
         productId, 
-        tabType, 
         quantity: 1, 
         addedAt: new Date().toISOString() 
       });
@@ -275,7 +281,7 @@ app.post('/api/cart/add', async (req, res) => {
 });
 
 app.post('/api/cart/remove', async (req, res) => {
-  const { userId, productId, tabType } = req.body;
+  const { userId, productId } = req.body;
   
   try {
     const { data: cart } = await supabase
@@ -288,7 +294,7 @@ app.post('/api/cart/remove', async (req, res) => {
     
     let items = cart.items;
     items = items.filter(item => 
-      !(item.productId == productId && item.tabType === tabType)
+      !(item.productId == productId)
     );
     
     const { data: updatedCart, error } = await supabase
@@ -307,7 +313,7 @@ app.post('/api/cart/remove', async (req, res) => {
 });
 
 app.post('/api/cart/update', async (req, res) => {
-  const { userId, productId, tabType, quantity } = req.body;
+  const { userId, productId, quantity } = req.body;
   
   try {
     const { data: cart } = await supabase
@@ -320,7 +326,7 @@ app.post('/api/cart/update', async (req, res) => {
     
     let items = cart.items;
     const itemIndex = items.findIndex(item => 
-      item.productId == productId && item.tabType === tabType
+      item.productId == productId
     );
     
     if (itemIndex === -1) {
@@ -361,19 +367,18 @@ app.post('/api/cart/clear/:userId', async (req, res) => {
   }
 });
 
-app.get('/api/products/:type', async (req, res) => {
-  const type = req.params.type;
-  
+// Solo productos digitales
+app.get('/api/products', async (req, res) => {
   try {
     const { data: products, error } = await supabase
       .from('products')
       .select(`
-        id, type, name, description, details, prices, images, 
+        id, name, description, details, prices, images, 
         has_color_variant, colors, required_fields, date_created,
         categories:category_id!inner(name)
       `)
-      .eq('type', type);
-    
+      .eq('type', 'digital');
+
     if (error) throw error;
 
     const result = {};
@@ -385,20 +390,20 @@ app.get('/api/products/:type', async (req, res) => {
     
     res.json(result);
   } catch (error) {
-    console.error('💥 Error en GET /api/products/:type:', error);
-    res.status(500).json({ error: 'Error obteniendo productos' });
+    console.error('💥 Error en GET /api/products:', error);
+    res.status(500).json({ error: 'Error obteniendo productos digitales' });
   }
 });
 
-app.get('/api/products/:type/:id', async (req, res) => {
-  const { type, id } = req.params;
+app.get('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
   
   try {
     const { data: product, error } = await supabase
       .from('products')
       .select('*, categories:category_id!inner(name)')
-      .eq('type', type)
       .eq('id', id)
+      .eq('type', 'digital')
       .single();
     
     if (error) {
@@ -411,14 +416,18 @@ app.get('/api/products/:type/:id', async (req, res) => {
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json({ ...product, category: product.categories.name });
   } catch (error) {
-    console.error('💥 Error en GET /api/products/:type/:id:', error);
-    res.status(500).json({ error: 'Error obteniendo producto' });
+    console.error('💥 Error en GET /api/products/:id:', error);
+    res.status(500).json({ error: 'Error obteniendo producto digital' });
   }
 });
 
 app.get('/api/admin/categories', isAdmin, async (req, res) => {
   try {
-    const { data: categories, error } = await supabase.from('categories').select('*');
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('type', 'digital');
+      
     if (error) throw error;
     res.json(categories);
   } catch (error) {
@@ -428,12 +437,15 @@ app.get('/api/admin/categories', isAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/categories', isAdmin, async (req, res) => {
-  const { type, name } = req.body;
+  const { name } = req.body;
   
   try {
     const { data, error } = await supabase
       .from('categories')
-      .insert([{ type, name }])
+      .insert([{ 
+        type: 'digital',
+        name 
+      }])
       .select()
       .single();
     
@@ -463,9 +475,9 @@ app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
 });
 
 app.post('/api/admin/products', isAdmin, async (req, res) => {
-  const { type, categoryId, product } = req.body;
+  const { categoryId, product } = req.body;
 
-  if (!type || !categoryId || !product) {
+  if (!categoryId || !product) {
     return res.status(400).json({ error: 'Faltan campos requeridos' });
   }
   
@@ -474,7 +486,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     
     const productData = {
       id: productId,
-      type,
+      type: 'digital',
       category_id: categoryId,
       name: product.name,
       description: product.description,
@@ -497,7 +509,7 @@ app.post('/api/admin/products', isAdmin, async (req, res) => {
     res.status(201).json({ id: data.id, ...product });
   } catch (error) {
     console.error('💥 Error en POST /api/admin/products:', error);
-    res.status(500).json({ error: 'Error creando producto' });
+    res.status(500).json({ error: 'Error creando producto digital' });
   }
 });
 
@@ -534,13 +546,13 @@ app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
 
 app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
   const productId = req.params.id;
-  const { type, categoryId, product } = req.body;
+  const { categoryId, product } = req.body;
 
   try {
     const { data, error } = await supabase
       .from('products')
       .update({
-        type,
+        type: 'digital',
         category_id: categoryId,
         name: product.name,
         description: product.description,
@@ -568,7 +580,8 @@ app.get('/api/admin/products', isAdmin, async (req, res) => {
   try {
     const { data: products, error } = await supabase
       .from('products')
-      .select('*, categories:category_id (id, name)');
+      .select('*, categories:category_id (id, name)')
+      .eq('type', 'digital');
     
     if (error) throw error;
     
@@ -601,20 +614,18 @@ app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/categories/:type', async (req, res) => {
-  const type = req.params.type;
-  
+app.get('/api/categories', async (req, res) => {
   try {
     const { data: categories, error } = await supabase
       .from('categories')
       .select('id, name')
-      .eq('type', type);
+      .eq('type', 'digital');
     
     if (error) throw error;
     res.json(categories);
   } catch (error) {
-    console.error('💥 Error en GET /api/categories/:type:', error);
-    res.status(500).json({ error: 'Error obteniendo categorías' });
+    console.error('💥 Error en GET /api/categories:', error);
+    res.status(500).json({ error: 'Error obteniendo categorías digitales' });
   }
 });
 
@@ -653,7 +664,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
     console.log(`🔍 [LOG] Obteniendo detalles de pedidos`);
     const { data: orderDetails, error: detailsError } = await supabase
       .from('order_details')
-      .select('order_id, payment_method, transfer_data, recipient_data, required_fields')
+      .select('order_id, payment_method, transfer_data, required_fields')
       .in('order_id', orderIds);
     
     if (detailsError) {
@@ -669,7 +680,7 @@ app.get('/api/orders/user/:userId', async (req, res) => {
     console.log(`🔍 [LOG] Obteniendo items de pedidos`);
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
-      .select('order_id, product_name, quantity, price, image_url, tab_type')
+      .select('order_id, product_name, quantity, price, image_url')
       .in('order_id', orderIds);
     
     if (itemsError) {
@@ -685,7 +696,6 @@ app.get('/api/orders/user/:userId', async (req, res) => {
     console.log(`🔍 [LOG] Combinando datos para ${orderIds.length} órdenes`);
     const parsedOrders = orders.map(order => {
       const details = orderDetails.find(d => d.order_id === order.id);
-      const items = orderItems.filter(i => i.order_id === order.id);
       
       return {
         id: order.id,
@@ -700,15 +710,15 @@ app.get('/api/orders/user/:userId', async (req, res) => {
           ...(details?.transfer_data || {}),
           proof_url: details?.transfer_data?.proof_url || ''
         },
-        recipient: details?.recipient_data || null,
         requiredFields: details?.required_fields || null,
-        items: items.map(item => ({
-          product_name: item.product_name,
-          quantity: item.quantity,
-          price: item.price,
-          image_url: item.image_url,
-          tab_type: item.tab_type
-        })) || []
+        items: orderItems
+          .filter(i => i.order_id === order.id)
+          .map(item => ({
+            product_name: item.product_name,
+            quantity: item.quantity,
+            price: item.price,
+            image_url: item.image_url
+          })) || []
       };
     });
     
@@ -742,15 +752,13 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
         order_details!inner (
           payment_method,
           transfer_data,
-          recipient_data,
           required_fields
         ),
         order_items:order_items (
           product_name,
           quantity,
           price,
-          image_url,
-          tab_type
+          image_url
         )
       `);
     
@@ -771,7 +779,6 @@ app.get('/api/admin/orders', isAdmin, async (req, res) => {
           method: orderDetail.payment_method,
           ...(orderDetail.transfer_data || {})
         },
-        recipient: orderDetail.recipient_data || null,
         requiredFields: orderDetail.required_fields || null,
         items: order.order_items || []
       };
@@ -801,15 +808,13 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
         order_details!inner (
           payment_method,
           transfer_data,
-          recipient_data,
           required_fields
         ),
         order_items:order_items (
           product_name,
           quantity,
           price,
-          image_url,
-          tab_type
+          image_url
         )
       `)
       .eq('id', orderId)
@@ -832,7 +837,6 @@ app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
         method: orderDetail.payment_method,
         ...(orderDetail.transfer_data || {})
       },
-      recipient: orderDetail.recipient_data || null,
       requiredFields: orderDetail.required_fields || null,
       items: order.order_items || []
     };
@@ -914,12 +918,10 @@ app.post('/api/checkout', async (req, res) => {
       user_id: userId,
       total: parseFloat(formData.total),
       status: 'Pendiente',
+      // Solo guardar nombre y teléfono
       user_data: {
         fullName: formData.fullName,
-        ci: formData.ci,
-        phone: formData.phone,
-        address: formData.address,
-        province: formData.province
+        phone: formData.phone
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -939,11 +941,6 @@ app.post('/api/checkout', async (req, res) => {
       transfer_data: {
         proof_url: proofUrl
       },
-      recipient_data: formData.recipientName ? {
-        name: formData.recipientName,
-        ci: formData.recipientCi,
-        phone: formData.recipientPhone
-      } : null,
       required_fields: formData.requiredFields ? JSON.parse(formData.requiredFields) : {}
     };
 
@@ -986,8 +983,7 @@ app.post('/api/checkout', async (req, res) => {
         product_name: product.name,
         quantity: item.quantity,
         price: price,
-        image_url: product.images[0] || '',
-        tab_type: item.tabType
+        image_url: product.images[0] || ''
       });
     }
 
@@ -1030,8 +1026,8 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
   console.log('🛜 Endpoints disponibles:');
-  console.log(`- GET /api/products/:type`);
-  console.log(`- GET /api/products/:type/:id`);
+  console.log(`- GET /api/products`);
+  console.log(`- GET /api/products/:id`);
   console.log(`- PUT /api/admin/products/:id`);
   console.log(`- GET /api/admin/products/:id`);
   console.log(`- POST /api/checkout`);
