@@ -583,10 +583,10 @@ body {
   font-weight: 600;
   color: var(--secondary-color);
 }
-
+/* Estilo para el botón de añadir al carrito */
 .add-to-cart {
-  padding: 8px 20px;
-  background: var(--metallic-secondary);
+  padding: 12px 25px;
+  background: var(--metallic-primary);
   color: white;
   border: none;
   border-radius: var(--border-radius-sm);
@@ -599,8 +599,50 @@ body {
 }
 
 .add-to-cart:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-primary);
+}
+
+/* Estilo para el botón de cerrar */
+.close-modal {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 1.8rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: var(--transition-fast);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-modal:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--accent-color);
+}
+
+/* Estilo para el botón de ver detalles */
+.btn-view {
+  padding: 10px 20px;
   background: var(--metallic-primary);
-  transform: translateY(-2px);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+}
+
+.btn-view:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
   box-shadow: var(--glow-primary);
 }
 
