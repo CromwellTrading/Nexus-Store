@@ -1,5 +1,5 @@
 const Tabs = {
-  currentTab: 'fisico',
+  currentTab: 'digital',
   
   init: function() {
     this.setupEventListeners();
@@ -7,24 +7,15 @@ const Tabs = {
   },
   
   setupEventListeners: function() {
-    const tabButtons = document.querySelectorAll('.tab-button');
-    tabButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        const tabType = button.getAttribute('data-tab');
-        this.switchTab(tabType);
-      });
-    });
+    // Solo tenemos la pestaña digital ahora
+    const tabButton = document.querySelector('.tab-button[data-tab="digital"]');
+    if (tabButton) {
+      tabButton.classList.add('active');
+    }
   },
   
   switchTab: function(tabType) {
-    this.currentTab = tabType;
-    
-    document.querySelectorAll('.tab-button').forEach(btn => {
-      btn.classList.remove('active');
-    });
-    document.querySelector(`.tab-button[data-tab="${tabType}"]`).classList.add('active');
-    
-    SearchFilter.updateCategorySelector();
-    ProductView.loadProducts(tabType);
+    this.currentTab = 'digital'; // Forzar siempre digital
+    ProductView.loadProducts();
   }
 };
