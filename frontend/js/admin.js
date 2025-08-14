@@ -92,7 +92,6 @@ const AdminSystem = {
       modal.style.display = 'none';
     });
   },
-  
   getAdminPanelHTML: function() {
     return `
     <div class="modal-content" style="max-width: 800px;">
@@ -149,10 +148,10 @@ const AdminSystem = {
                       <span class="checkmark"></span>
                       Requerido
                     </label>
-                    <button class="remove-field small-btn">🗑️</button>
+                    <button class="remove-field small-btn admin-action-btn admin-delete-btn">🗑️</button>
                   </div>
                 </div>
-                <button type="button" id="add-field-btn" class="small-btn">➕ Añadir Campo</button>
+                <button type="button" id="add-field-btn" class="small-btn admin-action-btn">➕ Añadir Campo</button>
               </div>
               
               <div class="form-group">
@@ -181,8 +180,8 @@ const AdminSystem = {
               </div>
               
               <div class="form-buttons">
-                <button id="save-product" class="save-btn">💾 Guardar Producto</button>
-                <button id="cancel-product" class="btn-cancel">❌ Cancelar</button>
+                <button id="save-product" class="save-btn admin-btn">💾 Guardar Producto</button>
+                <button id="cancel-product" class="btn-cancel admin-action-btn">❌ Cancelar</button>
               </div>
             </div>
             
@@ -214,7 +213,7 @@ const AdminSystem = {
           <h3>📋 Lista de Pedidos</h3>
           <div class="order-filter">
             <label>Filtrar por estado:</label>
-            <select id="order-status-filter">
+            <select id="order-status-filter" class="admin-select">
               <option value="all">Todos</option>
               <option value="Pendiente">Pendiente</option>
               <option value="En proceso">En proceso</option>
@@ -507,8 +506,8 @@ const AdminSystem = {
                   </div>
                 </div>
                 <div class="product-actions">
-                  <button class="edit-product" data-id="${product.id}">✏️ Editar</button>
-                  <button class="delete-product" data-id="${product.id}">🗑️ Eliminar</button>
+                  <button class="edit-product admin-action-btn" data-id="${product.id}">✏️ Editar</button>
+                  <button class="delete-product admin-action-btn admin-delete-btn" data-id="${product.id}">🗑️ Eliminar</button>
                 </div>
               </div>
             `).join('')}
@@ -716,7 +715,7 @@ const AdminSystem = {
                 <small>Tipo: ${category.type}</small>
               </div>
               <div class="category-actions">
-                <button class="delete-category" data-id="${category.id}">🗑️ Eliminar</button>
+                <button class="delete-category admin-action-btn admin-delete-btn" data-id="${category.id}">🗑️ Eliminar</button>
               </div>
             </div>
           `).join('')}
@@ -802,7 +801,7 @@ const AdminSystem = {
             <div class="order-id">📋 Pedido #${order.id}</div>
             <div class="order-date">📅 ${new Date(order.createdAt).toLocaleDateString()}</div>
             <div class="order-status">
-              <select class="status-select" data-id="${order.id}">
+              <select class="status-select admin-select" data-id="${order.id}">
                 <option value="Pendiente" ${order.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
                 <option value="En proceso" ${order.status === 'En proceso' ? 'selected' : ''}>En proceso</option>
                 <option value="Enviado" ${order.status === 'Enviado' ? 'selected' : ''}>Enviado</option>
@@ -815,7 +814,7 @@ const AdminSystem = {
             <div><strong>💰 Total:</strong> $${order.total.toFixed(2)}</div>
           </div>
           <div class="order-actions">
-            <button class="btn-view" data-id="${order.id}">👁️ Ver Detalles</button>
+            <button class="btn-view admin-action-btn" data-id="${order.id}">👁️ Ver Detalles</button>
           </div>
         `;
         ordersList.appendChild(orderElement);
