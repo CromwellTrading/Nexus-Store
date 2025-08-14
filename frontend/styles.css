@@ -1295,3 +1295,76 @@ body {
     max-height: 120px;
   }
 }
+/* Estilos para botones de cierre */
+.styled-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger-color);
+  border: 1px solid var(--danger-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 1.2rem;
+}
+
+.styled-close-btn:hover {
+  background: var(--danger-color);
+  color: white;
+  transform: rotate(90deg);
+}
+
+.modal-header {
+  position: relative;
+  padding-right: 60px; /* Espacio para el botón de cierre */
+}
+
+/* Estilos para botones de acción */
+.btn-view {
+  padding: 10px 20px;
+  background: var(--metallic-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.btn-view:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-primary);
+}
+
+/* Estilos para botón de añadir al carrito en modal */
+.modal-add-to-cart {
+  padding: 12px 24px;
+  background: var(--metallic-primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-add-to-cart:hover {
+  background: var(--metallic-secondary);
+  transform: translateY(-3px);
+  box-shadow: var(--glow-primary);
+}
