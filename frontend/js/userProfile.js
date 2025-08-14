@@ -1,10 +1,7 @@
 const UserProfile = {
   userData: {
     fullName: "",
-    ci: "",
     phone: "",
-    address: "",
-    province: "",
     adminCards: {
       bpa: "",
       bandec: "",
@@ -145,38 +142,14 @@ const UserProfile = {
               <input type="text" id="full-name" value="${this.userData.fullName || ''}" class="modern-input" required>
             </div>
             <div class="form-group">
-              <label>🆔 Carnet de Identidad:</label>
-              <input type="text" id="ci" value="${this.userData.ci || ''}" class="modern-input" required>
-            </div>
-            <div class="form-group">
               <label>📱 Teléfono:</label>
               <input type="text" id="phone" value="${this.userData.phone || ''}" class="modern-input" required>
-            </div>
-            <div class="form-group">
-              <label>🏠 Dirección:</label>
-              <input type="text" id="address" value="${this.userData.address || ''}" class="modern-input" required>
-            </div>
-            <div class="form-group">
-              <label>📍 Provincia:</label>
-              <select id="province" class="modern-select" required>
-                <option value="">Seleccionar provincia</option>
-                ${[
-                  'Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas',
-                  'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila',
-                  'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba',
-                  'Guantánamo', 'Isla de la Juventud'
-                ].map(prov => `
-                  <option value="${prov}" ${this.userData.province === prov ? 'selected' : ''}>
-                    ${prov}
-                  </option>
-                `).join('')}
-              </select>
             </div>
             
             ${this.isAdmin() ? this.getAdminFieldsHTML() : ''}
             
             <div class="form-buttons">
-              <button id="save-profile" class="btn-primary">💾 Guardar Perfil</button>
+              <button id="save-profile" class="save-btn">💾 Guardar Perfil</button>
               <button id="cancel-profile" class="btn-cancel">❌ Cancelar</button>
             </div>
           </div>
@@ -251,10 +224,7 @@ const UserProfile = {
     this.userData = {
       ...this.userData,
       fullName: document.getElementById('full-name').value.trim(),
-      ci: document.getElementById('ci').value.trim(),
-      phone: document.getElementById('phone').value.trim(),
-      address: document.getElementById('address').value.trim(),
-      province: document.getElementById('province').value
+      phone: document.getElementById('phone').value.trim()
     };
     
     if (this.isAdmin()) {
