@@ -3,6 +3,7 @@ const ProductView = {
   
   init: function() {
     this.setupEventListeners();
+    this.loadProducts(); // Cargar productos digitales al inicio
   },
   
   setupEventListeners: function() {
@@ -25,14 +26,14 @@ const ProductView = {
     });
     document.querySelector(`.view-button[data-view="${viewType}"]`).classList.add('active');
     
-    this.loadProducts(Tabs.currentTab);
+    this.loadProducts();
   },
   
-  loadProducts: function(tabType) {
-    fetch(`${window.API_BASE_URL}/api/products/${tabType}`)
+  loadProducts: function() {
+    fetch(`${window.API_BASE_URL}/api/products/digital`)
       .then(response => response.json())
       .then(products => {
-        this.displayProducts(tabType, products);
+        this.displayProducts(products);
       })
       .catch(error => {
         console.error('Error cargando productos:', error);
@@ -40,26 +41,26 @@ const ProductView = {
       });
   },
   
-  displayProducts: function(tabType, products) {
+  displayProducts: function(products) {
     document.getElementById('list-view').style.display = 'none';
     document.getElementById('columns-view').style.display = 'none';
     document.getElementById('grid-view').style.display = 'none';
     
     if (this.currentView === 'list') {
-      this.generateListView(tabType, products);
+      this.generateListView(products);
       document.getElementById('list-view').style.display = 'block';
     } else if (this.currentView === 'columns') {
-      this.generateColumnsView(tabType, products);
+      this.generateColumnsView(products);
       document.getElementById('columns-view').style.display = 'flex';
     } else if (this.currentView === 'grid') {
-      this.generateGridView(tabType, products);
+      this.generateGridView(products);
       document.getElementById('grid-view').style.display = 'grid';
     }
     
-    this.setupProductEvents(tabType);
+    this.setupProductEvents();
   },
   
-  generateListView: function(tabType, products) {
+  generateListView: function(products) {
     const listView = document.getElementById('list-view');
     listView.innerHTML = '';
     
@@ -74,7 +75,7 @@ const ProductView = {
       
       const categorySection = document.createElement('div');
       categorySection.className = 'category-section';
-      categorySection.innerHTML = `<h2 class="category-title">${category}</h2>`; // Usamos el nombre de la categoría directamente
+      categorySection.innerHTML = `<h2 class="category-title">${category}</h2>`;
       
       productsInCategory.forEach(product => {
         const productItem = document.createElement('div');
@@ -112,7 +113,7 @@ const ProductView = {
     });
   },
   
-  generateColumnsView: function(tabType, products) {
+  generateColumnsView: function(products) {
     const columnsView = document.getElementById('columns-view');
     columnsView.innerHTML = '';
     
@@ -127,7 +128,7 @@ const ProductView = {
       
       const categoryColumn = document.createElement('div');
       categoryColumn.className = 'category-column';
-      categoryColumn.innerHTML = `<h2 class="category-title">${category}</h2>`; // Nombre de categoría directo
+      categoryColumn.innerHTML = `<h2 class="category-title">${category}</h2>`;
       
       productsInCategory.forEach(product => {
         const productItem = document.createElement('div');
@@ -161,7 +162,7 @@ const ProductView = {
     });
   },
   
-  generateGridView: function(tabType, products) {
+  generateGridView: function(products) {
     const gridView = document.getElementById('grid-view');
     gridView.innerHTML = '';
     
@@ -219,7 +220,7 @@ const ProductView = {
     return html || '<div class="product-price">Precio no disponible</div>';
   },
   
-  setupProductEvents: function(tabType) {
+  setupProductEvents: function() {
     document.querySelectorAll('.product-item, .grid-product').forEach(item => {
       item.addEventListener('click', function(e) {
         // Evitar abrir modal si se hizo clic en un botón dentro del item
@@ -228,7 +229,7 @@ const ProductView = {
         }
         
         const productId = this.dataset.id;
-        ProductModal.openModal(productId, tabType);
+        ProductModal.openModal(productId);
       });
     });
     
@@ -236,18 +237,18 @@ const ProductView = {
       button.addEventListener('click', function(e) {
         e.stopPropagation();
         const productId = this.dataset.id;
-        CartSystem.addToCart(productId, tabType);
+        CartSystem.addToCart(productId);
       });
     });
   },
   
   getCategoryName: function(categoryKey) {
-    return categoryKey; // Usamos directamente el nombre de la categoría
+    return categoryKey;
   },
   
-  getProductById: async function(id, tabType) {
+  getProductById: async function(id) {
     try {
-      const response = await fetch(`${window.API_BASE_URL}/api/products/${tabType}/${id}`);
+      const response = await fetch(`${window.API_BASE_URL}/api/products/digital/${id}`);
       return await response.json();
     } catch (error) {
       console.error('Error obteniendo producto:', error);
