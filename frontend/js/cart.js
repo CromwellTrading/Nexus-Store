@@ -59,10 +59,11 @@ const CartSystem = {
     
     try {
       console.log('[Cart] Enviando petición para añadir al carrito');
+      // Cambio: Eliminamos tabType (ya no se necesita)
       const response = await fetch(`${window.API_BASE_URL}/api/cart/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId, tabType: 'digital' })
+        body: JSON.stringify({ userId, productId })
       });
       
       const result = await response.json();
@@ -87,10 +88,11 @@ const CartSystem = {
     const userId = UserProfile.getTelegramUserId();
     try {
       console.log('[Cart] Enviando petición para eliminar del carrito');
+      // Cambio: Eliminamos tabType
       const response = await fetch(`${window.API_BASE_URL}/api/cart/remove`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId, tabType: 'digital' })
+        body: JSON.stringify({ userId, productId })
       });
       
       if (!response.ok) {
@@ -112,13 +114,13 @@ const CartSystem = {
     const userId = UserProfile.getTelegramUserId();
     try {
       console.log('[Cart] Enviando petición para actualizar cantidad');
+      // Cambio: Eliminamos tabType
       const response = await fetch(`${window.API_BASE_URL}/api/cart/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId, 
           productId, 
-          tabType: 'digital', 
           quantity: newQuantity 
         })
       });
