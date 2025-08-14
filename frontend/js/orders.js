@@ -30,12 +30,11 @@ const OrdersSystem = (function() {
         const modalContent = document.createElement('div');
         modalContent.className = 'modal-content';
         
-        // Verificar si hay pedidos
         if (!ordersData || ordersData.length === 0) {
             modalContent.innerHTML = `
                 <h2>Mis Pedidos</h2>
                 <p>No tienes pedidos aún</p>
-                <button class="close-modal">Cerrar</button>
+                <button class="close-modal btn-view">Cerrar</button> <!-- Agregada clase btn-view -->
             `;
         } else {
             modalContent.innerHTML = `
@@ -47,18 +46,17 @@ const OrdersSystem = (function() {
                             <p><strong>Total:</strong> $${order.total.toFixed(2)}</p>
                             <p><strong>Estado:</strong> ${order.status}</p>
                             <p><strong>Fecha:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
-                            <button class="view-order-details" data-order-id="${order.id}">Ver Detalles</button>
+                            <button class="view-order-details btn-view" data-order-id="${order.id}">Ver Detalles</button> <!-- Agregada clase btn-view -->
                         </div>
                     `).join('')}
                 </div>
-                <button class="close-modal">Cerrar</button>
+                <button class="close-modal btn-view">Cerrar</button> <!-- Agregada clase btn-view -->
             `;
         }
 
         modal.appendChild(modalContent);
         modal.style.display = 'flex';
 
-        // Event listeners para los botones de detalles
         modalContent.querySelectorAll('.view-order-details').forEach(button => {
             button.addEventListener('click', function() {
                 const orderId = this.getAttribute('data-order-id');
@@ -66,7 +64,6 @@ const OrdersSystem = (function() {
             });
         });
 
-        // Event listener para cerrar el modal
         modalContent.querySelector('.close-modal').addEventListener('click', function() {
             modal.style.display = 'none';
             isModalOpen = false;
@@ -113,12 +110,11 @@ const OrdersSystem = (function() {
                 `).join('')}
             ` : ''}
             
-            <button class="close-modal">Volver</button>
+            <button class="close-modal btn-view">Volver</button> <!-- Agregada clase btn-view -->
         `;
 
         modal.appendChild(modalContent);
 
-        // Event listener para cerrar el modal
         modalContent.querySelector('.close-modal').addEventListener('click', function() {
             renderOrdersModal(orders);
         });
