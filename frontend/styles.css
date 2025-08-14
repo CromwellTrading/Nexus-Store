@@ -1312,7 +1312,7 @@ body {
 
 @media (max-width: 480px) {
   .store-logo {
-    max-height: 150px;
+    max-height: 120px;
   }
 }
 
