@@ -48,8 +48,8 @@ const CartSystem = {
     }
   },
   
-  async addToCart(productId, tabType) {
-    console.log(`[Cart] ADD producto al carrito - Producto: ${productId}, Tab: ${tabType}`);
+  async addToCart(productId) {
+    console.log(`[Cart] ADD producto al carrito - Producto: ${productId}`);
     const userId = UserProfile.getTelegramUserId();
     if (!userId) {
       console.log('[Cart] Usuario no identificado al intentar añadir al carrito');
@@ -62,7 +62,7 @@ const CartSystem = {
       const response = await fetch(`${window.API_BASE_URL}/api/cart/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId, tabType })
+        body: JSON.stringify({ userId, productId, tabType: 'digital' })
       });
       
       const result = await response.json();
@@ -82,15 +82,15 @@ const CartSystem = {
     }
   },
   
-  async removeFromCart(productId, tabType) {
-    console.log(`[Cart] REMOVE producto del carrito - Producto: ${productId}, Tab: ${tabType}`);
+  async removeFromCart(productId) {
+    console.log(`[Cart] REMOVE producto del carrito - Producto: ${productId}`);
     const userId = UserProfile.getTelegramUserId();
     try {
       console.log('[Cart] Enviando petición para eliminar del carrito');
       const response = await fetch(`${window.API_BASE_URL}/api/cart/remove`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, productId, tabType })
+        body: JSON.stringify({ userId, productId, tabType: 'digital' })
       });
       
       if (!response.ok) {
@@ -107,7 +107,7 @@ const CartSystem = {
     }
   },
   
-  async updateCartItemQuantity(productId, tabType, newQuantity) {
+  async updateCartItemQuantity(productId, newQuantity) {
     console.log(`[Cart] UPDATE cantidad producto - Producto: ${productId}, Nueva cantidad: ${newQuantity}`);
     const userId = UserProfile.getTelegramUserId();
     try {
@@ -118,7 +118,7 @@ const CartSystem = {
         body: JSON.stringify({ 
           userId, 
           productId, 
-          tabType, 
+          tabType: 'digital', 
           quantity: newQuantity 
         })
       });
@@ -159,9 +159,9 @@ const CartSystem = {
       console.log(`[Cart] Hay ${this.cart.items.length} items en el carrito`);
       
       cartContent = await Promise.all(this.cart.items.map(async item => {
-        console.log(`[Cart] Procesando item: ${item.productId} (${item.tabType})`);
+        console.log(`[Cart] Procesando item: ${item.productId}`);
         
-        const product = await ProductView.getProductById(item.productId, item.tabType);
+        const product = await ProductView.getProductById(item.productId);
         if (!product) {
           console.warn(`[Cart] Producto ${item.productId} no encontrado`);
           return '';
@@ -193,10 +193,10 @@ const CartSystem = {
                 <div>Total: ${itemTotal.toFixed(2)} CUP</div>
             </div>
             <div class="cart-buttons">
-                <button class="decrease-quantity" data-id="${item.productId}" data-tab="${item.tabType}">-</button>
+                <button class="decrease-quantity" data-id="${item.productId}">-</button>
                 <span>${item.quantity}</span>
-                <button class="increase-quantity" data-id="${item.productId}" data-tab="${item.tabType}">+</button>
-                <button class="remove-item" data-id="${item.productId}" data-tab="${item.tabType}">Eliminar</button>
+                <button class="increase-quantity" data-id="${item.productId}">+</button>
+                <button class="remove-item" data-id="${item.productId}">Eliminar</button>
             </div>
           </div>
         `;
@@ -247,20 +247,18 @@ const CartSystem = {
       modal.querySelectorAll('.remove-item').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
-          const tabType = e.target.getAttribute('data-tab');
-          console.log(`[Cart] Eliminando item: ${productId} (${tabType})`);
-          this.removeFromCart(productId, tabType);
+          console.log(`[Cart] Eliminando item: ${productId}`);
+          this.removeFromCart(productId);
         });
       });
       
       modal.querySelectorAll('.increase-quantity').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
-          const tabType = e.target.getAttribute('data-tab');
-          const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
+          const item = this.cart.items.find(i => i.productId === productId);
           if (item) {
             console.log(`[Cart] Incrementando cantidad de ${productId} a ${item.quantity + 1}`);
-            this.updateCartItemQuantity(productId, tabType, item.quantity + 1);
+            this.updateCartItemQuantity(productId, item.quantity + 1);
           }
         });
       });
@@ -268,11 +266,10 @@ const CartSystem = {
       modal.querySelectorAll('.decrease-quantity').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.target.getAttribute('data-id');
-          const tabType = e.target.getAttribute('data-tab');
-          const item = this.cart.items.find(i => i.productId === productId && i.tabType === tabType);
+          const item = this.cart.items.find(i => i.productId === productId);
           if (item && item.quantity > 1) {
             console.log(`[Cart] Reduciendo cantidad de ${productId} a ${item.quantity - 1}`);
-            this.updateCartItemQuantity(productId, tabType, item.quantity - 1);
+            this.updateCartItemQuantity(productId, item.quantity - 1);
           }
         });
       });
