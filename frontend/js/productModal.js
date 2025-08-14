@@ -12,7 +12,7 @@ const ProductModal = {
           <div class="thumbnails-container"></div>
           <div class="modal-product-price"></div>
           <p class="modal-product-description"></p>
-          <button class="modal-add-to-cart">Añadir al carrito</button>
+          <button class="modal-add-to-cart add-to-cart">Añadir al carrito</button> <!-- Agregada clase add-to-cart -->
         </div>
       `;
     }
@@ -43,16 +43,17 @@ const ProductModal = {
         const addToCartBtn = modal.querySelector('.modal-add-to-cart');
         addToCartBtn.setAttribute('data-id', product.id);
         
+        // Asegurar que tenga la clase correcta
+        addToCartBtn.classList.add('add-to-cart');
+        
         const mainImage = modal.querySelector('.main-image-container');
         const thumbnailsContainer = modal.querySelector('.thumbnails-container');
         mainImage.innerHTML = '';
         thumbnailsContainer.innerHTML = '';
         
         if (product.images && product.images.length > 0) {
-          // Mostrar la primera imagen como principal
           mainImage.innerHTML = `<img src="${product.images[0]}" alt="${product.name}" class="main-image">`;
           
-          // Mostrar miniaturas para el resto de imágenes
           if (product.images.length > 1) {
             product.images.forEach((img, index) => {
               const thumb = document.createElement('div');
