@@ -30,7 +30,8 @@ const ProductView = {
   },
   
   loadProducts: function() {
-    fetch(`${window.API_BASE_URL}/api/products/digital`)
+    // Cambio: Usar endpoint /api/products (sin tipo)
+    fetch(`${window.API_BASE_URL}/api/products`)
       .then(response => response.json())
       .then(products => {
         this.displayProducts(products);
@@ -248,7 +249,8 @@ const ProductView = {
   
   getProductById: async function(id) {
     try {
-      const response = await fetch(`${window.API_BASE_URL}/api/products/digital/${id}`);
+      // Cambio: Usar endpoint /api/products/:id (sin tipo)
+      const response = await fetch(`${window.API_BASE_URL}/api/products/${id}`);
       return await response.json();
     } catch (error) {
       console.error('Error obteniendo producto:', error);
