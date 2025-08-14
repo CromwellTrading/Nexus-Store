@@ -1,6 +1,4 @@
 const ProductModal = {
-  currentTab: null,
-  
   init: function() {
     const modal = document.getElementById('product-modal');
     if (!modal.querySelector('.modal-content')) {
@@ -26,9 +24,8 @@ const ProductModal = {
     });
   },
   
-  openModal: function(productId, tabType) {
-    this.currentTab = tabType;
-    ProductView.getProductById(productId, tabType)
+  openModal: function(productId) {
+    ProductView.getProductById(productId)
       .then(product => {
         if (!product) return;
 
@@ -45,7 +42,6 @@ const ProductModal = {
         
         const addToCartBtn = modal.querySelector('.modal-add-to-cart');
         addToCartBtn.setAttribute('data-id', product.id);
-        addToCartBtn.setAttribute('data-tab', tabType);
         
         const mainImage = modal.querySelector('.main-image-container');
         const thumbnailsContainer = modal.querySelector('.thumbnails-container');
@@ -75,7 +71,7 @@ const ProductModal = {
         }
         
         addToCartBtn.onclick = () => {
-          CartSystem.addToCart(product.id, tabType);
+          CartSystem.addToCart(product.id);
           this.closeModal();
         };
         
