@@ -954,7 +954,7 @@ const AdminSystem = {
     
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
-    fetch(`${window.API_BASE_URL}/api/categories/digital`, {
+    fetch(`${window.API_BASE_URL}/api/categories`, {
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
     .then(response => response.json())
