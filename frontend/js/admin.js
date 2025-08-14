@@ -1,6 +1,5 @@
 const AdminSystem = {
-  productType: 'fisico',
-  categoryType: 'fisico',
+  categoryType: 'digital',
   isAdmin: false,
   telegramUserId: null,
   
@@ -120,32 +119,14 @@ const AdminSystem = {
               <input type="hidden" id="product-id">
               
               <div class="form-group">
-                <label>📦 Tipo de Producto:</label>
-                <div class="tab-selector">
-                  <button class="type-tab ${this.productType === 'fisico' ? 'active' : ''}" data-type="fisico">Físico</button>
-                  <button class="type-tab ${this.productType === 'digital' ? 'active' : ''}" data-type="digital">Digital</button>
-                </div>
+                <label>📦 Tipo de Producto: <strong>Digital</strong></label>
+                <input type="hidden" id="product-type" value="digital">
               </div>
               
-              <div id="physical-fields" style="${this.productType === 'fisico' ? '' : 'display: none;'}">
-                <div class="form-group">
-                  <label>🖼️ Imágenes (1-4):</label>
-                  <input type="file" id="product-images" multiple accept="image/*">
-                  <div id="image-preview" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;"></div>
-                </div>
-                
-                <div class="form-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="has-color-variant"> 
-                    <span class="checkmark"></span>
-                    🎨 ¿Tiene variantes de color?
-                  </label>
-                  
-                  <div id="color-variant-section" style="display: none; margin-top: 10px;">
-                    <div class="color-variants" id="color-variants-container"></div>
-                    <button type="button" id="add-color-btn" class="small-btn">➕ Añadir Color</button>
-                  </div>
-                </div>
+              <div class="form-group">
+                <label>🖼️ Imagen:</label>
+                <input type="file" id="digital-image" accept="image/*">
+                <div id="digital-image-preview" style="margin-top: 10px;"></div>
               </div>
               
               <div class="form-group">
@@ -158,27 +139,20 @@ const AdminSystem = {
                 <textarea id="product-description" rows="3" required class="modern-input"></textarea>
               </div>
               
-              <div id="digital-fields" style="${this.productType === 'digital' ? '' : 'display: none;'}">
-                <div class="form-group">
-                  <label>🖼️ Imagen:</label>
-                  <input type="file" id="digital-image" accept="image/*">
-                  <div id="digital-image-preview" style="margin-top: 10px;"></div>
-                </div>
-                <div class="form-group">
-                  <label>📋 Campos Requeridos:</label>
-                  <div id="required-fields-container">
-                    <div class="required-field">
-                      <input type="text" placeholder="Nombre del campo" class="field-name modern-input" style="flex: 1;">
-                      <label class="checkbox-label">
-                        <input type="checkbox" class="field-required" checked>
-                        <span class="checkmark"></span>
-                        Requerido
-                      </label>
-                      <button class="remove-field small-btn">🗑️</button>
-                    </div>
+              <div class="form-group">
+                <label>📋 Campos Requeridos:</label>
+                <div id="required-fields-container">
+                  <div class="required-field">
+                    <input type="text" placeholder="Nombre del campo" class="field-name modern-input" style="flex: 1;">
+                    <label class="checkbox-label">
+                      <input type="checkbox" class="field-required" checked>
+                      <span class="checkmark"></span>
+                      Requerido
+                    </label>
+                    <button class="remove-field small-btn">🗑️</button>
                   </div>
-                  <button type="button" id="add-field-btn" class="small-btn">➕ Añadir Campo</button>
                 </div>
+                <button type="button" id="add-field-btn" class="small-btn">➕ Añadir Campo</button>
               </div>
               
               <div class="form-group">
@@ -206,11 +180,6 @@ const AdminSystem = {
                 </select>
               </div>
               
-              <div class="form-group" id="physical-details-section" style="${this.productType === 'fisico' ? '' : 'display: none;'}">
-                <label>📄 Detalles Adicionales:</label>
-                <textarea id="product-details" rows="2" class="modern-input"></textarea>
-              </div>
-              
               <div class="form-buttons">
                 <button id="save-product" class="save-btn">💾 Guardar Producto</button>
                 <button id="cancel-product" class="btn-cancel">❌ Cancelar</button>
@@ -226,11 +195,8 @@ const AdminSystem = {
             <h3>📁 Gestionar Categorías</h3>
             
             <div class="category-type-selector">
-              <label>📦 Tipo de Producto:</label>
-              <div class="tab-selector">
-                <button class="type-tab ${this.categoryType === 'fisico' ? 'active' : ''}" data-type="fisico">Físico</button>
-                <button class="type-tab ${this.categoryType === 'digital' ? 'active' : ''}" data-type="digital">Digital</button>
-              </div>
+              <label>📦 Tipo de Producto: <strong>Digital</strong></label>
+              <input type="hidden" id="category-type" value="digital">
             </div>
             
             <div class="form-group">
@@ -289,59 +255,11 @@ const AdminSystem = {
       this.resetProductForm();
     });
     
-    document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
-      tab.addEventListener('click', (e) => {
-        const type = e.target.dataset.type;
-        console.log(`[AdminSystem] Cambiando tipo de producto a: ${type}`);
-        this.productType = type;
-        document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
-        e.target.classList.add('active');
-        
-        document.getElementById('physical-fields').style.display = type === 'fisico' ? 'block' : 'none';
-        document.getElementById('digital-fields').style.display = type === 'digital' ? 'block' : 'none';
-        document.getElementById('physical-details-section').style.display = type === 'fisico' ? 'block' : 'none';
-        
-        this.renderCategoryOptions(type);
-      });
-    });
-
-    document.querySelectorAll('.type-tab[data-type]').forEach(tab => {
-      tab.addEventListener('click', (e) => {
-        this.categoryType = e.target.dataset.type;
-        console.log(`[AdminSystem] Cambiando tipo de categoría a: ${this.categoryType}`);
-        this.renderCategoriesList();
-      });
-    });
-    
-    document.getElementById('has-color-variant').addEventListener('change', (e) => {
-      console.log(`[AdminSystem] Variante de color: ${e.target.checked ? 'activada' : 'desactivada'}`);
-      document.getElementById('color-variant-section').style.display = e.target.checked ? 'block' : 'none';
-    });
-    
-    document.getElementById('add-color-btn').addEventListener('click', () => {
-      console.log("[AdminSystem] Añadiendo variante de color");
-      const container = document.getElementById('color-variants-container');
-      container.innerHTML += `
-        <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-          <input type="color" value="#ffffff" class="color-picker">
-          <input type="text" placeholder="Nombre del color" class="color-name">
-          <button class="remove-color">❌</button>
-        </div>
-      `;
-      
-      container.querySelectorAll('.remove-color').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          console.log("[AdminSystem] Eliminando variante de color");
-          e.target.closest('.color-variant').remove();
-        });
-      });
-    });
-    
     document.getElementById('add-field-btn').addEventListener('click', () => {
       console.log("[AdminSystem] Añadiendo campo requerido");
       const container = document.getElementById('required-fields-container');
       container.innerHTML += `
-        <div class="required-field" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <div class="required-field">
           <input type="text" placeholder="Nombre del campo" class="field-name modern-input" style="flex: 1;">
           <label class="checkbox-label">
             <input type="checkbox" class="field-required" checked>
@@ -382,14 +300,9 @@ const AdminSystem = {
       this.loadOrders(e.target.value);
     });
     
-    document.getElementById('product-images')?.addEventListener('change', (e) => {
-      console.log("[AdminSystem] Vista previa de imágenes físicas");
-      this.previewImages(e.target, 'image-preview');
-    });
-    
     document.getElementById('digital-image')?.addEventListener('change', (e) => {
       console.log("[AdminSystem] Vista previa de imagen digital");
-      this.previewImages(e.target, 'digital-image-preview', false);
+      this.previewImages(e.target, 'digital-image-preview');
     });
     
     this.renderProductsList();
@@ -409,12 +322,9 @@ const AdminSystem = {
       reader.onload = (e) => {
         const img = document.createElement('img');
         img.src = e.target.result;
-        img.style.maxWidth = '100px';
-        img.style.maxHeight = '100px';
+        img.style.maxWidth = '200px';
+        img.style.maxHeight = '200px';
         img.style.objectFit = 'contain';
-        img.style.margin = '5px';
-        img.style.border = '1px solid #ddd';
-        img.style.borderRadius = '4px';
         preview.appendChild(img);
       };
       reader.readAsDataURL(file);
@@ -424,11 +334,10 @@ const AdminSystem = {
   saveProduct: async function() {
     console.log("[AdminSystem] Iniciando guardado de producto...");
     const productId = document.getElementById('product-id').value;
-    const type = this.productType;
+    const type = 'digital';
     const name = document.getElementById('product-name').value;
     const description = document.getElementById('product-description').value;
     const categoryId = document.getElementById('product-category').value;
-    const details = document.getElementById('product-details').value;
     
     const prices = {};
     document.querySelectorAll('.price-currency').forEach(input => {
@@ -445,96 +354,48 @@ const AdminSystem = {
       name, 
       description, 
       prices, 
-      details: details || '', 
       date_created: new Date().toISOString(),
-      has_color_variant: document.getElementById('has-color-variant').checked,
-      colors: [],
       required_fields: []
     };
     
     try {
-      if (type === 'fisico') {
-        const imageFiles = document.getElementById('product-images').files;
-        if (imageFiles.length > 0) {
-          product.images = [];
-          for (let i = 0; i < imageFiles.length; i++) {
-            console.log(`[AdminSystem] Subiendo imagen ${i+1}/${imageFiles.length}`);
-            this.showLoading('image-preview', `Subiendo imagen ${i+1}/${imageFiles.length}`);
-            
-            const formData = new FormData();
-            formData.append('image', imageFiles[i]);
-            
-            const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
-              method: 'POST',
-              headers: { 'Telegram-ID': this.telegramUserId.toString() },
-              body: formData
-            });
-            
-            if (!uploadResponse.ok) {
-              const errorText = await uploadResponse.text();
-              throw new Error(`Error subiendo imagen: ${uploadResponse.status} - ${errorText}`);
-            }
-            
-            const { url } = await uploadResponse.json();
-            product.images.push(url);
-            
-            const preview = document.getElementById('image-preview');
-            const img = document.createElement('img');
-            img.src = url;
-            img.style.maxWidth = '100px';
-            img.style.maxHeight = '100px';
-            img.style.objectFit = 'contain';
-            img.style.margin = '5px';
-            preview.appendChild(img);
-          }
-        }
+      const imageFile = document.getElementById('digital-image').files[0];
+      if (imageFile) {
+        console.log("[AdminSystem] Subiendo imagen digital");
+        this.showLoading('digital-image-preview', 'Subiendo imagen...');
         
-        if (product.has_color_variant) {
-          document.querySelectorAll('.color-variant').forEach(variant => {
-            const color = variant.querySelector('.color-picker').value;
-            const name = variant.querySelector('.color-name').value || 'Color ' + (product.colors.length + 1);
-            product.colors.push({ color, name });
-          });
-        }
-      } else {
-        const imageFile = document.getElementById('digital-image').files[0];
-        if (imageFile) {
-          console.log("[AdminSystem] Subiendo imagen digital");
-          this.showLoading('digital-image-preview', 'Subiendo imagen...');
-          
-          const formData = new FormData();
-          formData.append('image', imageFile);
-          
-          const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
-            method: 'POST',
-            headers: { 'Telegram-ID': this.telegramUserId.toString() },
-            body: formData
-          });
-          
-          if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            throw new Error(`Error subiendo imagen: ${uploadResponse.status} - ${errorText}`);
-          }
-          
-          const { url } = await uploadResponse.json();
-          product.images = [url];
-          
-          const preview = document.getElementById('digital-image-preview');
-          preview.innerHTML = '';
-          const img = document.createElement('img');
-          img.src = url;
-          img.style.maxWidth = '200px';
-          img.style.maxHeight = '200px';
-          img.style.objectFit = 'contain';
-          preview.appendChild(img);
-        }
+        const formData = new FormData();
+        formData.append('image', imageFile);
         
-        document.querySelectorAll('.required-field').forEach(field => {
-          const fieldName = field.querySelector('.field-name').value.trim();
-          const isRequired = field.querySelector('.field-required').checked;
-          if (fieldName) product.required_fields.push({ name: fieldName, required: isRequired });
+        const uploadResponse = await fetch(`${window.API_BASE_URL}/api/upload-image`, {
+          method: 'POST',
+          headers: { 'Telegram-ID': this.telegramUserId.toString() },
+          body: formData
         });
+        
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          throw new Error(`Error subiendo imagen: ${uploadResponse.status} - ${errorText}`);
+        }
+        
+        const { url } = await uploadResponse.json();
+        product.images = [url];
+        
+        const preview = document.getElementById('digital-image-preview');
+        preview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.maxWidth = '200px';
+        img.style.maxHeight = '200px';
+        img.style.objectFit = 'contain';
+        preview.appendChild(img);
       }
+      
+      document.querySelectorAll('.required-field').forEach(field => {
+        const fieldName = field.querySelector('.field-name').value.trim();
+        const isRequired = field.querySelector('.field-required').checked;
+        if (fieldName) product.required_fields.push({ name: fieldName, required: isRequired });
+      });
       
       const method = productId ? 'PUT' : 'POST';
       const url = productId 
@@ -640,7 +501,7 @@ const AdminSystem = {
                   </div>
                   <div class="product-details">
                     <strong>${product.name}</strong>
-                    <div>Tipo: ${product.type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                    <div>Tipo: Digital</div>
                     <div>Categoría: ${product.category || 'Sin categoría'}</div>
                     <div>${Object.entries(product.prices || {}).map(([currency, price]) => `${currency}: ${price}`).join(', ')}</div>
                   </div>
@@ -688,119 +549,67 @@ const AdminSystem = {
         document.getElementById('add-product-btn').style.display = 'none';
         
         document.getElementById('product-id').value = product.id;
-        
         document.getElementById('save-product').textContent = '🔄 Actualizar Producto';
-        
-        this.productType = product.type;
-        document.querySelectorAll('.type-tab').forEach(tab => {
-          tab.classList.toggle('active', tab.dataset.type === product.type);
-        });
         
         document.getElementById('product-name').value = product.name;
         document.getElementById('product-description').value = product.description;
         document.getElementById('product-category').value = product.category_id;
-        document.getElementById('product-details').value = product.details || '';
         
         const prices = product.prices || {};
         document.querySelectorAll('.price-currency').forEach(input => {
           if (prices[input.dataset.currency]) input.value = prices[input.dataset.currency];
         });
         
-        if (product.type === 'fisico') {
-          document.getElementById('has-color-variant').checked = !!product.has_color_variant;
-          document.getElementById('color-variant-section').style.display = product.has_color_variant ? 'block' : 'none';
-          
-          const preview = document.getElementById('image-preview');
-          preview.innerHTML = '';
-          if (product.images) {
-            product.images.forEach(img => {
-              const imgEl = document.createElement('img');
-              imgEl.src = img;
-              imgEl.style.maxWidth = '100px';
-              imgEl.style.maxHeight = '100px';
-              imgEl.style.objectFit = 'contain';
-              imgEl.style.margin = '5px';
-              imgEl.style.border = '1px solid #ddd';
-              imgEl.style.borderRadius = '4px';
-              preview.appendChild(imgEl);
-            });
-          }
-          
-          preview.innerHTML += `
-            <div style="font-size: 12px; color: #666; margin-top: 10px;">
-              Las imágenes existentes se mantendrán. Sube nuevas solo si quieres reemplazarlas.
-            </div>
-          `;
-          
-          if (product.has_color_variant && product.colors) {
-            const container = document.getElementById('color-variants-container');
-            container.innerHTML = '';
-            product.colors.forEach(color => {
-              container.innerHTML += `
-                <div class="color-variant" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                  <input type="color" value="${color.color}" class="color-picker">
-                  <input type="text" value="${color.name}" placeholder="Nombre del color" class="color-name">
-                  <button class="remove-color">❌</button>
-                </div>
-              `;
-            });
-            
-            container.querySelectorAll('.remove-color').forEach(btn => {
-              btn.addEventListener('click', (e) => e.target.closest('.color-variant').remove());
-            });
-          }
-        } else {
-          const preview = document.getElementById('digital-image-preview');
-          preview.innerHTML = '';
-          if (product.images?.length > 0) {
-            const imgEl = document.createElement('img');
-            imgEl.src = product.images[0];
-            imgEl.style.maxWidth = '200px';
-            imgEl.style.maxHeight = '200px';
-            imgEl.style.objectFit = 'contain';
-            preview.appendChild(imgEl);
-          }
-          
-          preview.innerHTML += `
-            <div style="font-size: 12px; color: #666; margin-top: 10px;">
-              La imagen existente se mantendrá. Sube una nueva solo si quieres reemplazarla.
-            </div>
-          `;
-          
-          const container = document.getElementById('required-fields-container');
-          container.innerHTML = '';
-          if (product.required_fields?.length > 0) {
-            product.required_fields.forEach(field => {
-              container.innerHTML += `
-                <div class="required-field">
-                  <input type="text" value="${field.name}" class="field-name modern-input" style="flex: 1;">
-                  <label class="checkbox-label">
-                    <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
-                    <span class="checkmark"></span>
-                    Requerido
-                  </label>
-                  <button class="remove-field small-btn">🗑️</button>
-                </div>
-              `;
-            });
-          } else {
-            container.innerHTML = `
+        const preview = document.getElementById('digital-image-preview');
+        preview.innerHTML = '';
+        if (product.images?.length > 0) {
+          const imgEl = document.createElement('img');
+          imgEl.src = product.images[0];
+          imgEl.style.maxWidth = '200px';
+          imgEl.style.maxHeight = '200px';
+          imgEl.style.objectFit = 'contain';
+          preview.appendChild(imgEl);
+        }
+        
+        preview.innerHTML += `
+          <div style="font-size: 12px; color: #666; margin-top: 10px;">
+            La imagen existente se mantendrá. Sube una nueva solo si quieres reemplazarla.
+          </div>
+        `;
+        
+        const container = document.getElementById('required-fields-container');
+        container.innerHTML = '';
+        if (product.required_fields?.length > 0) {
+          product.required_fields.forEach(field => {
+            container.innerHTML += `
               <div class="required-field">
-                <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name modern-input" style="flex: 1;">
+                <input type="text" value="${field.name}" class="field-name modern-input" style="flex: 1;">
                 <label class="checkbox-label">
-                  <input type="checkbox" class="field-required" checked>
+                  <input type="checkbox" class="field-required" ${field.required ? 'checked' : ''}>
                   <span class="checkmark"></span>
                   Requerido
                 </label>
                 <button class="remove-field small-btn">🗑️</button>
               </div>
             `;
-          }
-          
-          container.querySelectorAll('.remove-field').forEach(btn => {
-            btn.addEventListener('click', (e) => e.target.closest('.required-field').remove());
           });
+        } else {
+          container.innerHTML = `
+            <div class="required-field">
+              <input type="text" placeholder="Nombre del campo (ej: ID de usuario)" class="field-name modern-input" style="flex: 1;">
+              <label class="checkbox-label">
+                <input type="checkbox" class="field-required" checked>
+                <span class="checkmark"></span>
+                Requerido
+              </label>
+              <button class="remove-field small-btn">🗑️</button>
+            </div>
+          `;
         }
+        
+        container.querySelectorAll('.remove-field').forEach(btn => {
+          btn.addEventListener('click', (e) => e.target.closest('.required-field').remove());
+        });
         
         document.getElementById('save-product').onclick = () => this.saveProduct();
       })
@@ -832,7 +641,7 @@ const AdminSystem = {
   },
   
   addCategory: function() {
-    const type = this.categoryType;
+    const type = 'digital';
     const nameInput = document.getElementById('new-category-name');
     const name = nameInput.value.trim();
     
@@ -878,7 +687,7 @@ const AdminSystem = {
   },
   
   renderCategoriesList: function() {
-    const type = this.categoryType;
+    const type = 'digital';
     console.log(`[AdminSystem] Cargando categorías de tipo: ${type}`);
     const container = document.getElementById('categories-list');
     container.innerHTML = '<div class="loading">Cargando categorías...</div>';
@@ -898,7 +707,7 @@ const AdminSystem = {
       
       console.log(`[AdminSystem] Mostrando ${filtered.length} categorías`);
       container.innerHTML = `
-        <h4>📁 Categorías de ${type === 'fisico' ? '📦 Productos Físicos' : '💾 Productos Digitales'}</h4>
+        <h4>📁 Categorías de Productos Digitales</h4>
         <div class="admin-items-list">
           ${filtered.map(category => `
             <div class="admin-category-item">
@@ -1094,9 +903,7 @@ const AdminSystem = {
             <div class="customer-info">
               <div><strong>ID:</strong> ${order.userId}</div>
               <div><strong>Nombre:</strong> ${order.userData?.fullName || 'No especificado'}</div>
-              <div><strong>🆔 CI:</strong> ${order.userData?.ci || 'No especificado'}</div>
               <div><strong>📱 Teléfono:</strong> ${order.userData?.phone || 'No especificado'}</div>
-              <div><strong>📍 Dirección:</strong> ${order.userData?.address || 'No especificado'}, ${order.userData?.province || ''}</div>
             </div>
             
             <h3>💳 Información de Pago</h3>
@@ -1116,7 +923,7 @@ const AdminSystem = {
                   </div>
                   <div class="product-details">
                     <div><strong>${item.product_name}</strong></div>
-                    <div>${item.tab_type === 'fisico' ? '📦 Físico' : '💾 Digital'}</div>
+                    <div>💾 Digital</div>
                     <div>${item.quantity} x $${item.price.toFixed(2)}</div>
                     <div>Total: $${(item.price * item.quantity).toFixed(2)}</div>
                   </div>
@@ -1124,16 +931,6 @@ const AdminSystem = {
               `).join('')}
             </div>
             
-            <h3>📝 Información Adicional</h3>
-            ${order.recipient && Object.keys(order.recipient).length > 0 ? 
-              `<div class="additional-info">
-                <h4>📦 Datos del Receptor</h4>
-                <div><strong>Nombre:</strong> ${order.recipient.name || 'N/A'}</div>
-                <div><strong>CI:</strong> ${order.recipient.ci || 'N/A'}</div>
-                <div><strong>Teléfono:</strong> ${order.recipient.phone || 'N/A'}</div>
-              </div>` : 
-              '<p>No hay información adicional de receptor</p>'}
-              
             ${requiredFieldsHTML}
           </div>
         </div>
@@ -1150,14 +947,14 @@ const AdminSystem = {
     });
   },
   
-  renderCategoryOptions: function(type = this.productType) {
-    console.log(`[AdminSystem] Cargando opciones de categoría para tipo: ${type}`);
+  renderCategoryOptions: function() {
+    console.log(`[AdminSystem] Cargando opciones de categoría para tipo: digital`);
     const categorySelect = document.getElementById('product-category');
     if (!categorySelect) return;
     
     categorySelect.innerHTML = '<option value="">Seleccionar categoría</option>';
     
-    fetch(`${window.API_BASE_URL}/api/categories/${type}`, {
+    fetch(`${window.API_BASE_URL}/api/categories/digital`, {
       headers: { 'Telegram-ID': this.telegramUserId.toString() }
     })
     .then(response => response.json())
@@ -1182,11 +979,6 @@ const AdminSystem = {
     
     document.getElementById('product-name').value = '';
     document.getElementById('product-description').value = '';
-    document.getElementById('product-details').value = '';
-    document.getElementById('has-color-variant').checked = false;
-    document.getElementById('color-variant-section').style.display = 'none';
-    document.getElementById('color-variants-container').innerHTML = '';
-    document.getElementById('image-preview').innerHTML = '';
     document.getElementById('digital-image-preview').innerHTML = '';
     document.getElementById('required-fields-container').innerHTML = `
       <div class="required-field">
