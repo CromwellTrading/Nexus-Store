@@ -102,11 +102,16 @@ const OrdersSystem = (function() {
                 `).join('')}
             </ul>
             
-            <h3>Datos de Envío</h3>
-            <p><strong>Nombre:</strong> ${order.userData.fullName}</p>
-            <p><strong>CI:</strong> ${order.userData.ci}</p>
-            <p><strong>Teléfono:</strong> ${order.userData.phone}</p>
-            <p><strong>Dirección:</strong> ${order.userData.address}, ${order.userData.province}</p>
+            <h3>Datos del Cliente</h3>
+            <p><strong>Nombre:</strong> ${order.userData?.fullName || 'No especificado'}</p>
+            <p><strong>Teléfono:</strong> ${order.userData?.phone || 'No especificado'}</p>
+            
+            ${order.requiredFields && Object.keys(order.requiredFields).length > 0 ? `
+                <h3>Datos Requeridos</h3>
+                ${Object.entries(order.requiredFields).map(([key, value]) => `
+                    <p><strong>${key}:</strong> ${value}</p>
+                `).join('')}
+            ` : ''}
             
             <button class="close-modal">Volver</button>
         `;
