@@ -7,7 +7,7 @@ const CheckoutSystem = {
     this.selectedMethodPrices = totalByCurrency;
     const userData = UserProfile.getUserData();
     const modal = document.getElementById('product-modal');
-    const isProfileComplete = userData.fullName && userData.ci && userData.phone && userData.address && userData.province;
+    const isProfileComplete = userData.fullName && userData.phone;
     const startingStep = isProfileComplete ? 2 : 1;
     
     this.cartItemsWithDetails = await this.getCartItemsDetails(cart.items);
@@ -33,47 +33,8 @@ const CheckoutSystem = {
               <input type="text" id="checkout-fullname" value="${userData.fullName || ''}" required class="modern-input">
             </div>
             <div class="form-group">
-              <label>Carnet de Identidad:</label>
-              <input type="text" id="checkout-ci" value="${userData.ci || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Teléfono:</label>
+              <label>📱 Teléfono:</label>
               <input type="text" id="checkout-phone" value="${userData.phone || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Dirección:</label>
-              <input type="text" id="checkout-address" value="${userData.address || ''}" required class="modern-input">
-            </div>
-            <div class="form-group">
-              <label>Provincia:</label>
-              <select id="checkout-province" required class="modern-select">
-                <option value="">Seleccionar provincia</option>
-                ${['Pinar del Río', 'Artemisa', 'La Habana', 'Mayabeque', 'Matanzas', 'Cienfuegos', 'Villa Clara', 'Sancti Spíritus', 'Ciego de Ávila', 'Camagüey', 'Las Tunas', 'Granma', 'Holguín', 'Santiago de Cuba', 'Guantánamo', 'Isla de la Juventud']
-                  .map(prov => `<option value="${prov}" ${userData.province === prov ? 'selected' : ''}>${prov}</option>`).join('')}
-              </select>
-            </div>
-            
-            <div class="optional-recipient">
-              <label class="checkbox-label">
-                <input type="checkbox" id="add-recipient"> 
-                <span class="checkmark"></span>
-                📦 ¿Entregar a otra persona?
-              </label>
-              
-              <div id="recipient-fields" style="display: none; margin-top: 15px;">
-                <div class="form-group">
-                  <label>Nombre y Apellidos del Receptor:</label>
-                  <input type="text" id="recipient-name" class="modern-input">
-                </div>
-                <div class="form-group">
-                  <label>CI del Receptor:</label>
-                  <input type="text" id="recipient-ci" class="modern-input">
-                </div>
-                <div class="form-group">
-                  <label>Teléfono del Receptor:</label>
-                  <input type="text" id="recipient-phone" class="modern-input">
-                </div>
-              </div>
             </div>
             
             <div class="checkout-buttons">
@@ -155,7 +116,7 @@ const CheckoutSystem = {
     
     for (const item of cartItems) {
       try {
-        const product = await ProductView.getProductById(item.productId, item.tabType);
+        const product = await ProductView.getProductById(item.productId);
         if (product) {
           itemsWithDetails.push({
             ...item,
@@ -274,23 +235,16 @@ const CheckoutSystem = {
   },
   
   setupCheckoutEvents: function(cart) {
-    document.getElementById('add-recipient')?.addEventListener('change', function() {
-      document.getElementById('recipient-fields').style.display = this.checked ? 'block' : 'none';
-    });
-    
     document.getElementById('next-to-payment')?.addEventListener('click', () => {
       const fullName = document.getElementById('checkout-fullname').value;
-      const ci = document.getElementById('checkout-ci').value;
       const phone = document.getElementById('checkout-phone').value;
-      const address = document.getElementById('checkout-address').value;
-      const province = document.getElementById('checkout-province').value;
       
-      if (!fullName || !ci || !phone || !address || !province) {
+      if (!fullName || !phone) {
         alert('Por favor complete todos los campos obligatorios');
         return;
       }
       
-      UserProfile.userData = { fullName, ci, phone, address, province };
+      UserProfile.userData = { fullName, phone };
       UserProfile.saveUserData();
       this.goToStep(2);
     });
@@ -375,16 +329,7 @@ const CheckoutSystem = {
         formData.append('userId', userId);
         formData.append('paymentMethod', method);
         formData.append('fullName', document.getElementById('checkout-fullname').value);
-        formData.append('ci', document.getElementById('checkout-ci').value);
         formData.append('phone', document.getElementById('checkout-phone').value);
-        formData.append('address', document.getElementById('checkout-address').value);
-        formData.append('province', document.getElementById('checkout-province').value);
-        
-        if (document.getElementById('add-recipient')?.checked) {
-          formData.append('recipientName', document.getElementById('recipient-name').value);
-          formData.append('recipientCi', document.getElementById('recipient-ci').value);
-          formData.append('recipientPhone', document.getElementById('recipient-phone').value);
-        }
         
         formData.append('requiredFields', JSON.stringify(requiredFields));
         
