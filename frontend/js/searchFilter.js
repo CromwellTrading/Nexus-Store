@@ -18,7 +18,7 @@ const SearchFilter = {
         categories.forEach(cat => {
           const option = document.createElement('option');
           option.value = cat.id;
-          option.textContent = cat.name; // Usar propiedad 'name'
+          option.textContent = cat.name;
           categoryFilter.appendChild(option);
         });
         
