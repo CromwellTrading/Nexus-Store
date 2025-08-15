@@ -55,15 +55,17 @@ body.theme-light {
   --card-shadow: var(--shadow-sm);
   --border-color: #e9ecef;
   --modal-bg: #ffffff;
+  --text-secondary: #6c757d;
 }
 
 body.theme-dark {
   --bg-primary: #121212;
   --text-primary: #f0f0f0;
-  --card-bg: #1e1e2e;
+  --card-bg: #1e1e1e;
   --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-  --border-color: #2d3748;
+  --border-color: #333;
   --modal-bg: #252525;
+  --text-secondary: #b0b0b0;
 }
 
 body.theme-red {
@@ -80,6 +82,67 @@ body.theme-blue {
   --metallic-primary: linear-gradient(145deg, #2196f3, #42a5f5);
   --metallic-secondary: linear-gradient(145deg, #42a5f5, #2196f3);
   --glow-primary: 0 0 15px rgba(33, 150, 243, 0.5);
+}
+
+/* ===== MEJORAS PARA TEMA OSCURO ===== */
+body.theme-dark .product-item,
+body.theme-dark .category-column,
+body.theme-dark .grid-product,
+body.theme-dark .modal-content,
+body.theme-dark .admin-section,
+body.theme-dark .admin-product-item,
+body.theme-dark .admin-category-item,
+body.theme-dark .admin-order,
+body.theme-dark .order-info-card,
+body.theme-dark .order-totals,
+body.theme-dark .order-status-section,
+body.theme-dark .price-inputs,
+body.theme-dark .form-group,
+body.theme-dark .required-field {
+  background-color: #1e1e1e;
+  color: #f0f0f0;
+  border-color: #333;
+}
+
+body.theme-dark .product-name,
+body.theme-dark .product-description,
+body.theme-dark .category-title,
+body.theme-dark .order-info-label,
+body.theme-dark .order-info-value,
+body.theme-dark .admin-section h3,
+body.theme-dark .required-field label,
+body.theme-dark .form-group label,
+body.theme-dark .modal-body p,
+body.theme-dark .modal-body h3,
+body.theme-dark .modal-body li,
+body.theme-dark .order-card h3,
+body.theme-dark .order-card p {
+  color: #f0f0f0;
+}
+
+body.theme-dark .product-price,
+body.theme-dark .modal-product-price,
+body.theme-dark .order-product-price,
+body.theme-dark .order-total-value {
+  color: #42a5f5;
+}
+
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea {
+  background-color: #2d2d2d;
+  color: #f0f0f0;
+  border-color: #444;
+}
+
+body.theme-dark input::placeholder {
+  color: #aaa;
+}
+
+body.theme-dark .btn-view,
+body.theme-dark .add-to-cart,
+body.theme-dark .modal-add-to-cart {
+  color: white;
 }
 
 /* ===== RESET Y ESTILOS BASE ===== */
@@ -607,25 +670,27 @@ body {
 /* Estilo para el botón de cerrar */
 .close-modal {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  font-size: 1.8rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-primary);
-  transition: var(--transition-fast);
+  top: 20px;
+  right: 20px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  background: rgba(255, 107, 107, 0.1);
+  color: var(--danger-color);
+  border: 1px solid var(--danger-color);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  z-index: 10;
 }
 
 .close-modal:hover {
-  background: rgba(255, 107, 107, 0.1);
-  color: var(--accent-color);
+  background: var(--danger-color);
+  color: white;
+  transform: rotate(90deg);
 }
 
 /* Estilo para el botón de ver detalles */
@@ -784,26 +849,6 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-}
-
-.close-modal {
-  font-size: 1.8rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-primary);
-  transition: var(--transition-fast);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-modal:hover {
-  background: rgba(255, 107, 107, 0.1);
-  color: var(--accent-color);
 }
 
 /* ===== MEJORAS PARA MODAL DE PEDIDOS ===== */
@@ -1367,4 +1412,10 @@ body {
   background: var(--metallic-secondary);
   transform: translateY(-3px);
   box-shadow: var(--glow-primary);
+}
+
+/* Eliminar botones de cierre redundantes */
+.modal-body .btn-view.close-modal,
+.modal-footer .btn-close {
+  display: none !important;
 }
