@@ -11,7 +11,7 @@
   /* Colores de fondo */
   --bg-light: #f8f9fa;
   --bg-dark: #121212;
-  --modal-bg: #290707;
+  --modal-bg: #ffffff;
   
   /* Textos */
   --text-light: #f8f9fa;
@@ -64,7 +64,7 @@ body.theme-dark {
   --card-bg: #1e1e1e;
   --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   --border-color: #333;
-  --modal-bg: #252525;
+  --modal-bg: #1e1e1e; /* Cambiado de #252525 a #1e1e1e para mejor contraste */
   --text-secondary: #b0b0b0;
 }
 
@@ -84,59 +84,31 @@ body.theme-blue {
   --glow-primary: 0 0 15px rgba(33, 150, 243, 0.5);
 }
 
-/* ===== MEJORAS PARA TEMA OSCURO ===== */
-body.theme-dark .product-item,
-body.theme-dark .category-column,
-body.theme-dark .grid-product,
-body.theme-dark .modal-content,
-body.theme-dark .admin-section,
-body.theme-dark .admin-product-item,
-body.theme-dark .admin-category-item,
-body.theme-dark .admin-order,
-body.theme-dark .order-info-card,
-body.theme-dark .order-totals,
-body.theme-dark .order-status-section,
-body.theme-dark .price-inputs,
-body.theme-dark .form-group,
-body.theme-dark .required-field {
-  background-color: #1e1e1e;
-  color: #211633;
-  border-color: #333;
+/* ===== MEJORAS ESPECÍFICAS PARA MODALES EN TEMA OSCURO ===== */
+body.theme-dark .modal-content {
+  background-color: var(--modal-bg);
+  color: var(--text-primary);
 }
 
-body.theme-dark .product-name,
-body.theme-dark .product-description,
-body.theme-dark .category-title,
-body.theme-dark .order-info-label,
-body.theme-dark .order-info-value,
-body.theme-dark .admin-section h3,
-body.theme-dark .required-field label,
-body.theme-dark .form-group label,
+body.theme-dark .modal-header,
+body.theme-dark .modal-body,
+body.theme-dark .modal-footer {
+  color: var(--text-primary);
+}
+
+body.theme-dark .modal-header h2 {
+  color: var(--primary-color);
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+}
+
 body.theme-dark .modal-body p,
 body.theme-dark .modal-body h3,
 body.theme-dark .modal-body li,
-body.theme-dark .order-card h3,
-body.theme-dark .order-card p {
-  color: #f0f0f0;
-}
-
-body.theme-dark .product-price,
-body.theme-dark .modal-product-price,
-body.theme-dark .order-product-price,
-body.theme-dark .order-total-value {
-  color: #42a5f5;
-}
-
-body.theme-dark input,
-body.theme-dark select,
-body.theme-dark textarea {
-  background-color: #2d2d2d;
-  color: #f0f0f0;
-  border-color: #444;
-}
-
-body.theme-dark input::placeholder {
-  color: #aaa;
+body.theme-dark .modal-body span,
+body.theme-dark .modal-body div {
+  color: var(--text-primary);
 }
 
 body.theme-dark .btn-view,
@@ -845,10 +817,8 @@ body {
 
 .modal-header h2 {
   font-size: 1.8rem;
-  background: var(--metallic-primary);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primary-color);
+  font-weight: 700;
 }
 
 /* ===== MEJORAS PARA MODAL DE PEDIDOS ===== */
