@@ -67,33 +67,17 @@ body.theme-dark {
   --card-bg: #1e1e1e;
   --card-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
   --border-color: #333;
-  --modal-bg: #1e1e1e;
+  --modal-bg: #1e1e1e; /* Fondo oscuro para modales */
   --text-secondary: #b0b0b0;
   
   background-image: radial-gradient(circle at 15% 50%, rgba(74, 0, 224, 0.05) 0%, transparent 25%),
                    radial-gradient(circle at 85% 30%, rgba(142, 45, 226, 0.05) 0%, transparent 25%);
 }
 
-body.theme-red {
-  --primary-color: #e53935;
-  --secondary-color: #ff5252;
-  --metallic-primary: linear-gradient(145deg, #e53935, #ff5252);
-  --metallic-secondary: linear-gradient(145deg, #ff5252, #e53935);
-  --glow-primary: 0 0 15px rgba(229, 57, 53, 0.5);
-}
-
-body.theme-blue {
-  --primary-color: #2196f3;
-  --secondary-color: #42a5f5;
-  --metallic-primary: linear-gradient(145deg, #2196f3, #42a5f5);
-  --metallic-secondary: linear-gradient(145deg, #42a5f5, #2196f3);
-  --glow-primary: 0 0 15px rgba(33, 150, 243, 0.5);
-}
-
-/* ===== CORRECCIÓN ESPECÍFICA PARA MODALES ===== */
-/* Fondo del modal */
+/* ===== CORRECCIÓN DEFINITIVA PARA MODALES EN TEMA OSCURO ===== */
+/* Fondo principal del modal */
 body.theme-dark .modal-content {
-  background-color: var(--modal-bg);
+  background-color: var(--modal-bg) !important;
   color: var(--text-primary);
 }
 
@@ -101,26 +85,12 @@ body.theme-dark .modal-content {
 body.theme-dark .modal-header,
 body.theme-dark .modal-body,
 body.theme-dark .modal-footer {
-  background-color: var(--modal-bg);
+  background-color: var(--modal-bg) !important;
 }
 
-/* Elementos específicos dentro del modal */
-body.theme-dark .modal-header h2,
-body.theme-dark .modal-body p,
-body.theme-dark .modal-body h3,
-body.theme-dark .modal-body li,
-body.theme-dark .modal-body span,
-body.theme-dark .modal-body div,
-body.theme-dark .modal-footer button {
-  color: var(--text-primary);
-}
-
-/* Corrección para tarjetas dentro del modal */
-body.theme-dark .modal-content .order-info-card,
-body.theme-dark .modal-content .order-status-section,
-body.theme-dark .modal-content .order-totals {
-  background-color: #2a2a2a;
-  border: 1px solid #444;
+/* Textos en modales */
+body.theme-dark .modal-content * {
+  color: var(--text-primary) !important;
 }
 
 /* ===== RESET Y ESTILOS BASE ===== */
