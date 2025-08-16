@@ -43,9 +43,10 @@ const UserProfile = {
         const response = await fetch(`${window.API_BASE_URL}/api/users/${userId}`);
         if (response.ok) {
           const user = await response.json();
+          // CORRECCIÓN: cargar todas las propiedades del perfil (incluyendo adminPhone y adminCards)
           this.userData = {
             ...this.userData,
-            ...(user.profile_data || {})
+            ...user   // Esto incluye los campos del perfil, adminPhone y adminCards
           };
           console.log("[UserProfile] Datos de usuario cargados desde API");
           
