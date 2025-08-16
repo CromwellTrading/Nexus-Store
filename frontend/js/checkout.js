@@ -472,8 +472,6 @@ const CheckoutSystem = {
     if (!method) return;
     
     const adminData = UserProfile.getUserData();
-    console.log('Admin data in checkout:', adminData);  // Log temporal para depuración
-    
     let cardNumber = '';
     let phoneNumber = adminData.adminPhone || 'Número no disponible';
     
