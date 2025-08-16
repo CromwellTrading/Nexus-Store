@@ -14,6 +14,10 @@ console.log('🔌 Conectando a Supabase...');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Variables para control de instancia del bot
+let botInstance = null;
+let botPolling = false;
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
@@ -67,6 +71,20 @@ const isAdmin = (req, res, next) => {
   next();
 };
 
+// Función para detener instancias previas del bot
+const stopPreviousBotInstance = () => {
+  if (botInstance && botPolling) {
+    console.log('🛑 Deteniendo instancia previa del bot...');
+    try {
+      botInstance.stopPolling();
+      botPolling = false;
+      console.log('✅ Instancia previa detenida correctamente');
+    } catch (error) {
+      console.error('❌ Error deteniendo bot previo:', error.message);
+    }
+  }
+};
+
 app.get('/', (req, res) => {
   console.log('🏠 Petición a endpoint raíz');
   res.send('Backend Nexus Store funcionando');
@@ -78,7 +96,8 @@ app.get('/api/admin/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date(),
     supabaseConnected: !!process.env.SUPABASE_URL,
-    imagekitConfigured: !!process.env.IMAGEKIT_PUBLIC_KEY
+    imagekitConfigured: !!process.env.IMAGEKIT_PUBLIC_KEY,
+    botActive: !!botInstance
   });
 });
 
@@ -1007,8 +1026,18 @@ app.post('/api/checkout', async (req, res) => {
   }
 });
 
+// =============================================
+// 🤖 Inicialización del Bot de Telegram
+// =============================================
 if (process.env.TELEGRAM_BOT_TOKEN) {
-  const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+  // Detener cualquier instancia previa
+  stopPreviousBotInstance();
+  
+  // Crear nueva instancia
+  botInstance = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
+  botPolling = true;
+  
+  console.log('🤖 Nueva instancia del bot creada');
   console.log('⏳ Configurando Keep-Alive...');
 
   setInterval(() => {
@@ -1017,38 +1046,40 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     
     const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
     if (ADMIN_CHAT_ID) {
-      bot.sendMessage(ADMIN_CHAT_ID, `🔄 Bot activo (${date.toLocaleTimeString()})`)
+      botInstance.sendMessage(ADMIN_CHAT_ID, `🔄 Bot activo (${date.toLocaleTimeString()})`)
         .catch(err => console.error('❌ Error enviando Keep-Alive:', err));
     }
   }, 5 * 60 * 1000);
-}
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
-  console.log('🛜 Endpoints disponibles:');
-  console.log(`- GET /api/products`);
-  console.log(`- GET /api/products/:id`);
-  console.log(`- PUT /api/admin/products/:id`);
-  console.log(`- GET /api/admin/products/:id`);
-  console.log(`- POST /api/checkout`);
-  console.log(`- GET /api/orders/user/:userId`);
+  // =============================================
+  // 🛑 Manejador para detener el bot correctamente
+  // =============================================
+  const gracefulShutdown = () => {
+    console.log('🛑 Recibida señal de terminación. Deteniendo bot...');
+    if (botInstance && botPolling) {
+      botInstance.stopPolling();
+      console.log('✅ Bot detenido correctamente');
+    }
+    process.exit(0);
+  };
+
+  // Capturar señales de terminación
+  process.on('SIGINT', gracefulShutdown);
+  process.on('SIGTERM', gracefulShutdown);
   
-  if (process.env.TELEGRAM_BOT_TOKEN) {
-    const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-    console.log('🤖 Bot de Telegram iniciado');
+  // Configuración del bot
+  const ADMIN_IDS = process.env.ADMIN_IDS 
+    ? process.env.ADMIN_IDS.split(',').map(Number) 
+    : [];
     
-    const ADMIN_IDS = process.env.ADMIN_IDS 
-      ? process.env.ADMIN_IDS.split(',').map(Number) 
-      : [];
+  const getFrontendUrl = () => process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
+  
+  botInstance.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
     
-    const getFrontendUrl = () => process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
-    
-    bot.onText(/\/start/, (msg) => {
-      const chatId = msg.chat.id;
-      const userId = msg.from.id;
-      const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
-      
-      const promoMessage = `🌟 <b>💎𝘽𝙄𝙀𝙉𝙑𝙀𝙉𝙄𝘿𝙊𝙎 𝘼 𝙉𝙀𝙓𝙐𝙎 𝙎𝙃𝙊𝙋💎
+    const promoMessage = `🌟 <b>💎𝘽𝙄𝙀𝙉𝙑𝙀𝙉𝙄𝘿𝙊𝙎 𝘼 𝙉𝙀𝙓𝙐𝙎 𝙎𝙃𝙊𝙋💎
 
 👾 𝐇𝐨𝐥𝐚, 𝐪𝐮𝐞𝐫𝐢𝐝𝐨 𝐣𝐮𝐠𝐚𝐝𝐨𝐫! 🎮  
 ¿𝐐𝐮𝐢𝐞𝐫𝐞𝐬 𝐫𝐞𝐜𝐚𝐫𝐠𝐚𝐫 𝐭𝐮 𝐣𝐮𝐞𝐠𝐨 𝐟𝐚𝐯𝐨𝐫𝐢𝐭𝐨? 🤔  
@@ -1063,13 +1094,27 @@ app.listen(PORT, () => {
 ¡Ú𝐧𝐞𝐭𝐞 𝐚 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐠𝐫𝐮𝐩𝐨 𝐝𝐞 𝐯𝐞𝐧𝐭𝐚𝐬 𝐲 𝐧𝐨 𝐝𝐮𝐝𝐞𝐬 𝐞𝐧 𝐜𝐨𝐧𝐬𝐮𝐥𝐭𝐚𝐫 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐜𝐚𝐭á𝐥𝐨𝐠𝐨! 📚🛒
 
 𝐍𝐨 𝐨𝐥𝐯𝐢𝐝𝐞𝐬 𝐠𝐮𝐚𝐫𝐝𝐚𝐫 𝐩𝐚𝐫𝐭𝐢𝐝𝐚 😉</b> 🌟`;
-      
-      const keyboard = {
-        inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
-      };
-      
-      bot.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard });
-    });
+    
+    const keyboard = {
+      inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
+    };
+    
+    botInstance.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard });
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
+  console.log('🛜 Endpoints disponibles:');
+  console.log(`- GET /api/products`);
+  console.log(`- GET /api/products/:id`);
+  console.log(`- PUT /api/admin/products/:id`);
+  console.log(`- GET /api/admin/products/:id`);
+  console.log(`- POST /api/checkout`);
+  console.log(`- GET /api/orders/user/:userId`);
+  
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    console.log('🤖 Bot de Telegram iniciado');
   }
 });
 
