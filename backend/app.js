@@ -109,6 +109,49 @@ app.get('/api/admin/ids', (req, res) => {
   res.json(adminIds);
 });
 
+// Nuevo endpoint para obtener información de pago del admin
+app.get('/api/admin/payment-info', async (req, res) => {
+  try {
+    const adminIds = process.env.ADMIN_IDS 
+      ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
+      : [];
+    
+    if (adminIds.length === 0) {
+      return res.status(404).json({ error: 'No hay administradores configurados' });
+    }
+
+    // Usar el primer admin de la lista
+    const adminId = adminIds[0];
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('admin_phone, admin_cards')
+      .eq('id', adminId)
+      .single();
+
+    if (error) {
+      console.error('Error obteniendo información de pago del admin:', error);
+      return res.status(500).json({ error: 'Error obteniendo información de pago' });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: 'Administrador no encontrado' });
+    }
+
+    res.json({
+      adminPhone: data.admin_phone || '',
+      adminCards: data.admin_cards || {
+        bpa: "",
+        bandec: "",
+        mlc: ""
+      }
+    });
+  } catch (error) {
+    console.error('Error en /api/admin/payment-info:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 app.get('/api/users/:userId', async (req, res) => {
   const userId = req.params.userId;
   console.log(`👤 GET perfil solicitado para usuario: ${userId}`);
@@ -1091,7 +1134,7 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
 ✅ 𝐑𝐚𝐩𝐢𝐝𝐞𝐳 𝐞𝐧 𝐞𝐥 𝐬𝐞𝐫𝐯𝐢𝐜𝐢𝐨 ⚡
 
 ¿𝐐𝐮é 𝐞𝐬𝐩𝐞𝐫𝐚𝐬? 🚀  
-¡Ú𝐧𝐞𝐭𝐞 𝐚 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐠𝐫𝐮𝐩𝐨 𝐝𝐞 𝐯𝐞𝐧𝐭𝐚𝐬 𝐲 𝐧𝐨 𝐝𝐮𝐝𝐞𝐬 𝐞𝐧 𝐜𝐨𝐧𝐬𝐮𝐥𝐭𝐚𝐫 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐜𝐚𝐭á𝐥𝐨𝐠𝐨! 📚🛒
+¡Ú𝐧𝐞𝐭𝐞 𝐚 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐠𝐫𝐮𝐩𝐨 𝐝𝐞 𝐯𝐞𝐧𝐭𝐚𝐬 𝐲 𝐧𝐨 𝐝𝐮𝐝𝐞𝐬 𝐞𝐧 𝐜𝐨𝐧𝐬𝐮𝐥𝐭𝐚𝐫 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐐𝐚𝐭á𝐥𝐨𝐠𝐨! 📚🛒
 
 𝐍𝐨 𝐨𝐥𝐯𝐢𝐝𝐞𝐬 𝐠𝐮𝐚𝐫𝐝𝐚𝐫 𝐩𝐚𝐫𝐭𝐢𝐝𝐚 😉</b> 🌟`;
     
