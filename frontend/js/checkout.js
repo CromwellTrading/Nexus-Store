@@ -2,6 +2,7 @@ const CheckoutSystem = {
   selectedMethodPrices: {},
   cartItemsWithDetails: [],
   selectedPaymentMethod: null,
+  adminPaymentInfo: null, // Almacenará la información de pago del admin
     
   async openCheckout(cart, totalByCurrency) {
     this.selectedMethodPrices = totalByCurrency;
@@ -11,6 +12,35 @@ const CheckoutSystem = {
     const startingStep = isProfileComplete ? 2 : 1;
     
     this.cartItemsWithDetails = await this.getCartItemsDetails(cart.items);
+    
+    // Obtener información de pago del admin
+    try {
+      const response = await fetch(`${window.API_BASE_URL}/api/admin/payment-info`);
+      if (response.ok) {
+        this.adminPaymentInfo = await response.json();
+      } else {
+        console.error('Error obteniendo información de pago del admin');
+        // Valores por defecto en caso de error
+        this.adminPaymentInfo = {
+          adminPhone: 'Número no disponible',
+          adminCards: {
+            bpa: 'Tarjeta no configurada',
+            bandec: 'Tarjeta no configurada',
+            mlc: 'Tarjeta no configurada'
+          }
+        };
+      }
+    } catch (error) {
+      console.error('Error al cargar información de pago:', error);
+      this.adminPaymentInfo = {
+        adminPhone: 'Número no disponible',
+        adminCards: {
+          bpa: 'Tarjeta no configurada',
+          bandec: 'Tarjeta no configurada',
+          mlc: 'Tarjeta no configurada'
+        }
+      };
+    }
     
     modal.innerHTML = `
       <div class="modal-content">
@@ -471,7 +501,8 @@ const CheckoutSystem = {
     const method = this.selectedPaymentMethod;
     if (!method) return;
     
-    const adminData = UserProfile.getUserData();
+    // Usar this.adminPaymentInfo en lugar de UserProfile.getUserData()
+    const adminData = this.adminPaymentInfo;
     let cardNumber = '';
     let phoneNumber = adminData.adminPhone || 'Número no disponible';
     
