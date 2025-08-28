@@ -1,1167 +1,1291 @@
-import dotenv from 'dotenv';
-dotenv.config();
-import express from 'express';
-import cors from 'cors';
-import { createClient } from '@supabase/supabase-js';
-import TelegramBot from 'node-telegram-bot-api';
-import fileUpload from 'express-fileupload';
-import ImageKit from 'imagekit';
-
-console.log('🚀 ===== INICIANDO BACKEND NEXUS STORE =====');
-console.log('🕒 Hora de inicio:', new Date().toISOString());
-console.log('🔌 Conectando a Supabase...');
-
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Variables para control de instancia del bot
-let botInstance = null;
-let botPolling = false;
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
-console.log('✅ Supabase conectado');
-
-const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
-});
-console.log('🖼️ ImageKit configurado');
-
-console.log('🛠️ Configurando middlewares...');
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Telegram-ID']
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(fileUpload({
-  limits: { fileSize: 5 * 1024 * 1024 },
-  abortOnLimit: true
-}));
-
-app.use((req, res, next) => {
-  req.telegramId = req.headers['telegram-id'] || 
-                   req.query.tgid || 
-                   req.body.telegramId;
-  console.log(`📩 Petición recibida: ${req.method} ${req.path} | Usuario: ${req.telegramId || 'No identificado'}`);
-  next();
-});
-
-const isAdmin = (req, res, next) => {
-  const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
-    : [];
-  
-  if (!req.telegramId) {
-    console.log('🔒 Intento de acceso sin Telegram-ID');
-    return res.status(401).json({ error: 'Se requiere Telegram-ID' });
-  }
-  
-  if (!adminIds.includes(req.telegramId.toString())) {
-    console.log(`⛔ Acceso no autorizado desde ID: ${req.telegramId}`);
-    return res.status(403).json({ error: 'Acceso no autorizado' });
-  }
-  
-  console.log(`👑 Acceso admin autorizado para ID: ${req.telegramId}`);
-  next();
-};
-
-// Función para detener instancias previas del bot
-const stopPreviousBotInstance = () => {
-  if (botInstance && botPolling) {
-    console.log('🛑 Deteniendo instancia previa del bot...');
-    try {
-      botInstance.stopPolling();
-      botPolling = false;
-      console.log('✅ Instancia previa detenida correctamente');
-    } catch (error) {
-      console.error('❌ Error deteniendo bot previo:', error.message);
-    }
-  }
-};
-
-app.get('/', (req, res) => {
-  console.log('🏠 Petición a endpoint raíz');
-  res.send('Backend Nexus Store funcionando');
-});
-
-app.get('/api/admin/health', (req, res) => {
-  console.log('🩺 Verificación de salud del servidor');
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date(),
-    supabaseConnected: !!process.env.SUPABASE_URL,
-    imagekitConfigured: !!process.env.IMAGEKIT_PUBLIC_KEY,
-    botActive: !!botInstance
-  });
-});
-
-app.get('/api/admin/ids', (req, res) => {
-  console.log('🆔 IDs de admin solicitadas');
-  const adminIds = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
-    : [];
-  res.json(adminIds);
-});
-
-// Nuevo endpoint para obtener información de pago del admin
-app.get('/api/admin/payment-info', async (req, res) => {
-  try {
-    const adminIds = process.env.ADMIN_IDS 
-      ? process.env.ADMIN_IDS.split(',').map(id => id.trim())
-      : [];
-    
-    if (adminIds.length === 0) {
-      return res.status(404).json({ error: 'No hay administradores configurados' });
-    }
-
-    // Usar el primer admin de la lista
-    const adminId = adminIds[0];
-
-    const { data, error } = await supabase
-      .from('users')
-      .select('admin_phone, admin_cards')
-      .eq('id', adminId)
-      .single();
-
-    if (error) {
-      console.error('Error obteniendo información de pago del admin:', error);
-      return res.status(500).json({ error: 'Error obteniendo información de pago' });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: 'Administrador no encontrado' });
-    }
-
-    res.json({
-      adminPhone: data.admin_phone || '',
-      adminCards: data.admin_cards || {
-        bpa: "",
-        bandec: "",
-        mlc: ""
-      }
-    });
-  } catch (error) {
-    console.error('Error en /api/admin/payment-info:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.get('/api/users/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  console.log(`👤 GET perfil solicitado para usuario: ${userId}`);
-
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('profile_data, admin_phone, admin_cards')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error(`❌ Error obteniendo perfil: ${error.message}`);
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    // Eliminar campos de dirección, CI y provincia
-    const { address, ci, province, ...cleanProfile } = data.profile_data || {};
-    
-    const profileData = {
-      ...cleanProfile,
-      adminPhone: data.admin_phone || null,
-      adminCards: data.admin_cards || {
-        bpa: "",
-        bandec: "",
-        mlc: ""
-      }
-    };
-
-    console.log(`✅ Perfil obtenido para ${userId}`);
-    res.json(profileData);
-  } catch (error) {
-    console.error('💥 Error en GET /api/users/:userId:', {
-      error: error.message,
-      userId
-    });
-    res.status(500).json({ error: 'Error obteniendo perfil' });
-  }
-});
-
-app.put('/api/users/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  let profileData = req.body;
-  console.log(`✏️ PUT perfil solicitado para usuario: ${userId}`, profileData);
-
-  try {
-    // Eliminar campos de dirección, CI y provincia
-    const { address, ci, province, ...cleanProfile } = profileData;
-    profileData = cleanProfile;
-
-    const adminPhone = profileData.adminPhone || null;
-    const adminCards = profileData.adminCards || {
-      bpa: "",
-      bandec: "",
-      mlc: ""
-    };
-
-    const cleanProfileData = { ...profileData };
-    delete cleanProfileData.adminPhone;
-    delete cleanProfileData.adminCards;
-
-    const { data, error } = await supabase
-      .from('users')
-      .upsert({
-        id: userId,
-        profile_data: cleanProfileData,
-        admin_phone: adminPhone,
-        admin_cards: adminCards,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' })
-      .select()
-      .single();
-
-    if (error) throw error;
-    
-    const responseData = {
-      ...(data.profile_data || {}),
-      adminPhone: data.admin_phone,
-      adminCards: data.admin_cards
-    };
-
-    console.log(`✅ Perfil guardado para ${userId}`);
-    res.json(responseData);
-  } catch (error) {
-    console.error('💥 Error en PUT /api/users/:userId:', {
-      error: error.message,
-      userId,
-      profileData
-    });
-    res.status(500).json({ 
-      error: 'Error guardando perfil',
-      details: error.message 
-    });
-  }
-});
-
-app.post('/api/upload-image', isAdmin, async (req, res) => {
-  console.log('🖼️ Solicitud de subida de imagen recibida');
-  
-  try {
-    if (!req.files || !req.files.image) {
-      return res.status(400).json({ error: 'No se subió ninguna imagen' });
-    }
-
-    const imageFile = req.files.image;
-    
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024;
-    
-    if (!validTypes.includes(imageFile.mimetype)) {
-      return res.status(400).json({ error: 'Formato inválido. Use JPG, PNG o WEBP' });
-    }
-    
-    if (imageFile.size > maxSize) {
-      return res.status(400).json({ 
-        error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB). Máx: 5MB` 
-      });
-    }
-
-    const uploadResponse = await imagekit.upload({
-      file: imageFile.data,
-      fileName: imageFile.name,
-      useUniqueFileName: true
-    });
-
-    res.json({ url: uploadResponse.url });
-  } catch (error) {
-    console.error('💥 Error subiendo imagen:', error);
-    res.status(500).json({ error: 'Error subiendo imagen' });
-  }
-});
-
-app.get('/api/cart/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  console.log(`🛒 GET carrito para usuario: ${userId}`);
-  
-  try {
-    const { data: cart, error } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    const items = cart?.items || [];
-    res.json({ userId, items });
-  } catch (error) {
-    console.error('💥 Error en GET /api/cart/:userId:', error);
-    res.status(500).json({ error: 'Error obteniendo carrito' });
-  }
-});
-
-app.post('/api/cart/add', async (req, res) => {
-  const { userId, productId } = req.body;
-  
-  try {
-    let { data: cart } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    let items = cart?.items || [];
-    const existingItemIndex = items.findIndex(item => 
-      item.productId == productId
-    );
-    
-    if (existingItemIndex !== -1) {
-      items[existingItemIndex].quantity += 1;
-    } else {
-      items.push({ 
-        productId, 
-        quantity: 1, 
-        addedAt: new Date().toISOString() 
-      });
-    }
-    
-    const { data: updatedCart, error } = await supabase
-      .from('carts')
-      .upsert({ user_id: userId, items }, { onConflict: 'user_id' })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.json({ userId, items: updatedCart.items });
-  } catch (error) {
-    console.error('💥 Error en POST /api/cart/add:', error);
-    res.status(500).json({ error: 'Error añadiendo al carrito' });
-  }
-});
-
-app.post('/api/cart/remove', async (req, res) => {
-  const { userId, productId } = req.body;
-  
-  try {
-    const { data: cart } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
-    
-    let items = cart.items;
-    items = items.filter(item => 
-      !(item.productId == productId)
-    );
-    
-    const { data: updatedCart, error } = await supabase
-      .from('carts')
-      .update({ items })
-      .eq('user_id', userId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.json({ userId, items: updatedCart.items });
-  } catch (error) {
-    console.error('💥 Error en POST /api/cart/remove:', error);
-    res.status(500).json({ error: 'Error removiendo del carrito' });
-  }
-});
-
-app.post('/api/cart/update', async (req, res) => {
-  const { userId, productId, quantity } = req.body;
-  
-  try {
-    const { data: cart } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    if (!cart) return res.status(404).json({ error: 'Carrito no encontrado' });
-    
-    let items = cart.items;
-    const itemIndex = items.findIndex(item => 
-      item.productId == productId
-    );
-    
-    if (itemIndex === -1) {
-      return res.status(404).json({ error: 'Producto no encontrado en el carrito' });
-    }
-    
-    items[itemIndex].quantity = quantity;
-    
-    const { data: updatedCart, error } = await supabase
-      .from('carts')
-      .update({ items })
-      .eq('user_id', userId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.json({ userId, items: updatedCart.items });
-  } catch (error) {
-    console.error('💥 Error en POST /api/cart/update:', error);
-    res.status(500).json({ error: 'Error actualizando carrito' });
-  }
-});
-
-app.post('/api/cart/clear/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  
-  try {
-    const { error } = await supabase
-      .from('carts')
-      .delete()
-      .eq('user_id', userId);
-    
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('💥 Error en POST /api/cart/clear/:userId:', error);
-    res.status(500).json({ error: 'Error vaciando carrito' });
-  }
-});
-
-// Solo productos digitales
-app.get('/api/products', async (req, res) => {
-  try {
-    const { data: products, error } = await supabase
-      .from('products')
-      .select(`
-        id, name, description, details, prices, images, 
-        has_color_variant, colors, required_fields, date_created,
-        categories:category_id!inner(name)
-      `)
-      .eq('type', 'digital');
-
-    if (error) throw error;
-
-    const result = {};
-    products.forEach(product => {
-      const categoryName = product.categories.name;
-      if (!result[categoryName]) result[categoryName] = [];
-      result[categoryName].push({ ...product, category: categoryName });
-    });
-    
-    res.json(result);
-  } catch (error) {
-    console.error('💥 Error en GET /api/products:', error);
-    res.status(500).json({ error: 'Error obteniendo productos digitales' });
-  }
-});
-
-app.get('/api/products/:id', async (req, res) => {
-  const { id } = req.params;
-  
-  try {
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('*, categories:category_id!inner(name)')
-      .eq('id', id)
-      .eq('type', 'digital')
-      .single();
-    
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Producto no encontrado' });
-      }
-      throw error;
-    }
-
-    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
-    res.json({ ...product, category: product.categories.name });
-  } catch (error) {
-    console.error('💥 Error en GET /api/products/:id:', error);
-    res.status(500).json({ error: 'Error obteniendo producto digital' });
-  }
-});
-
-app.get('/api/admin/categories', isAdmin, async (req, res) => {
-  try {
-    const { data: categories, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('type', 'digital');
-      
-    if (error) throw error;
-    res.json(categories);
-  } catch (error) {
-    console.error('💥 Error en GET /api/admin/categories:', error);
-    res.status(500).json({ error: 'Error obteniendo categorías' });
-  }
-});
-
-app.post('/api/admin/categories', isAdmin, async (req, res) => {
-  const { name } = req.body;
-  
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .insert([{ 
-        type: 'digital',
-        name 
-      }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.status(201).json(data);
-  } catch (error) {
-    console.error('💥 Error en POST /api/admin/categories:', error);
-    res.status(500).json({ error: 'Error al crear categoría' });
-  }
-});
-
-app.delete('/api/admin/categories/:id', isAdmin, async (req, res) => {
-  const categoryId = req.params.id;
-  
-  try {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', categoryId);
-    
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('💥 Error en DELETE /api/admin/categories/:id:', error);
-    res.status(500).json({ error: 'Error eliminando categoría' });
-  }
-});
-
-app.post('/api/admin/products', isAdmin, async (req, res) => {
-  const { categoryId, product } = req.body;
-
-  if (!categoryId || !product) {
-    return res.status(400).json({ error: 'Faltan campos requeridos' });
-  }
-  
-  try {
-    const productId = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    
-    const productData = {
-      id: productId,
-      type: 'digital',
-      category_id: categoryId,
-      name: product.name,
-      description: product.description,
-      details: product.details || null,
-      prices: product.prices,
-      images: product.images || [],
-      has_color_variant: product.has_color_variant || false,
-      colors: product.colors || null,
-      required_fields: product.required_fields || null,
-      date_created: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase
-      .from('products')
-      .insert([productData])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.status(201).json({ id: data.id, ...product });
-  } catch (error) {
-    console.error('💥 Error en POST /api/admin/products:', error);
-    res.status(500).json({ error: 'Error creando producto digital' });
-  }
-});
-
-app.get('/api/admin/products/:id', isAdmin, async (req, res) => {
-  const productId = req.params.id;
-  
-  try {
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('*, categories:category_id (id, name)')
-      .eq('id', productId)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Producto no encontrado' });
-      }
-      throw error;
-    }
-
-    if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
-    
-    const formattedProduct = {
-      ...product,
-      category: product.categories ? product.categories.name : 'Sin categoría'
-    };
-    
-    res.json(formattedProduct);
-  } catch (error) {
-    console.error('💥 Error en GET /api/admin/products/:id:', error);
-    res.status(500).json({ error: 'Error obteniendo producto' });
-  }
-});
-
-app.put('/api/admin/products/:id', isAdmin, async (req, res) => {
-  const productId = req.params.id;
-  const { categoryId, product } = req.body;
-
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .update({
-        type: 'digital',
-        category_id: categoryId,
-        name: product.name,
-        description: product.description,
-        details: product.details || null,
-        prices: product.prices,
-        images: product.images || [],
-        has_color_variant: product.has_color_variant || false,
-        colors: product.colors || null,
-        required_fields: product.required_fields || null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productId)
-      .select()
-      .single();
-
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    console.error('💥 Error en PUT /api/admin/products/:id:', error);
-    res.status(500).json({ error: 'Error actualizando producto' });
-  }
-});
-
-app.get('/api/admin/products', isAdmin, async (req, res) => {
-  try {
-    const { data: products, error } = await supabase
-      .from('products')
-      .select('*, categories:category_id (id, name)')
-      .eq('type', 'digital');
-    
-    if (error) throw error;
-    
-    const formattedProducts = products.map(product => ({
-      ...product,
-      category: product.categories ? product.categories.name : 'Sin categoría'
-    }));
-    
-    res.json(formattedProducts);
-  } catch (error) {
-    console.error('💥 Error en GET /api/admin/products:', error);
-    res.status(500).json({ error: 'Error obteniendo productos' });
-  }
-});
-
-app.delete('/api/admin/products/:id', isAdmin, async (req, res) => {
-  const productId = req.params.id;
-  
-  try {
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', productId);
-    
-    if (error) throw error;
-    res.json({ success: true });
-  } catch (error) {
-    console.error('💥 Error en DELETE /api/admin/products/:id:', error);
-    res.status(500).json({ error: 'Error eliminando producto' });
-  }
-});
-
-app.get('/api/categories', async (req, res) => {
-  try {
-    const { data: categories, error } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('type', 'digital');
-    
-    if (error) throw error;
-    res.json(categories);
-  } catch (error) {
-    console.error('💥 Error en GET /api/categories:', error);
-    res.status(500).json({ error: 'Error obteniendo categorías digitales' });
-  }
-});
-
-// Rutas de pedidos con logs detallados
-app.get('/api/orders/user/:userId', async (req, res) => {
-  const userId = req.params.userId;
-  console.log(`🔍 [LOG] Buscando pedidos para usuario: ${userId}`);
-  
-  try {
-    // Paso 1: Obtener las órdenes básicas
-    console.log(`🔍 [LOG] Obteniendo órdenes básicas para ${userId}`);
-    const { data: orders, error: ordersError } = await supabase
-      .from('orders')
-      .select('id, total, status, created_at, updated_at, user_data')
-      .eq('user_id', userId);
-    
-    if (ordersError) {
-      console.error('❌ [ERROR] Error obteniendo órdenes:', {
-        message: ordersError.message,
-        details: ordersError.details,
-        userId
-      });
-      return res.status(500).json({ error: 'Error obteniendo pedidos' });
-    }
-    
-    if (!orders || orders.length === 0) {
-      console.log(`ℹ️ [LOG] No se encontraron pedidos para el usuario ${userId}`);
-      return res.json([]);
-    }
-    
-    // Paso 2: Obtener detalles adicionales
-    const orderIds = orders.map(order => order.id);
-    console.log(`🔍 [LOG] IDs de órdenes encontradas: ${orderIds.join(', ')}`);
-    
-    // Obtener detalles de pago y campos requeridos
-    console.log(`🔍 [LOG] Obteniendo detalles de pedidos`);
-    const { data: orderDetails, error: detailsError } = await supabase
-      .from('order_details')
-      .select('order_id, payment_method, transfer_data, required_fields')
-      .in('order_id', orderIds);
-    
-    if (detailsError) {
-      console.error('❌ [ERROR] Error obteniendo detalles de pedidos:', {
-        message: detailsError.message,
-        details: detailsError.details,
-        orderIds
-      });
-      return res.status(500).json({ error: 'Error obteniendo detalles de pedidos' });
-    }
-    
-    // Obtener items de los pedidos
-    console.log(`🔍 [LOG] Obteniendo items de pedidos`);
-    const { data: orderItems, error: itemsError } = await supabase
-      .from('order_items')
-      .select('order_id, product_name, quantity, price, image_url')
-      .in('order_id', orderIds);
-    
-    if (itemsError) {
-      console.error('❌ [ERROR] Error obteniendo items de pedidos:', {
-        message: itemsError.message,
-        details: itemsError.details,
-        orderIds
-      });
-      return res.status(500).json({ error: 'Error obteniendo items de pedidos' });
-    }
-    
-    // Paso 3: Combinar los datos
-    console.log(`🔍 [LOG] Combinando datos para ${orderIds.length} órdenes`);
-    const parsedOrders = orders.map(order => {
-      const details = orderDetails.find(d => d.order_id === order.id);
-      
-      return {
-        id: order.id,
-        userId,
-        total: order.total,
-        status: order.status,
-        createdAt: order.created_at,
-        updatedAt: order.updated_at,
-        userData: order.user_data,
-        payment: {
-          method: details?.payment_method || 'No especificado',
-          ...(details?.transfer_data || {}),
-          proof_url: details?.transfer_data?.proof_url || ''
-        },
-        requiredFields: details?.required_fields || null,
-        items: orderItems
-          .filter(i => i.order_id === order.id)
-          .map(item => ({
-            product_name: item.product_name,
-            quantity: item.quantity,
-            price: item.price,
-            image_url: item.image_url
-          })) || []
-      };
-    });
-    
-    console.log(`✅ [LOG] Pedidos obtenidos: ${parsedOrders.length}`);
-    res.json(parsedOrders);
-  } catch (error) {
-    console.error('💥 [ERROR] Crítico en GET /api/orders/user/:userId:', {
-      error: error.message,
-      stack: error.stack,
-      userId
-    });
-    res.status(500).json({ 
-      error: 'Error obteniendo pedidos',
-      details: error.message 
-    });
-  }
-});
-
-app.get('/api/admin/orders', isAdmin, async (req, res) => {
-  try {
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        user_id,
-        total,
-        status,
-        created_at,
-        updated_at,
-        user_data,
-        order_details!inner (
-          payment_method,
-          transfer_data,
-          required_fields
-        ),
-        order_items:order_items (
-          product_name,
-          quantity,
-          price,
-          image_url
-        )
-      `);
-    
-    if (error) throw error;
-    
-    const parsedOrders = orders.map(order => {
-      const orderDetail = order.order_details;
-      
-      return {
-        id: order.id,
-        userId: order.user_id,
-        total: order.total,
-        status: order.status,
-        createdAt: order.created_at,
-        updatedAt: order.updated_at,
-        userData: order.user_data,
-        payment: {
-          method: orderDetail.payment_method,
-          ...(orderDetail.transfer_data || {})
-        },
-        requiredFields: orderDetail.required_fields || null,
-        items: order.order_items || []
-      };
-    });
-    
-    res.json(parsedOrders);
-  } catch (error) {
-    console.error('💥 Error en GET /api/admin/orders:', error);
-    res.status(500).json({ error: 'Error obteniendo pedidos' });
-  }
-});
-
-app.get('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
-  const orderId = req.params.orderId;
-  
-  try {
-    const { data: order, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        user_id,
-        total,
-        status,
-        created_at,
-        updated_at,
-        user_data,
-        order_details!inner (
-          payment_method,
-          transfer_data,
-          required_fields
-        ),
-        order_items:order_items (
-          product_name,
-          quantity,
-          price,
-          image_url
-        )
-      `)
-      .eq('id', orderId)
-      .single();
-    
-    if (error) throw error;
-    if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
-    
-    const orderDetail = order.order_details;
-    
-    const parsedOrder = {
-      id: order.id,
-      userId: order.user_id,
-      total: order.total,
-      status: order.status,
-      createdAt: order.created_at,
-      updatedAt: order.updated_at,
-      userData: order.user_data,
-      payment: {
-        method: orderDetail.payment_method,
-        ...(orderDetail.transfer_data || {})
-      },
-      requiredFields: orderDetail.required_fields || null,
-      items: order.order_items || []
-    };
-    
-    res.json(parsedOrder);
-  } catch (error) {
-    console.error('💥 Error en GET /api/admin/orders/:orderId:', error);
-    res.status(500).json({ error: 'Error obteniendo pedido' });
-  }
-});
-
-app.put('/api/admin/orders/:orderId', isAdmin, async (req, res) => {
-  const orderId = req.params.orderId;
-  const { status } = req.body;
-  
-  try {
-    const { data: updatedOrder, error } = await supabase
-      .from('orders')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    res.json(updatedOrder);
-  } catch (error) {
-    console.error('💥 Error en PUT /api/admin/orders/:orderId:', error);
-    res.status(500).json({ error: 'Error actualizando orden' });
-  }
-});
-
-app.post('/api/checkout', async (req, res) => {
-  console.log('🛒 Procesando pedido...');
-  
-  try {
-    const userId = req.headers['telegram-id'];
-    if (!userId) {
-      return res.status(401).json({ error: 'No se pudo identificar el usuario' });
-    }
-
-    const formData = req.body;
-    const imageFile = req.files?.image;
-    
-    if (!formData.paymentMethod || !formData.total) {
-      return res.status(400).json({ error: 'Faltan datos esenciales' });
-    }
-
-    if (formData.paymentMethod !== 'Saldo Móvil' && !imageFile) {
-      return res.status(400).json({ error: 'Se requiere comprobante de transferencia' });
-    }
-
-    let proofUrl = '';
-    if (imageFile) {
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      const maxSize = 5 * 1024 * 1024;
-      
-      if (!validTypes.includes(imageFile.mimetype)) {
-        return res.status(400).json({ error: 'Formato de imagen inválido' });
-      }
-      
-      if (imageFile.size > maxSize) {
-        return res.status(400).json({ 
-          error: `Imagen demasiado grande (${(imageFile.size/1024/1024).toFixed(1)}MB)` 
-        });
-      }
-
-      const uploadResponse = await imagekit.upload({
-        file: imageFile.data,
-        fileName: `transfer_${Date.now()}.${imageFile.name.split('.').pop()}`,
-        useUniqueFileName: true
-      });
-      proofUrl = uploadResponse.url;
-    }
-
-    const orderId = `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-    const orderData = {
-      id: orderId,
-      user_id: userId,
-      total: parseFloat(formData.total),
-      status: 'Pendiente',
-      // Solo guardar nombre y teléfono
-      user_data: {
-        fullName: formData.fullName,
-        phone: formData.phone
-      },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert([orderData])
-      .select()
-      .single();
-    
-    if (orderError) throw orderError;
-
-    const paymentDetails = {
-      order_id: orderId,
-      payment_method: formData.paymentMethod,
-      transfer_data: {
-        proof_url: proofUrl
-      },
-      required_fields: formData.requiredFields ? JSON.parse(formData.requiredFields) : {}
-    };
-
-    const { error: detailsError } = await supabase
-      .from('order_details')
-      .insert([paymentDetails]);
-    
-    if (detailsError) throw detailsError;
-
-    const { data: cart, error: cartError } = await supabase
-      .from('carts')
-      .select('items')
-      .eq('user_id', userId)
-      .single();
-    
-    if (cartError) throw cartError;
-
-    const orderItems = [];
-    for (const item of cart.items) {
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('name, prices, images')
-        .eq('id', item.productId)
-        .single();
-      
-      if (productError) throw productError;
-
-      let price;
-      if (formData.paymentMethod === 'MLC') {
-        price = product.prices.MLC || 0;
-      } else if (formData.paymentMethod === 'Saldo Móvil') {
-        price = product.prices['Saldo Móvil'] || 0;
-      } else {
-        price = product.prices.CUP || 0;
-      }
-
-      orderItems.push({
-        order_id: orderId,
-        product_id: item.productId,
-        product_name: product.name,
-        quantity: item.quantity,
-        price: price,
-        image_url: product.images[0] || ''
-      });
-    }
-
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
-    
-    if (itemsError) throw itemsError;
-
-    await supabase
-      .from('carts')
-      .delete()
-      .eq('user_id', userId);
-
-    console.log(`✅ Pedido ${orderId} creado exitosamente`);
-    res.json({ orderId, status: 'Pendiente', total: formData.total, proofUrl });
-    
-  } catch (error) {
-    console.error('💥 Error en POST /api/checkout:', error);
-    res.status(500).json({ error: 'Error procesando pedido', details: error.message });
-  }
-});
-
-// =============================================
-// 🤖 Inicialización del Bot de Telegram
-// =============================================
-if (process.env.TELEGRAM_BOT_TOKEN) {
-  // Detener cualquier instancia previa
-  stopPreviousBotInstance();
-  
-  // Crear nueva instancia
-  botInstance = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
-  botPolling = true;
-  
-  console.log('🤖 Nueva instancia del bot creada');
-  console.log('⏳ Configurando Keep-Alive...');
-
-  setInterval(() => {
-    const date = new Date();
-    console.log(`🔄 Keep-Alive ping a las ${date.toLocaleTimeString()}`);
-    
-    const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
-    if (ADMIN_CHAT_ID) {
-      botInstance.sendMessage(ADMIN_CHAT_ID, `🔄 Bot activo (${date.toLocaleTimeString()})`)
-        .catch(err => console.error('❌ Error enviando Keep-Alive:', err));
-    }
-  }, 5 * 60 * 1000);
-
-  // =============================================
-  // 🛑 Manejador para detener el bot correctamente
-  // =============================================
-  const gracefulShutdown = () => {
-    console.log('🛑 Recibida señal de terminación. Deteniendo bot...');
-    if (botInstance && botPolling) {
-      botInstance.stopPolling();
-      console.log('✅ Bot detenido correctamente');
-    }
-    process.exit(0);
-  };
-
-  // Capturar señales de terminación
-  process.on('SIGINT', gracefulShutdown);
-  process.on('SIGTERM', gracefulShutdown);
-  
-  // Configuración del bot
-  const ADMIN_IDS = process.env.ADMIN_IDS 
-    ? process.env.ADMIN_IDS.split(',').map(Number) 
-    : [];
-    
-  const getFrontendUrl = () => process.env.FRONTEND_URL || 'https://tu-frontend.onrender.com';
-  
-  botInstance.onText(/\/start/, (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const webAppUrl = `${getFrontendUrl()}/?tgid=${userId}`;
-    
-    const promoMessage = `🌟 <b>💎𝘽𝙄𝙀𝙉𝙑𝙀𝙉𝙄𝘿𝙊𝙎 𝘼 𝙉𝙀𝙓𝙐𝙎 𝙎𝙃𝙊𝙋💎
-
-👾 𝐇𝐨𝐥𝐚, 𝐪𝐮𝐞𝐫𝐢𝐝𝐨 𝐣𝐮𝐠𝐚𝐝𝐨𝐫! 🎮  
-¿𝐐𝐮𝐢𝐞𝐫𝐞𝐬 𝐫𝐞𝐜𝐚𝐫𝐠𝐚𝐫 𝐭𝐮 𝐣𝐮𝐞𝐠𝐨 𝐟𝐚𝐯𝐨𝐫𝐢𝐭𝐨? 🤔  
-¡𝐄𝐧 𝐍𝐞𝐱𝐮𝐬 𝐒𝐡𝐨𝐩 𝐭𝐞 𝐟𝐚𝐜𝐢𝐥𝐢𝐭𝐚𝐦𝐨𝐬 𝐭𝐮𝐬 𝐜𝐨𝐦𝐩𝐫𝐚𝐬 𝐚𝐥 𝐚𝐥𝐜𝐚𝐧𝐜𝐞 𝐝𝐞 𝐮𝐧 𝐜𝐥𝐢𝐜! 🖱️✨
-
-💰 𝐎𝐟𝐫𝐞𝐜𝐞𝐦𝐨𝐬:  
-✅ 𝐋𝐨𝐬 𝐦𝐞𝐣𝐨𝐫𝐞𝐬 𝐩𝐫𝐞𝐜𝐢𝐨𝐬 💵  
-✅ 𝐒𝐞𝐠𝐮𝐫𝐢𝐝𝐚𝐝 𝐞𝐧 𝐜𝐚𝐝𝐚 𝐜𝐨𝐦𝐩𝐫𝐚 🔒  
-✅ 𝐑𝐚𝐩𝐢𝐝𝐞𝐳 𝐞𝐧 𝐞𝐥 𝐬𝐞𝐫𝐯𝐢𝐜𝐢𝐨 ⚡
-
-¿𝐐𝐮é 𝐞𝐬𝐩𝐞𝐫𝐚𝐬? 🚀  
-¡Ú𝐧𝐞𝐭𝐞 𝐚 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐠𝐫𝐮𝐩𝐨 𝐝𝐞 𝐯𝐞𝐧𝐭𝐚𝐬 𝐲 𝐧𝐨 𝐝𝐮𝐝𝐞𝐬 𝐞𝐧 𝐜𝐨𝐧𝐬𝐮𝐥𝐭𝐚𝐫 𝐧𝐮𝐞𝐬𝐭𝐫𝐨 𝐐𝐚𝐭á𝐥𝐨𝐠𝐨! 📚🛒
-
-𝐍𝐨 𝐨𝐥𝐯𝐢𝐝𝐞𝐬 𝐠𝐮𝐚𝐫𝐝𝐚𝐫 𝐩𝐚𝐫𝐭𝐢𝐝𝐚 😉</b> 🌟`;
-    
-    const keyboard = {
-      inline_keyboard: [[{ text: "🚀 ABRIR TIENDA AHORA", web_app: { url: webAppUrl } }]]
-    };
-    
-    botInstance.sendMessage(chatId, promoMessage, { parse_mode: 'HTML', reply_markup: keyboard });
-  });
+import os
+import logging
+import requests
+from datetime import datetime, timedelta, timezone
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, CallbackQueryHandler, ContextTypes, 
+    MessageHandler, filters, JobQueue, CallbackContext
+)
+from supabase import create_client, Client
+
+# Configuración
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+ADMIN_ID = "5376388604"
+COINCAP_API_KEY = "c0b9354ec2c2d06d6395519f432b056c06f6340b62b72de1cf71a44ed9c6a36e"
+COINCAP_API_URL = "https://rest.coincap.io/v3"
+MAX_DAILY_CHECKS = 80
+MIN_DEPOSITO = 5000
+MIN_RIESGO = 5000
+MIN_RETIRO = 6500
+CUP_RATE = 440
+CONFIRMATION_NUMBER = "59190241"
+CARD_NUMBER = "9227 0699 9532 8054"
+GROUP_ID = os.getenv("GROUP_ID", "-1002479699968")
+
+# Mapeo de activos y valores de pip (sin cambios)
+ASSETS = {
+    "bitcoin": {"symbol": "BTC", "name": "Bitcoin", "coincap_id": "bitcoin", "emoji": "🪙"},
+    # ... (todos los demás activos)
 }
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend corriendo en: http://localhost:${PORT}`);
-  console.log('🛜 Endpoints disponibles:');
-  console.log(`- GET /api/products`);
-  console.log(`- GET /api/products/:id`);
-  console.log(`- PUT /api/admin/products/:id`);
-  console.log(`- GET /api/admin/products/:id`);
-  console.log(`- POST /api/checkout`);
-  console.log(`- GET /api/orders/user/:userId`);
-  
-  if (process.env.TELEGRAM_BOT_TOKEN) {
-    console.log('🤖 Bot de Telegram iniciado');
-  }
-});
+PIP_VALUES = {
+    "bitcoin": 0.01,
+    # ... (todos los demás valores de pip)
+}
 
-console.log('===========================================');
-console.log('🚀 Sistema completamente inicializado 🚀');
-console.log('===========================================');
-console.log('🕒 Hora actual:', new Date().toISOString());
+# Configurar Supabase y logging (sin cambios)
+SUPABASE_URL = "https://xowsmpukhedukeoqcreb.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhvd3NtcHVraGVkdWtlb3FjcmViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4MzkwNDEsImV4cCI6MjA3MDQxNTA0MX0.zy1rCXPfuNQ95Bk0ATTkdF6DGLB9DhG9EjaBr0v3c0M"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Niveles de apalancamiento
+APALANCAMIENTOS = [5, 10, 20, 50, 100]
+
+# Funciones de cálculo de pips (sin cambios)
+def calcular_valor_pip(asset_id, cup_rate):
+    pip_value_usd = PIP_VALUES.get(asset_id, 0.01)
+    return pip_value_usd * cup_rate
+
+def calcular_ganancia_pips(pips, asset_id, cup_rate, apalancamiento=1):
+    valor_pip = calcular_valor_pip(asset_id, cup_rate)
+    return pips * valor_pip * apalancamiento
+
+def calcular_pips_movidos(precio_inicial, precio_final, asset_id):
+    pip_value = PIP_VALUES.get(asset_id, 0.01)
+    return abs(precio_final - precio_inicial) / pip_value
+
+def calcular_max_sl(monto_riesgo, asset_id, entry_price, operation_type, leverage, cup_rate):
+    valor_pip = calcular_valor_pip(asset_id, cup_rate) * leverage
+    max_pips = monto_riesgo / valor_pip
+    return max_pips
+
+# Gestión de saldo (sin cambios)
+def obtener_saldo(user_id: str) -> float:
+    try:
+        response = supabase.table('balance').select('saldo').eq('user_id', user_id).execute()
+        return response.data[0]['saldo'] if response.data else 0.0
+    except Exception as e:
+        logger.error(f"Error obteniendo saldo: {e}")
+        return 0.0
+
+def actualizar_saldo(user_id: str, monto: float) -> float:
+    try:
+        saldo_actual = obtener_saldo(user_id)
+        nuevo_saldo = saldo_actual + monto
+        
+        response = supabase.table('balance').select('*').eq('user_id', user_id).execute()
+        
+        if response.data:
+            supabase.table('balance').update({'saldo': nuevo_saldo}).eq('user_id', user_id).execute()
+        else:
+            supabase.table('balance').insert({'user_id': user_id, 'saldo': nuevo_saldo}).execute()
+            
+        return nuevo_saldo
+    except Exception as e:
+        logger.error(f"Error actualizando saldo: {e}")
+        return saldo_actual
+
+# Solicitudes (sin cambios)
+def crear_solicitud(user_id: str, tipo: str, monto: float, datos: str = None) -> int:
+    try:
+        solicitud_data = {
+            'user_id': user_id,
+            'tipo': tipo,
+            'monto': monto,
+            'estado': 'pendiente',
+            'fecha_solicitud': datetime.now(timezone.utc).isoformat()
+        }
+        if datos:
+            solicitud_data['datos'] = datas
+            
+        response = supabase.table('solicitudes').insert(solicitud_data).execute()
+        return response.data[0]['id'] if response.data else None
+    except Exception as e:
+        logger.error(f"Error creando solicitud: {e}")
+        return None
+
+def actualizar_solicitud(solicitud_id: int, estado: str, motivo: str = None) -> bool:
+    try:
+        update_data = {
+            'estado': estado,
+            'fecha_resolucion': datetime.now(timezone.utc).isoformat()
+        }
+        if motivo:
+            update_data['motivo_rechazo'] = motivo
+            
+        supabase.table('solicitudes').update(update_data).eq('id', solicitud_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Error actualizando solicitud: {e}")
+        return False
+
+# Gestión de créditos (sin cambios)
+def check_credits(user_id: str) -> bool:
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        response = supabase.table("credit_usage").select("count").eq("user_id", user_id).eq("date", today).execute()
+        if response.data:
+            count = response.data[0]["count"]
+            return count < MAX_DAILY_CHECKS
+        return True
+    except Exception as e:
+        logger.error(f"Error checking credits: {e}")
+        return True
+
+def log_credit_usage(user_id: str) -> None:
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        response = supabase.table("credit_usage").select("*").eq("user_id", user_id).eq("date", today).execute()
+        if response.data:
+            record = response.data[0]
+            new_count = record["count"] + 1
+            supabase.table("credit_usage").update({"count": new_count}).eq("id", record["id"]).execute()
+        else:
+            supabase.table("credit_usage").insert({
+                "user_id": user_id,
+                "date": today,
+                "count": 1
+            }).execute()
+    except Exception as e:
+        logger.error(f"Error logging credit usage: {e}")
+
+def get_credit_info(user_id: str) -> tuple:
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        response = supabase.table("credit_usage").select("count").eq("user_id", user_id).eq("date", today).execute()
+        if response.data:
+            count = response.data[0]["count"]
+            return count, MAX_DAILY_CHECKS - count
+        return 0, MAX_DAILY_CHECKS
+    except Exception as e:
+        logger.error(f"Error getting credit info: {e}")
+        return 0, MAX_DAILY_CHECKS
+
+# Funciones de precios (sin cambios)
+def get_current_price(asset_id: str, currency: str = "USD") -> float:
+    try:
+        coincap_id = ASSETS[asset_id]["coincap_id"]
+        headers = {
+            "Authorization": f"Bearer {COINCAP_API_KEY}",
+            "Accept-Encoding": "gzip"
+        }
+        url = f"{COINCAP_API_URL}/assets/{coincap_id}"
+        
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        return float(data['data']['priceUsd'])
+    except Exception as e:
+        logger.error(f"Error obteniendo precio: {e}")
+        return 0.0
+
+def get_historical_prices(asset_id: str, start_time: datetime, end_time: datetime, interval: str = "m1") -> list:
+    try:
+        coincap_id = ASSETS[asset_id]["coincap_id"]
+        headers = {
+            "Authorization": f"Bearer {COINCAP_API_KEY}",
+            "Accept-Encoding": "gzip"
+        }
+        
+        start_ms = int(start_time.timestamp() * 1000)
+        end_ms = int(end_time.timestamp() * 1000)
+        
+        url = f"{COINCAP_API_URL}/assets/{coincap_id}/history"
+        params = {
+            "interval": interval,
+            "start": start_ms,
+            "end": end_ms
+        }
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        return [(datetime.fromtimestamp(item['time']/1000), float(item['priceUsd'])) for item in data['data']]
+    except Exception as e:
+        logger.error(f"Error obteniendo precios históricos: {e}")
+        return []
+
+def analyze_price_history(price_history, entry_price, sl_price, tp_price, operation_type):
+    if not price_history:
+        return None, None
+        
+    max_price = max(price[1] for price in price_history)
+    min_price = min(price[1] for price in price_history)
+    
+    if operation_type == "buy":
+        if min_price <= sl_price:
+            return "sl", min_price
+        elif max_price >= tp_price:
+            return "tp", max_price
+    else:
+        if max_price >= sl_price:
+            return "sl", max_price
+        elif min_price <= tp_price:
+            return "tp", min_price
+            
+    return None, None
+
+# Teclados (sin cambios)
+def get_admin_keyboard(solicitud_id: int, tipo: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Aprobar", callback_data=f"apr_{tipo}_{solicitud_id}"),
+        InlineKeyboardButton("❌ Rechazar", callback_data=f"rej_{tipo}_{solicitud_id}")
+    ]])
+
+def get_balance_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬆️ Depositar", callback_data="depositar"),
+        InlineKeyboardButton("⬇️ Retirar", callback_data="retirar")
+    ], [InlineKeyboardButton("🔙 Menú Principal", callback_data="back_main")]])
+
+def get_main_keyboard():
+    buttons = []
+    row = []
+    for i, asset_id in enumerate(ASSETS.keys()):
+        asset = ASSETS[asset_id]
+        row.append(InlineKeyboardButton(f"{asset['emoji']} {asset['symbol']}", callback_data=f"asset_{asset_id}"))
+        if (i + 1) % 3 == 0:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton("💳 Balance", callback_data="balance")])
+    buttons.append([InlineKeyboardButton("📊 Operaciones", callback_data="operations")])
+    buttons.append([InlineKeyboardButton("📋 Historial", callback_data="history")])
+    return InlineKeyboardMarkup(buttons)
+
+def get_currency_keyboard(asset_id):
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("💵 USD", callback_data=f"currency_{asset_id}_USD"),
+    ], [InlineKeyboardButton("🔙 Menú Principal", callback_data="back_main")]])
+
+def get_trade_keyboard(asset_id, currency):
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🟢 COMPRAR", callback_data=f"trade_{asset_id}_{currency}_buy"),
+        InlineKeyboardButton("🔴 VENDER", callback_data=f"trade_{asset_id}_{currency}_sell")
+    ], [InlineKeyboardButton("🔙 Atrás", callback_data=f"back_asset_{asset_id}")]])
+
+def get_apalancamiento_keyboard(asset_id, currency, operation_type):
+    buttons = []
+    row = []
+    for leverage in APALANCAMIENTOS:
+        row.append(InlineKeyboardButton(f"x{leverage}", callback_data=f"lev_{asset_id}_{currency}_{operation_type}_{leverage}"))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton("✏️ Personalizado", callback_data=f"lev_custom_{asset_id}_{currency}_{operation_type}")])
+    buttons.append([InlineKeyboardButton("🔙 Atrás", callback_data=f"back_trade_{asset_id}_{currency}")])
+    return InlineKeyboardMarkup(buttons)
+
+def get_operations_keyboard(user_id):
+    try:
+        response = supabase.table('operations').select(
+            "id, asset, currency, operation_type, entry_price, apalancamiento"
+        ).eq("user_id", user_id).eq("status", "pendiente").execute()
+        operations = response.data
+    except Exception as e:
+        logger.error(f"Error fetching operations: {e}")
+        operations = []
+    
+    buttons = []
+    for op in operations:
+        asset = ASSETS[op['asset']]
+        buttons.append([InlineKeyboardButton(
+            f"{asset['emoji']} {asset['symbol']} {op['operation_type']} x{op['apalancamiento']}",
+            callback_data=f"op_{op['id']}"
+        )])
+    buttons.append([InlineKeyboardButton("🔙 Menú Principal", callback_data="back_main")])
+    return InlineKeyboardMarkup(buttons)
+
+def get_history_keyboard(user_id):
+    try:
+        response = supabase.table('operations').select(
+            "id, asset, currency, operation_type, entry_price, result, apalancamiento"
+        ).eq("user_id", user_id).eq("status", "cerrada").order("entry_time", desc=True).limit(10).execute()
+        operations = response.data
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}")
+        operations = []
+    
+    buttons = []
+    for op in operations:
+        asset = ASSETS[op['asset']]
+        result_emoji = "✅" if op['result'] == "ganancia" else "❌" if op['result'] == "perdida" else "➖"
+        buttons.append([InlineKeyboardButton(
+            f"{result_emoji} {asset['emoji']} {asset['symbol']} {op['operation_type']}",
+            callback_data=f"history_{op['id']}"
+        )])
+    buttons.append([InlineKeyboardButton("🔙 Menú Principal", callback_data="back_main")])
+    return InlineKeyboardMarkup(buttons)
+
+def get_operation_detail_keyboard(op_id, is_history=False):
+    if is_history:
+        return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 A Historial", callback_data="history")]])
+    else:
+        return InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Cerrar Operación", callback_data=f"close_op_{op_id}"),
+            InlineKeyboardButton("📈 Comprobar", callback_data=f"check_op_{op_id}")
+        ], [
+            InlineKeyboardButton("🛑 Modificar SL", callback_data=f"mod_sl_{op_id}"),
+            InlineKeyboardButton("🎯 Modificar TP", callback_data=f"mod_tp_{op_id}")
+        ], [InlineKeyboardButton("🔙 A Operaciones", callback_data="operations")]])
+
+def get_welcome_keyboard():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Empezar a Operar", callback_data="start_trading")]])
+
+def get_navigation_keyboard():
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🏠 Menú Principal", callback_data="back_main")],
+        [InlineKeyboardButton("💳 Ver Balance", callback_data="balance")]
+    ])
+
+# Handlers
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.message.from_user
+    welcome_message = (
+        "🌟 Bienvenido al Sistema de Trading QVA Crypto 🌟\n\n"
+        "Este bot te permite operar con criptomonedas de forma sencilla y segura. "
+        "Con nuestro sistema podrás:\n\n"
+        "• 📈 Realizar operaciones de COMPRA/VENTA\n"
+        "• 🛑 Configurar Stop Loss y Take Profit\n"
+        "• 💰 Gestionar tu saldo en CUP\n"
+        "• 📊 Monitorear tus operaciones en tiempo real\n"
+        "• 🔔 Recibir alertas cuando se alcancen tus objetivos\n\n"
+        "Todo calculado automáticamente en pesos cubanos (CUP) usando la tasa actual de USDT.\n\n"
+        "¡Comienza ahora y lleva tu trading al siguiente nivel!"
+    )
+    
+    await update.message.reply_text(welcome_message, reply_markup=get_welcome_keyboard())
+
+async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    user_id = str(query.from_user.id)
+    await query.answer()
+    
+    data = query.data
+    
+    if data == "start_trading":
+        await query.edit_message_text("Selecciona un activo para operar:", reply_markup=get_main_keyboard())
+    
+    elif data == "back_main":
+        await query.edit_message_text("Selecciona un activo para operar:", reply_markup=get_main_keyboard())
+    
+    elif data.startswith("asset_"):
+        asset_id = data.split("_")[1]
+        asset = ASSETS[asset_id]
+        await query.edit_message_text(
+            f"Has seleccionado {asset['emoji']} {asset['name']} ({asset['symbol']})\n\n"
+            "Selecciona la moneda para operar:",
+            reply_markup=get_currency_keyboard(asset_id)
+        )
+    
+    elif data.startswith("currency_"):
+        parts = data.split("_")
+        asset_id = parts[1]
+        currency = parts[2]
+        asset = ASSETS[asset_id]
+        
+        price = get_current_price(asset_id, currency)
+        await query.edit_message_text(
+            f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+            f"Precio actual: {price:.8f} {currency}\n\n"
+            "Selecciona el tipo de operación:",
+            reply_markup=get_trade_keyboard(asset_id, currency)
+        )
+    
+    elif data.startswith("trade_"):
+        parts = data.split("_")
+        asset_id = parts[1]
+        currency = parts[2]
+        operation_type = parts[3]
+        asset = ASSETS[asset_id]
+        
+        operation_text = "COMPRA" if operation_type == "buy" else "VENTA"
+        await query.edit_message_text(
+            f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+            f"Operación: {operation_text}\n\n"
+            "Selecciona el nivel de apalancamiento:",
+            reply_markup=get_apalancamiento_keyboard(asset_id, currency, operation_type)
+        )
+    
+    elif data.startswith("lev_"):
+        parts = data.split("_")
+        
+        if parts[1] == "custom":
+            asset_id = parts[2]
+            currency = parts[3]
+            operation_type = parts[4]
+            context.user_data['awaiting_custom_leverage'] = {
+                'asset_id': asset_id,
+                'currency': currency,
+                'operation_type': operation_type
+            }
+            await query.edit_message_text("Por favor, envía el nivel de apalancamiento personalizado (ej: 25):")
+        else:
+            asset_id = parts[1]
+            currency = parts[2]
+            operation_type = parts[3]
+            leverage = int(parts[4])
+            
+            await process_leverage_selection(query, context, asset_id, currency, operation_type, leverage)
+    
+    elif data == "balance":
+        saldo = obtener_saldo(user_id)
+        await query.edit_message_text(
+            f"💳 Tu saldo actual: {saldo:.2f} CUP\n\n"
+            "Selecciona una opción:",
+            reply_markup=get_balance_keyboard()
+        )
+    
+    elif data == "depositar":
+        saldo = obtener_saldo(user_id)
+        context.user_data['state'] = 'solicitud_deposito'
+        await query.edit_message_text(
+            f"💳 Tu saldo actual: {saldo:.2f} CUP\n\n"
+            f"Para depositar, envía el monto en CUP (mínimo {MIN_DEPOSITO} CUP).\n\n"
+            f"📋 Datos para transferencia:\n"
+            f"💳 Número de tarjeta: {CARD_NUMBER}\n"
+            f"📞 Número de confirmación: {CONFIRMATION_NUMBER}\n\n"
+            "Después de realizar la transferencia, envía una foto del comprobante."
+        )
+    
+    elif data == "retirar":
+        saldo = obtener_saldo(user_id)
+        if saldo < MIN_RETIRO:
+            await query.edit_message_text(
+                f"❌ Saldo insuficiente para retirar. \n"
+                f"💳 Tu saldo actual: {saldo:.2f} CUP\n"
+                f"📋 Mínimo para retiro: {MIN_RETIRO} CUP\n\n"
+                "Puedes realizar un depósito para aumentar tu saldo.",
+                reply_markup=get_navigation_keyboard()
+            )
+            return
+            
+        context.user_data['state'] = 'solicitud_retiro'
+        await query.edit_message_text(
+            f"💳 Tu saldo actual: {saldo:.2f} CUP\n\n"
+            f"Para retirar, envía el monto en CUP (mínimo {MIN_RETIRO} CUP).\n\n"
+            "Luego necesitaremos tus datos de contacto y tarjeta para realizar la transferencia."
+        )
+    
+    elif data == "operations":
+        await query.edit_message_text(
+            "Tus operaciones activas:",
+            reply_markup=get_operations_keyboard(user_id)
+        )
+    
+    elif data == "history":
+        await query.edit_message_text(
+            "Tu historial de operaciones:",
+            reply_markup=get_history_keyboard(user_id)
+        )
+    
+    elif data.startswith("op_"):
+        op_id = int(data.split("_")[1])
+        try:
+            response = supabase.table('operations').select('*').eq('id', op_id).execute()
+            operation = response.data[0] if response.data else None
+            
+            if operation:
+                asset = ASSETS[operation['asset']]
+                operation_type = "COMPRA" if operation['operation_type'] == 'buy' else "VENTA"
+                
+                message = (
+                    f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+                    f"Operación: {operation_type}\n"
+                    f"Precio de entrada: {operation['entry_price']:.8f} {operation['currency']}\n"
+                    f"Apalancamiento: x{operation['apalancamiento']}\n"
+                    f"Stop Loss: {operation['sl_price'] if operation['sl_price'] else 'No establecido'}\n"
+                    f"Take Profit: {operation['tp_price'] if operation['tp_price'] else 'No establecido'}\n"
+                    f"Fecha: {operation['entry_time']}\n"
+                    f"Estado: {operation['status']}\n\n"
+                    "Selecciona una acción:"
+                )
+                
+                await query.edit_message_text(message, reply_markup=get_operation_detail_keyboard(op_id))
+            else:
+                await query.edit_message_text("❌ Operación no encontrada.")
+        except Exception as e:
+            logger.error(f"Error obteniendo operación: {e}")
+            await query.edit_message_text("❌ Error al obtener los detalles de la operación.")
+    
+    elif data.startswith("history_"):
+        op_id = int(data.split("_")[1])
+        try:
+            response = supabase.table('operations').select('*').eq('id', op_id).execute()
+            operation = response.data[0] if response.data else None
+            
+            if operation:
+                asset = ASSETS[operation['asset']]
+                operation_type = "COMPRA" if operation['operation_type'] == 'buy' else "VENTA"
+                result_emoji = "✅" if operation['result'] == "ganancia" else "❌" if operation['result'] == "perdida" else "➖"
+                result_text = "Ganancia" if operation['result'] == "ganancia" else "Pérdida" if operation['result'] == "perdida" else "Sin resultado"
+                
+                message = (
+                    f"{result_emoji} {asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+                    f"Operación: {operation_type}\n"
+                    f"Precio de entrada: {operation['entry_price']:.8f} {operation['currency']}\n"
+                    f"Precio de salida: {operation['exit_price'] if operation['exit_price'] else 'N/A'}\n"
+                    f"Apalancamiento: x{operation['apalancamiento']}\n"
+                    f"Resultado: {result_text}\n"
+                    f"Monto: {operation['result_amount'] if operation['result_amount'] else 'N/A'} CUP\n"
+                    f"Fecha entrada: {operation['entry_time']}\n"
+                    f"Fecha salida: {operation['exit_time'] if operation['exit_time'] else 'N/A'}\n"
+                )
+                
+                await query.edit_message_text(message, reply_markup=get_operation_detail_keyboard(op_id, True))
+            else:
+                await query.edit_message_text("❌ Operación no encontrada.")
+        except Exception as e:
+            logger.error(f"Error obteniendo operación histórica: {e}")
+            await query.edit_message_text("❌ Error al obtener los detalles de la operación.")
+    
+    elif data.startswith("close_op_"):
+        op_id = int(data.split("_")[2])
+        try:
+            response = supabase.table('operations').select('*').eq('id', op_id).execute()
+            operation = response.data[0] if response.data else None
+            
+            if operation:
+                current_price = get_current_price(operation['asset'], operation['currency'])
+                pips_movidos = calcular_pips_movidos(operation['entry_price'], current_price, operation['asset'])
+                
+                if operation['operation_type'] == 'buy':
+                    result = "ganancia" if current_price > operation['entry_price'] else "perdida"
+                else:
+                    result = "ganancia" if current_price < operation['entry_price'] else "perdida"
+                
+                valor_pip = calcular_valor_pip(operation['asset'], CUP_RATE)
+                resultado_monto = pips_movidos * valor_pip * operation['apalancamiento']
+                if result == "perdida":
+                    resultado_monto = -resultado_monto
+                
+                update_data = {
+                    'status': 'cerrada',
+                    'exit_price': current_price,
+                    'exit_time': datetime.now(timezone.utc).isoformat(),
+                    'result': result,
+                    'result_amount': resultado_monto
+                }
+                
+                supabase.table('operations').update(update_data).eq('id', op_id).execute()
+                
+                nuevo_saldo = actualizar_saldo(user_id, resultado_monto)
+                
+                asset = ASSETS[operation['asset']]
+                result_emoji = "✅" if result == "ganancia" else "❌"
+                
+                await query.edit_message_text(
+                    f"{result_emoji} Operación cerrada\n\n"
+                    f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+                    f"Resultado: {result.capitalize()}\n"
+                    f"Monto: {resultado_monto:.2f} CUP\n"
+                    f"💳 Nuevo saldo: {nuevo_saldo:.2f} CUP\n\n"
+                    "Selecciona una opción:",
+                    reply_markup=get_navigation_keyboard()
+                )
+            else:
+                await query.edit_message_text("❌ Operación no encontrada.")
+        except Exception as e:
+            logger.error(f"Error cerrando operación: {e}")
+            await query.edit_message_text("❌ Error al cerrar la operación.")
+    
+    elif data.startswith("check_op_"):
+        op_id = int(data.split("_")[2])
+        await check_operation(update, context, op_id)
+    
+    elif data.startswith("mod_sl_"):
+        op_id = int(data.split("_")[2])
+        context.user_data['modifying_sl'] = op_id
+        await query.edit_message_text("Por favor, envía el nuevo valor para el Stop Loss:")
+    
+    elif data.startswith("mod_tp_"):
+        op_id = int(data.split("_")[2])
+        context.user_data['modifying_tp'] = op_id
+        await query.edit_message_text("Por favor, envía el nuevo valor para el Take Profit:")
+    
+    elif data.startswith("apr_"):
+        if user_id != ADMIN_ID:
+            await query.answer("❌ Solo el administrador puede realizar esta acción.")
+            return
+            
+        parts = data.split("_")
+        tipo = parts[1]
+        solicitud_id = int(parts[2])
+        
+        try:
+            response = supabase.table('solicitudes').select('*').eq('id', solicitud_id).execute()
+            solicitud = response.data[0] if response.data else None
+            
+            if not solicitud:
+                await query.answer("❌ Solicitud no encontrada.")
+                return
+                
+            user_id_solicitud = solicitud['user_id']
+            monto = solicitud['monto']
+            
+            if tipo == 'deposito':
+                nuevo_saldo = actualizar_saldo(user_id_solicitud, monto)
+                actualizar_solicitud(solicitud_id, 'aprobada')
+                
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id_solicitud,
+                        text=f"✅ Tu depósito de {monto} CUP ha sido aprobado.\n\n💳 Tu nuevo saldo: {nuevo_saldo:.2f} CUP",
+                        reply_markup=get_navigation_keyboard()
+                    )
+                except Exception as e:
+                    logger.error(f"Error notificando al usuario: {e}")
+                
+                await query.edit_message_text(f"✅ Depósito aprobado. Nuevo saldo: {nuevo_saldo:.2f} CUP")
+                
+            else:
+                saldo_actual = obtener_saldo(user_id_solicitud)
+                if saldo_actual < monto:
+                    actualizar_solicitud(solicitud_id, 'rechazada', 'Saldo insuficiente')
+                    await query.edit_message_text("❌ Saldo insuficiente para aprobar el retiro.")
+                    return
+                    
+                nuevo_saldo = actualizar_saldo(user_id_solicitud, -monto)
+                actualizar_solicitud(solicitud_id, 'aprobada')
+                
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id_solicitud,
+                        text=f"✅ Tu retiro de {monto} CUP ha sido aprobado.\n\n💳 Tu nuevo saldo: {nuevo_saldo:.2f} CUP",
+                        reply_markup=get_navigation_keyboard()
+                    )
+                except Exception as e:
+                    logger.error(f"Error notificando al usuario: {e}")
+                
+                await query.edit_message_text(f"✅ Retiro aprobado. Nuevo saldo: {nuevo_saldo:.2f} CUP")
+                
+        except Exception as e:
+            logger.error(f"Error aprobando solicitud: {e}")
+            await query.answer("❌ Error al procesar la solicitud.")
+    
+    elif data.startswith("rej_"):
+        if user_id != ADMIN_ID:
+            await query.answer("❌ Solo el administrador puede realizar esta acción.")
+            return
+            
+        parts = data.split("_")
+        tipo = parts[1]
+        solicitud_id = int(parts[2])
+        
+        context.user_data['rechazando_solicitud'] = {
+            'solicitud_id': solicitud_id,
+            'tipo': tipo
+        }
+        await query.edit_message_text("Por favor, envía el motivo del rechazo:")
+
+    elif data == "confirm_trade":
+        trade_data = context.user_data.get('trade_data', {})
+        monto_riesgo = context.user_data.get('monto_riesgo')
+        sl_pips = context.user_data.get('sl_pips')
+        tp_pips = context.user_data.get('tp_pips')
+        sl_price = context.user_data.get('sl_price')
+        tp_price = context.user_data.get('tp_price')
+        
+        if not all([trade_data, monto_riesgo, sl_pips, tp_pips, sl_price, tp_price]):
+            await query.edit_message_text("❌ Error: Datos de operación incompletos. Comienza nuevamente.")
+            return
+            
+        try:
+            operation_data = {
+                'user_id': user_id,
+                'asset': trade_data['asset_id'],
+                'currency': trade_data['currency'],
+                'operation_type': trade_data['operation_type'],
+                'entry_price': trade_data['entry_price'],
+                'apalancamiento': trade_data['leverage'],
+                'sl_price': sl_price,
+                'tp_price': tp_price,
+                'monto_riesgo': monto_riesgo,
+                'status': 'pendiente',
+                'entry_time': datetime.now(timezone.utc).isoformat()
+            }
+            
+            response = supabase.table('operations').insert(operation_data).execute()
+            if response.data:
+                await query.edit_message_text(
+                    "✅ Operación confirmada y registrada.\n\n"
+                    "Puedes verificar el estado de tus operaciones en el menú 'Operaciones'.",
+                    reply_markup=get_navigation_keyboard()
+                )
+            else:
+                await query.edit_message_text("❌ Error al registrar la operación.")
+        except Exception as e:
+            logger.error(f"Error insertando operación: {e}")
+            await query.edit_message_text("❌ Error al registrar la operación.")
+        
+        keys_to_remove = ['trade_data', 'monto_riesgo', 'sl_pips', 'tp_pips', 'sl_price', 'tp_price', 'state']
+        for key in keys_to_remove:
+            context.user_data.pop(key, None)
+            
+    elif data == "cancel_trade":
+        keys_to_remove = ['trade_data', 'monto_riesgo', 'sl_pips', 'tp_pips', 'sl_price', 'tp_price', 'state']
+        for key in keys_to_remove:
+            context.user_data.pop(key, None)
+        await query.edit_message_text("❌ Operación cancelada.", reply_markup=get_navigation_keyboard())
+
+# Handler para recibir apalancamiento personalizado
+async def recibir_apalancamiento(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    text = update.message.text.strip()
+    
+    try:
+        leverage = float(text)
+        if leverage <= 0:
+            await update.message.reply_text("❌ El apalancamiento debe ser mayor a 0. Intenta nuevamente.")
+            return
+            
+        custom_data = context.user_data.get('awaiting_custom_leverage')
+        if custom_data:
+            asset_id = custom_data['asset_id']
+            currency = custom_data['currency']
+            operation_type = custom_data['operation_type']
+            
+            await process_leverage_selection(update, context, asset_id, currency, operation_type, leverage)
+            
+            del context.user_data['awaiting_custom_leverage']
+        else:
+            await update.message.reply_text("❌ No se encontraron datos de operación. Comienza nuevamente.")
+    except ValueError:
+        await update.message.reply_text("❌ Por favor, envía un número válido para el apalancamiento.")
+
+# Handler para recibir monto de riesgo
+async def recibir_monto_riesgo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    text = update.message.text.strip()
+    
+    try:
+        monto_riesgo = float(text)
+        if monto_riesgo < MIN_RIESGO:
+            await update.message.reply_text(f"❌ El monto de riesgo mínimo es {MIN_RIESGO} CUP. Intenta nuevamente.")
+            return
+            
+        trade_data = context.user_data.get('trade_data', {})
+        asset_id = trade_data.get('asset_id')
+        currency = trade_data.get('currency')
+        operation_type = trade_data.get('operation_type')
+        leverage = trade_data.get('leverage')
+        entry_price = trade_data.get('entry_price')
+        
+        if not all([asset_id, currency, operation_type, leverage, entry_price]):
+            await update.message.reply_text("❌ Error en los datos de operación. Comienza nuevamente.")
+            return
+            
+        max_sl_pips = calcular_max_sl(monto_riesgo, asset_id, entry_price, operation_type, leverage, CUP_RATE)
+        
+        asset = ASSETS[asset_id]
+        valor_pip = calcular_valor_pip(asset_id, CUP_RATE) * leverage
+        
+        await update.message.reply_text(
+            f"📊 Análisis de riesgo\n\n"
+            f"💰 Monto de riesgo: {monto_riesgo} CUP\n"
+            f"📏 SL máximo: {max_sl_pips:.2f} pips\n"
+            f"💵 Valor por pip: {valor_pip:.2f} CUP\n\n"
+            f"Por favor, envía el valor para el Stop Loss (en pips):"
+        )
+        
+        context.user_data['monto_riesgo'] = monto_riesgo
+        context.user_data['state'] = 'esperando_sl'
+        
+    except ValueError:
+        await update.message.reply_text("❌ Por favor, envía un número válido para el monto de riesgo.")
+
+# Handler para recibir SL/TP
+async def set_sl_tp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    text = update.message.text.strip()
+    
+    try:
+        value = float(text)
+        state = context.user_data.get('state')
+        
+        if state == 'esperando_sl':
+            monto_riesgo = context.user_data.get('monto_riesgo')
+            trade_data = context.user_data.get('trade_data', {})
+            asset_id = trade_data.get('asset_id')
+            entry_price = trade_data.get('entry_price')
+            operation_type = trade_data.get('operation_type')
+            leverage = trade_data.get('leverage')
+            currency = trade_data.get('currency')
+            
+            max_sl_pips = calcular_max_sl(monto_riesgo, asset_id, entry_price, operation_type, leverage, CUP_RATE)
+            
+            if value > max_sl_pips:
+                await update.message.reply_text(
+                    f"❌ El Stop Loss excede el máximo permitido de {max_sl_pips:.2f} pips. "
+                    f"Envía un valor menor o igual:"
+                )
+                return
+                
+            context.user_data['sl_pips'] = value
+            
+            pip_value = PIP_VALUES.get(asset_id, 0.01)
+            if operation_type == 'buy':
+                sl_price = entry_price - (value * pip_value)
+            else:
+                sl_price = entry_price + (value * pip_value)
+                
+            context.user_data['sl_price'] = sl_price
+            
+            await update.message.reply_text(
+                f"✅ Stop Loss establecido a {value} pips.\n"
+                f"📉 Precio de Stop Loss: {sl_price:.8f} {currency}\n\n"
+                "Ahora envía el valor para el Take Profit (en pips):"
+            )
+            context.user_data['state'] = 'esperando_tp'
+            
+        elif state == 'esperando_tp':
+            trade_data = context.user_data.get('trade_data', {})
+            asset_id = trade_data.get('asset_id')
+            entry_price = trade_data.get('entry_price')
+            operation_type = trade_data.get('operation_type')
+            currency = trade_data.get('currency')
+            
+            context.user_data['tp_pips'] = value
+            
+            pip_value = PIP_VALUES.get(asset_id, 0.01)
+            if operation_type == 'buy':
+                tp_price = entry_price + (value * pip_value)
+            else:
+                tp_price = entry_price - (value * pip_value)
+                
+            context.user_data['tp_price'] = tp_price
+            
+            sl_price = context.user_data.get('sl_price')
+            monto_riesgo = context.user_data.get('monto_riesgo')
+            
+            asset = ASSETS[asset_id]
+            operation_type_text = "COMPRA" if operation_type == 'buy' else "VENTA"
+            
+            riesgo_recompensa = value / context.user_data.get('sl_pips', 1) if context.user_data.get('sl_pips', 0) > 0 else 0
+            
+            message = (
+                f"📋 Resumen de operación\n\n"
+                f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+                f"Operación: {operation_type_text}\n"
+                f"Apalancamiento: x{trade_data['leverage']}\n"
+                f"Precio entrada: {entry_price:.8f} {currency}\n"
+                f"Stop Loss: {sl_price:.8f} {currency} ({context.user_data.get('sl_pips', 0):.2f} pips)\n"
+                f"Take Profit: {tp_price:.8f} {currency} ({value:.2f} pips)\n"
+                f"Monto riesgo: {monto_riesgo} CUP\n"
+                f"Riesgo/Recompensa: 1:{riesgo_recompensa:.2f}\n\n"
+                f"¿Confirmar operación?"
+            )
+            
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Confirmar", callback_data="confirm_trade"),
+                InlineKeyboardButton("❌ Cancelar", callback_data="cancel_trade")
+            ]])
+            
+            await update.message.reply_text(message, reply_markup=keyboard)
+            context.user_data['state'] = 'confirmando_operacion'
+            
+    except ValueError:
+        await update.message.reply_text("❌ Por favor, envía un número válido.")
+
+# Handler para recibir montos de depósito/retiro
+async def recibir_monto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    text = update.message.text.strip()
+    
+    try:
+        monto = float(text)
+        state = context.user_data.get('state')
+        
+        if state == 'solicitud_deposito':
+            if monto < MIN_DEPOSITO:
+                await update.message.reply_text(f"❌ El monto mínimo para depósito es {MIN_DEPOSITO} CUP. Intenta nuevamente.")
+                return
+                
+            context.user_data['solicitud'] = {
+                'tipo': 'deposito',
+                'monto': monto
+            }
+            
+            await update.message.reply_text(
+                f"✅ Monto de depósito aceptado: {monto} CUP\n\n"
+                "Por favor, envía una foto del comprobante de transferencia."
+            )
+            context.user_data['state'] = 'esperando_comprobante'
+            
+        elif state == 'solicitud_retiro':
+            saldo = obtener_saldo(user_id)
+            if monto < MIN_RETIRO:
+                await update.message.reply_text(f"❌ El monto mínimo para retiro es {MIN_RETIRO} CUP. Intenta nuevamente.")
+                return
+                
+            if monto > saldo:
+                await update.message.reply_text(f"❌ Saldo insuficiente. Tu saldo actual es {saldo:.2f} CUP. Intenta con un monto menor.")
+                return
+                
+            context.user_data['solicitud'] = {
+                'tipo': 'retiro',
+                'monto': monto
+            }
+            
+            await update.message.reply_text(
+                f"✅ Monto de retiro aceptado: {monto} CUP\n\n"
+                "Por favor, envía tu número de tarjeta y teléfono de contacto (en un solo mensaje):"
+            )
+            context.user_data['state'] = 'solicitud_retiro_datos'
+            
+    except ValueError:
+        await update.message.reply_text("❌ Por favor, envía un número válido para el monto.")
+
+# Handler para recibir comprobantes y datos de retiro
+async def recibir_datos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    user = update.message.from_user
+    username = f"@{user.username}" if user.username else "Sin username"
+    solicitud = context.user_data.get('solicitud', {})
+    tipo = solicitud.get('tipo')
+    monto = solicitud.get('monto')
+    
+    if tipo == 'deposito':
+        if update.message.photo:
+            file_id = update.message.photo[-1].file_id
+            file = await context.bot.get_file(file_id)
+            file_path = file.file_path
+            
+            datos = f"Comprobante: {file_path}"
+            solicitud_id = crear_solicitud(user_id, tipo, monto, datos)
+            
+            if solicitud_id:
+                admin_message = (f"📥 Nueva solicitud de DEPÓSITO\n"
+                               f"👤 Usuario: {username} (ID: {user_id})\n"
+                               f"💵 Monto: {monto} CUP\n"
+                               f"📋 Datos: {datos}")
+                
+                keyboard = get_admin_keyboard(solicitud_id, tipo)
+                try:
+                    await context.bot.send_message(chat_id=ADMIN_ID, text=admin_message, reply_markup=keyboard)
+                    await context.bot.send_message(chat_id=GROUP_ID, text=admin_message, reply_markup=keyboard)
+                except Exception as e:
+                    logger.error(f"Error notificando al admin: {e}")
+
+                await update.message.reply_text(
+                    "✅ Comprobante recibido. Espera la confirmación del administrador.",
+                    reply_markup=get_navigation_keyboard()
+                )
+            else:
+                await update.message.reply_text("❌ Error creando la solicitud. Intenta nuevamente.")
+            
+            context.user_data.clear()
+        else:
+            await update.message.reply_text("❌ Por favor, envía una foto del comprobante.")
+    
+    else:
+        datos = update.message.text.strip()
+        
+        solicitud_id = crear_solicitud(user_id, tipo, monto, datos)
+        
+        if solicitud_id:
+            admin_message = (f"📤 Nueva solicitud de RETIRO\n"
+                           f"👤 Usuario: {username} (ID: {user_id})\n"
+                           f"💳 Monto: {monto} CUP\n"
+                           f"📋 Datos: {datos}")
+            
+            keyboard = get_admin_keyboard(solicitud_id, tipo)
+            try:
+                await context.bot.send_message(chat_id=ADMIN_ID, text=admin_message, reply_markup=keyboard)
+                await context.bot.send_message(chat_id=GROUP_ID, text=admin_message, reply_markup=keyboard)
+            except Exception as e:
+                logger.error(f"Error notificando al admin: {e}")
+
+            await update.message.reply_text(
+                "✅ Solicitud de retiro enviada. Espera la confirmación del administrador.",
+                reply_markup=get_navigation_keyboard()
+            )
+        else:
+            await update.message.reply_text("❌ Error creando la solicitud. Intenta nuevamente.")
+        
+        context.user_data.clear()
+
+# Handler para recibir motivos de rechazo (admin)
+async def recibir_motivo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    motivo = update.message.text.strip()
+    
+    solicitud_data = context.user_data.get('rechazando_solicitud')
+    if solicitud_data:
+        solicitud_id = solicitud_data['solicitud_id']
+        tipo = solicitud_data['tipo']
+        
+        if actualizar_solicitud(solicitud_id, 'rechazada', motivo):
+            try:
+                response = supabase.table('solicitudes').select('*').eq('id', solicitud_id).execute()
+                solicitud = response.data[0] if response.data else None
+                
+                if solicitud:
+                    user_id_solicitud = solicitud['user_id']
+                    monto = solicitud['monto']
+                    
+                    try:
+                        await context.bot.send_message(
+                            chat_id=user_id_solicitud,
+                            text=f"❌ Tu solicitud de {tipo} de {monto} CUP ha sido rechazada.\n\nMotivo: {motivo}",
+                            reply_markup=get_navigation_keyboard()
+                        )
+                    except Exception as e:
+                        logger.error(f"Error notificando al usuario: {e}")
+            except Exception as e:
+                logger.error(f"Error obteniendo información de solicitud: {e}")
+            
+            await update.message.reply_text("✅ Solicitud rechazada y usuario notificado.")
+        else:
+            await update.message.reply_text("❌ Error al actualizar la solicitud.")
+        
+        del context.user_data['rechazando_solicitud']
+    else:
+        await update.message.reply_text("❌ No se encontró solicitud para rechazar.")
+
+# Función para comprobar operación
+async def check_operation(update: Update, context: ContextTypes.DEFAULT_TYPE, op_id: int):
+    query = update.callback_query
+    user_id = str(query.from_user.id)
+    await query.answer()
+    
+    try:
+        response = supabase.table('operations').select('*').eq('id', op_id).execute()
+        operation = response.data[0] if response.data else None
+        
+        if operation:
+            current_price = get_current_price(operation['asset'], operation['currency'])
+            pips_movidos = calcular_pips_movidos(operation['entry_price'], current_price, operation['asset'])
+            
+            valor_pip = calcular_valor_pip(operation['asset'], CUP_RATE)
+            resultado_actual = pips_movidos * valor_pip * operation['apalancamiento']
+            
+            if operation['operation_type'] == 'sell':
+                resultado_actual = -resultado_actual
+                
+            asset = ASSETS[operation['asset']]
+            operation_type = "COMPRA" if operation['operation_type'] == 'buy' else "VENTA"
+            resultado_text = f"{resultado_actual:.2f} CUP" if resultado_actual >= 0 else f"{resultado_actual:.2f} CUP"
+            emoji_resultado = "✅" if resultado_actual >= 0 else "❌"
+            
+            sl_alcanzado = False
+            tp_alcanzado = False
+            
+            if operation['sl_price']:
+                if (operation['operation_type'] == 'buy' and current_price <= operation['sl_price']) or \
+                   (operation['operation_type'] == 'sell' and current_price >= operation['sl_price']):
+                    sl_alcanzado = True
+                    
+            if operation['tp_price']:
+                if (operation['operation_type'] == 'buy' and current_price >= operation['tp_price']) or \
+                   (operation['operation_type'] == 'sell' and current_price <= operation['tp_price']):
+                    tp_alcanzado = True
+            
+            message = (
+                f"{emoji_resultado} Estado de operación\n\n"
+                f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+                f"Operación: {operation_type}\n"
+                f"Apalancamiento: x{operation['apalancamiento']}\n"
+                f"Precio entrada: {operation['entry_price']:.8f}\n"
+                f"Precio actual: {current_price:.8f}\n"
+                f"Pips movidos: {pips_movidos:.2f}\n"
+                f"Resultado actual: {resultado_text}\n"
+            )
+            
+            if sl_alcanzado:
+                message += "\n🛑 Stop Loss alcanzado"
+            elif tp_alcanzado:
+                message += "\n🎯 Take Profit alcanzado"
+                
+            if sl_alcanzado or tp_alcanzado:
+                message += "\n\nConsidera cerrar la operación."
+                
+            await query.edit_message_text(message, reply_markup=get_operation_detail_keyboard(op_id))
+        else:
+            await query.edit_message_text("❌ Operación no encontrada.")
+    except Exception as e:
+        logger.error(f"Error comprobando operación: {e}")
+        await query.edit_message_text("❌ Error al comprobar la operación.")
+
+# Comando para establecer saldo (solo admin)
+async def set_saldo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⚠️ Comando solo disponible para el administrador.")
+        return
+        
+    if not context.args or len(context.args) != 2:
+        await update.message.reply_text("Uso: /setsaldo <user_id> <monto>")
+        return
+        
+    try:
+        target_user_id = context.args[0]
+        monto = float(context.args[1])
+        
+        nuevo_saldo = actualizar_saldo(target_user_id, monto)
+        await update.message.reply_text(f"✅ Saldo de {target_user_id} actualizado a {nuevo_saldo:.2f} CUP")
+    except ValueError:
+        await update.message.reply_text("❌ Monto inválido.")
+    except Exception as e:
+        logger.error(f"Error estableciendo saldo: {e}")
+        await update.message.reply_text("❌ Error al establecer el saldo.")
+
+# Comando para establecer ID de grupo
+async def set_group_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = str(update.message.from_user.id)
+    if user_id != ADMIN_ID:
+        await update.message.reply_text("⚠️ Solo el administrador puede usar este comando.")
+        return
+        
+    if not context.args:
+        await update.message.reply_text("Uso: /setgroupid <group_id>")
+        return
+        
+    global GROUP_ID
+    GROUP_ID = context.args[0]
+    await update.message.reply_text(f"✅ ID de grupo actualizado a: {GROUP_ID}")
+
+# Comando para obtener ID de chat
+async def get_chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.message.chat_id
+    await update.message.reply_text(f"El ID de este chat es: `{chat_id}`", parse_mode="Markdown")
+
+# Función para procesar selección de apalancamiento
+async def process_leverage_selection(update, context, asset_id, currency, operation_type, leverage):
+    asset = ASSETS[asset_id]
+    price = get_current_price(asset_id, currency)
+    
+    operation_type_text = "COMPRA" if operation_type == "buy" else "VENTA"
+    
+    context.user_data['trade_data'] = {
+        'asset_id': asset_id,
+        'currency': currency,
+        'operation_type': operation_type,
+        'leverage': leverage,
+        'entry_price': price
+    }
+    
+    message = (
+        f"📊 Configuración de operación\n\n"
+        f"{asset['emoji']} {asset['name']} ({asset['symbol']})\n"
+        f"Operación: {operation_type_text}\n"
+        f"Apalancamiento: x{leverage}\n"
+        f"Precio actual: {price:.8f} {currency}\n\n"
+        f"Por favor, envía el monto que deseas arriesgar (en CUP):"
+    )
+    
+    if hasattr(update, 'edit_message_text'):
+        await update.edit_message_text(message)
+    else:
+        await update.message.reply_text(message)
+    
+    context.user_data['state'] = 'esperando_monto_riesgo'
+
+# Función unificada para mensajes de texto
+async def handle_text_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_data = context.user_data
+    state = user_data.get('state')
+    text = update.message.text.strip()
+    
+    if state == 'esperando_monto_riesgo':
+        await recibir_monto_riesgo(update, context)
+    elif state in ['esperando_sl', 'esperando_tp']:
+        await set_sl_tp(update, context)
+    elif state in ['solicitud_deposito', 'solicitud_retiro']:
+        await recibir_monto(update, context)
+    elif state == 'solicitud_retiro_datos':
+        await recibir_datos(update, context)
+    elif 'rechazando_solicitud' in user_data:
+        await recibir_motivo(update, context)
+    elif 'awaiting_custom_leverage' in user_data:
+        await recibir_apalancamiento(update, context)
+    elif 'modifying_sl' in user_data or 'modifying_tp' in user_data:
+        try:
+            value = float(text)
+            if 'modifying_sl' in user_data:
+                op_id = user_data['modifying_sl']
+                supabase.table('operations').update({'sl_price': value}).eq('id', op_id).execute()
+                await update.message.reply_text("✅ Stop Loss actualizado correctamente.")
+                del user_data['modifying_sl']
+            elif 'modifying_tp' in user_data:
+                op_id = user_data['modifying_tp']
+                supabase.table('operations').update({'tp_price': value}).eq('id', op_id).execute()
+                await update.message.reply_text("✅ Take Profit actualizado correctamente.")
+                del user_data['modifying_tp']
+        except ValueError:
+            await update.message.reply_text("❌ Por favor, envía un número válido.")
+    else:
+        await update.message.reply_text(
+            "No entiendo ese comando. Usa /start para comenzar.",
+            reply_markup=get_navigation_keyboard()
+        )
+
+# Handler para fotos (solo para comprobantes de depósito)
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_data = context.user_data
+    if 'solicitud' in user_data and 'monto' in user_data['solicitud'] and user_data['solicitud']['tipo'] == 'deposito':
+        await recibir_datos(update, context)
+
+# Función keep-alive
+async def keep_alive(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        requests.get("https://google.com", timeout=5)
+        logger.info("✅ Keep-alive ejecutado")
+    except Exception as e:
+        logger.warning(f"⚠️ Keep-alive falló: {e}")
+
+# Manejador de errores global
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+
+# Main con webhook
+def main():
+    PORT = int(os.environ.get('PORT', 10000))
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL', 'https://qvabotcrypto.onrender.com')
+    
+    # Crear aplicación
+    application = Application.builder().token(TOKEN).build()
+    
+    # Añadir handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("setsaldo", set_saldo))
+    application.add_handler(CommandHandler("setgroupid", set_group_id))
+    application.add_handler(CommandHandler("getchatid", get_chat_id))
+    
+    application.add_handler(CallbackQueryHandler(button_click))
+    
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_messages))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    # Añadir manejador de errores
+    application.add_error_handler(error_handler)
+    
+    # Añadir job de keep-alive
+    job_queue = application.job_queue
+    job_queue.run_repeating(keep_alive, interval=300, first=10)
+    
+    # Iniciar bot
+    if WEBHOOK_URL:
+        application.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            url_path=TOKEN,
+            webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+        )
+    else:
+        application.run_polling()
+
+if __name__ == "__main__":
+    main()
